@@ -5,7 +5,7 @@ This file maps project work to its business and architecture sources. Working in
 ## Project and paths
 
 - Project name: `betterf`
-- Application repository URL: ``
+- Application repository URL: `https://github.com/Samehadel/betterf.git`
 - Application checkout: `app/`
 - Backend implementation: `app/backend/`
 - Frontend implementation: `app/frontend/`
@@ -15,20 +15,18 @@ All local paths in this file are relative to the workspace folder where this fil
 ## Business requirements
 
 - Provider: `Linear` (replace if using another provider)
-- Workspace or organization: `<workspace name or URL>`
-- Project URL or identifier: `<business project URL or identifier>`
-- Team or issue prefix: `<for example, STORE for STORE-123>`
+- Workspace or organization: `https://linear.app/betterf/team/BTF/backlog`
+- Project URL or identifier: `BTF`
+- Team or issue prefix: `BTF-123`
 - Sources: relevant issue descriptions, acceptance criteria, project documents, and linked specifications.
-- Access method: `<available connector, CLI, or browser>`
 
 Use the task's issue identifier or link to locate the relevant requirements within the configured project. A prefix helps locate issues; it does not replace the project identifier or define the task's scope. Follow linked sources needed to understand the requested behavior.
 
 ## Architecture
 
-- Repository URL: `<architecture Git repository URL>`
 - Local checkout: `architecture/`
 - Remote name: `origin` (verify against the checkout)
-- Tracking branch: `<architecture branch name>`
+- Tracking branch: `develop`
 - Version policy: latest committed version on the configured tracking branch, unless the task specifies a tag or commit.
 - Entry point: `architecture/README.md`
 - Shared decisions: `architecture/decisions/`
