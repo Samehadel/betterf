@@ -24,9 +24,10 @@ Use the task's issue identifier or link to locate the relevant requirements with
 
 ## Architecture
 
+- Repository URL: `https://github.com/Samehadel/betterf-architecture.git`
 - Local checkout: `architecture/`
-- Remote name: `origin` (verify against the checkout)
-- Tracking branch: `develop`
+- Remote name: `origin`
+- Tracking branch: `main`
 - Version policy: latest committed version on the configured tracking branch, unless the task specifies a tag or commit.
 - Entry point: `architecture/README.md`
 - Shared decisions: `architecture/decisions/`
