@@ -1,0 +1,88 @@
+<ng-container *transloco="let t">
+<a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+<header class="top" id="top"><nav class="wrap" aria-label="Main navigation"><a class="brand" href="#top"><span class="logo" aria-hidden="true"></span>
+{{ t('landing.betterf') }}<span style="color:var(--accent)">.</span>
+</a>
+<a class="navlink" href="#why">{{ t('landing.why_betterf') }}</a>
+<a class="navlink" href="#workflow">{{ t('landing.the_vision') }}</a>
+<a class="button secondary" href="#workflow">{{ t('landing.explore_the_vision') }}<span aria-hidden="true">↗</span>
+</a>
+</nav>
+</header>
+<main class="wrap" id="main" tabindex="-1"><section class="hero center"><p class="eyebrow">{{ t('landing.organizational_memory_made_useful') }}</p>
+<h1>{{ t('landing.great_teams_shouldn_t') }}<br>{{ t('landing.have_to') }}<em>{{ t('landing.learn_twice') }}</em>
+</h1>
+<p class="lead">{{ t('landing.hero_description') }}</p>
+<div class="actions"><a class="button" href="#workflow">{{ t('landing.explore_the_vision') }}<span aria-hidden="true">↗</span>
+</a>
+<a class="button secondary" href="#why">{{ t('landing.explore_the_idea') }}<span aria-hidden="true">↓</span>
+</a>
+</div>
+</section>
+<section id="workflow" aria-label="Illustrative product preview"><div class="preview"><div class="previewbar"><span class="dots" aria-hidden="true">● ● ●</span>
+<span>{{ t('landing.acme_workspace_team_memory') }}</span>
+<span>{{ t('landing.illustrative_preview') }}</span>
+</div>
+<div class="app"><aside class="sidebar"><strong>◈ &nbsp;{{ t('landing.acme_engineering') }}</strong>
+<div class="sideitem active">◫ &nbsp;{{ t('landing.team_memory') }}</div>
+<div class="sideitem">◇ &nbsp;{{ t('landing.decisions') }}</div>
+<div class="sideitem">↗ &nbsp;{{ t('landing.sources') }}</div>
+<div class="sideitem">◎ &nbsp;{{ t('landing.people') }}</div>
+</aside>
+<div class="appmain"><div class="search"><span>⌕ &nbsp;{{ t('landing.find_a_problem_decision_or_lesson') }}</span>
+<span>{{ t('landing.preview_shortcut') }}</span>
+</div>
+<div class="appheading"><h2 class="preview-title">{{ t('landing.knowledge_worth_keeping') }}</h2>
+<span class="tag">{{ t('landing.team_memory') }}</span>
+</div>
+<div class="row"><span class="symbol">✓</span>
+<span>{{ t('landing.what_fixed_the_checkout_timeout') }}</span>
+<span class="small">{{ t('landing.problem_resolved') }}&nbsp; · &nbsp;{{ t('landing.today') }}</span>
+</div>
+<div class="row"><span class="symbol">◇</span>
+<span>{{ t('landing.why_we_chose_asynchronous_exports') }}</span>
+<span class="small">{{ t('landing.decision') }}&nbsp; · &nbsp;{{ t('landing.yesterday') }}</span>
+</div>
+<div class="row"><span class="symbol">↗</span>
+<span>{{ t('landing.what_we_learned_from_the_release') }}</span>
+<span class="small">{{ t('landing.lesson') }}&nbsp; · &nbsp;{{ t('landing.mon') }}</span>
+</div>
+</div>
+</div>
+</div>
+<p class="caption center">{{ t('landing.preview_caption') }}</p>
+</section>
+<section class="section" id="why"><div class="sectionhead"><div><p class="eyebrow">{{ t('landing.less_rediscovery_more_progress') }}</p>
+<h2>{{ t('landing.your_work_has_context') }}<br>{{ t('landing.give_it_a_place_to_stay') }}</h2>
+</div>
+<p>{{ t('landing.value_description') }}</p>
+</div>
+<div class="grid"><article class="card"><span class="number">{{ t('landing.01_preserve') }}</span>
+<h3>{{ t('landing.keep_the_reasoning') }}</h3>
+<p>{{ t('landing.preserve_description') }}</p>
+</article>
+<article class="card"><span class="number">{{ t('landing.02_connect') }}</span>
+<h3>{{ t('landing.bring_the_evidence') }}</h3>
+<p>{{ t('landing.connect_description') }}</p>
+</article>
+<article class="card"><span class="number">{{ t('landing.03_reuse') }}</span>
+<h3>{{ t('landing.move_forward_together') }}</h3>
+<p>{{ t('landing.reuse_description') }}</p>
+</article>
+</div>
+</section>
+<section class="section" id="start"><div class="cta"><div><p class="eyebrow">{{ t('landing.a_better_starting_point') }}</p>
+<h2>{{ t('landing.make_experience_a_team_asset') }}</h2>
+<p>{{ t('landing.closing_description') }}</p>
+</div>
+<a class="button" href="#workflow">{{ t('landing.explore_the_vision') }}<span aria-hidden="true">↗</span>
+</a>
+</div>
+</section>
+</main>
+<div class="wrap"><footer><div class="foot"><span>{{ t('landing.footer') }}</span>
+</div>
+</footer>
+</div>
+
+</ng-container>
