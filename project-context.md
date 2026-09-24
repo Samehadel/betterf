@@ -6,7 +6,8 @@ This file maps project work to its business and architecture sources. Working in
 
 - Project name: `betterf`
 - Application repository URL: `https://github.com/Samehadel/betterf.git`
-- Application checkout: `app/`
+- Application checkout: workspace root (`./`); implementation directories remain under `app/`.
+- Layout override: the current application Git repository is at the workspace root; `architecture/` remains a separate ignored repository. Run application Git commands from the workspace root. CI workflows live in `.github/workflows/`.
 - Backend implementation: `app/backend/`
 - Frontend implementation: `app/frontend/`
 
