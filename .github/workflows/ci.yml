@@ -27,6 +27,7 @@ jobs:
         run: |
           npm ci
           npm test
+          npm run typecheck
           npm run build
           npx playwright install --with-deps chromium
       - name: Start local stack and verify browser communication

@@ -6,7 +6,7 @@ Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot b
 
 The current Git checkout is rooted above this directory: application code lives under `app/backend` and `app/frontend`; CI lives at `.github/workflows/ci.yml`. The architecture repository is a separate sibling at `architecture/`. The original workspace source map describes a separate application checkout; this implementation preserves the root repository layout observed during setup. Run the commands below from `app/` unless another directory is stated.
 
-Architecture consulted: `6d36b622ee93b719abf37e1500e904069bd23421`, verified against freshly fetched `origin/main`. Delivered design and contracts: `../architecture/foundation.md`. Significant implementation choices are recorded in `../architecture/decisions/0002-local-foundation.md`.
+Architecture baseline consulted for develop integration: `ab3aa138af3f1b0d23d12661cc1c5849ab54a5ab`. Backend contracts are recorded in `backend/src/main/resources/openapi.yaml`. The removed `foundation.md` is not required.
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ From `app/`, in separate terminals:
 ./scripts/frontend.sh
 ```
 
-Open http://127.0.0.1:4200. The shell should display **Connected**. Stop the backend, choose **Check again**, and confirm **Backend unavailable** appears. Restart the backend and choose **Try again** to reconnect.
+Open http://127.0.0.1:4200 for the Orbit landing page. Open http://127.0.0.1:4200/status for the backend diagnostic screen, which should display **Connected**. Stop the backend, choose **Check again**, and confirm **Backend unavailable** appears. Restart the backend and choose **Try again** to reconnect.
 
 ```bash
 curl --fail http://127.0.0.1:8080/actuator/health/readiness
@@ -67,7 +67,7 @@ Use Ctrl-C in each application terminal and `docker compose down` to stop suppor
 | Variable | Purpose / default |
 |---|---|
 | `DB_PASSWORD` | Required local PostgreSQL password |
-| `DB_USER` | PostgreSQL username, `betterf` |
+| `DB_USER` | Required backend username; `.env.example` uses `postgres` |
 | `DB_PORT` | Compose host database port, `5432` |
 | `DB_URL` | Backend JDBC URL, `jdbc:postgresql://127.0.0.1:5432/betterf` |
 | `SERVER_PORT` | Backend port, `8080` |
@@ -97,7 +97,7 @@ With the backend running (the browser runner starts its own Angular server on po
 npm run test:e2e
 ```
 
-Stop a manually started frontend first to free port 4200. If the backend uses a custom port, run `BACKEND_URL=http://127.0.0.1:YOUR_PORT npm run test:e2e`.
+If port 4200 is already occupied, run `E2E_PORT=4320 npm run test:e2e` to test on a separate port. If the backend uses a custom port, run `BACKEND_URL=http://127.0.0.1:YOUR_PORT npm run test:e2e`.
 
 Backend coverage includes real startup/migration history, HTTP envelopes and exclusions, security denial, database outage/recovery, and Spring Modulith boundaries. Jest covers loading, success, malformed responses, service failure/retry, and timeout recovery. Playwright covers live backend communication, a browser-controlled network outage and real reconnect, keyboard interaction, and a narrow viewport. The outage interception verifies client recovery; the backend database outage is tested separately with a real paused PostgreSQL container.
 

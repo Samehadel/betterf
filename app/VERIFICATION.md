@@ -1,25 +1,12 @@
-# BTF-3 verification
+# Develop integration verification — 24 September 2026
 
-Verified locally on 2026-09-22 (Africa/Cairo), macOS arm64, Java 25.0.1, Node 22.23.1, npm 10.9.8, Docker Engine 28.3.2.
+- Backend: `./gradlew check bootJar --rerun-tasks` passed, 7 tests, none skipped. Real disposable PostgreSQL covered migration history, status contract, security denial, readiness/liveness, and database outage/recovery. An executable JAR was built.
+- Frontend: 4 Jest tests, strict type checking, and production build passed.
+- Browser: `E2E_PORT=4320 npm run test:e2e` passed all 4 Chromium tests, covering backend communication/retry, mobile layout, and the public landing page while API requests are unavailable.
+- Packaged backend HTTP probes: readiness and liveness returned UP; `/api/status` returned the expected UP data/error envelope.
+- Routes: `/` is the Orbit landing page; `/status` preserves the backend connection diagnostic. The landing page requires no API or login.
+- Architecture baseline consulted: `ab3aa138af3f1b0d23d12661cc1c5849ab54a5ab`.
 
-Architecture baseline: `6d36b622ee93b719abf37e1500e904069bd23421`, matching freshly fetched `origin/main`. Architecture updates for this implementation are uncommitted changes in the separate architecture repository.
+The local verification stack uses an isolated Compose project `betterf-develop-check` on PostgreSQL port 55433, with the packaged backend on 8080. Credentials are generated into an owner-readable temporary environment file, never committed. Existing `.env` and database data are preserved.
 
-| Check | Result |
-|---|---|
-| `backend/./gradlew check bootJar` | Passed: 7 tests; executable JAR and JaCoCo report generated |
-| `frontend/npm test` | Passed: 4 Jest/TestBed tests |
-| `frontend/npm run build` | Passed: Angular production bundle, approximately 248 kB initial raw size |
-| `frontend/npm run test:e2e` | Passed: 3 Chromium tests against the real backend and local PostgreSQL |
-| `docker compose up -d --wait` | Passed on local DB port 55432; default port 5432 was already occupied |
-| `scripts/backend.sh`, `scripts/frontend.sh` | Both startup commands verified; browser visibly shows Connected |
-| HTTP status/readiness probes | Expected JSON and HTTP 200 verified |
-| npm dependency audit | Zero reported vulnerabilities after pinning patched PostCSS 8.5.28 |
-| Shell syntax, CI YAML parsing, Git whitespace checks | Passed |
-
-Backend tests use disposable PostgreSQL 17.6 containers, real Liquibase migrations, and real HTTP startup/security/readiness checks. Pausing PostgreSQL produces HTTP 503 readiness/status while liveness stays HTTP 200; unpausing recovers. MVC fixture tests separately verify response wrapping, preserved headers/status, no-content/download exclusions, and safe unexpected-error responses.
-
-The browser suite verifies real frontend/backend communication, keyboard retry after an intercepted connection refusal, and a 375px viewport without horizontal overflow. Only the browser outage is substituted; recovery contacts the running backend. The shell was also visually inspected in the in-app browser.
-
-The workflow is configured but has not run on GitHub because no commit or push was requested. Linux CI remains unverified. No tests were skipped. Product authentication, business models, and production deployment are out of scope.
-
-The local preview remains running on http://127.0.0.1:4200 with backend on 8080 and project PostgreSQL on 55432. Its ignored `.env` contains a generated local-only password; no credentials are committed. Stop the applications with Ctrl-C in their launcher terminals and run `docker compose down` from `app/` to stop PostgreSQL while preserving its volume.
+CI is configured to run backend, frontend, and Chromium checks; its remote result is separate from these local checks.
