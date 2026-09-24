@@ -1,0 +1,23 @@
+<main class="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16 sm:px-12">
+  <p class="mb-4 text-xs font-semibold tracking-widest text-sky-800">{{ text()['eyebrow'] }}</p>
+  <h1 class="text-5xl font-semibold tracking-tight sm:text-6xl">{{ text()['title'] }}</h1>
+  <p class="mt-5 text-lg text-slate-600">{{ text()['intro'] }}</p>
+  <section class="mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="connection-heading">
+    <h2 id="connection-heading" class="text-sm font-medium text-slate-500">{{ text()['statusLabel'] }}</h2>
+    <div role="status" aria-live="polite" aria-atomic="true" class="mt-4">
+      @switch (store.connection()) {
+        @case ('loading') { <p class="text-xl font-medium">{{ text()['loading'] }}</p> }
+        @case ('connected') { <p class="text-xl font-medium text-emerald-800">{{ text()['connected'] }}</p> }
+        @case ('unavailable') {
+          <p class="text-xl font-medium text-amber-900">{{ text()['unavailable'] }}</p>
+          <p class="mt-2 text-slate-600">{{ text()['help'] }}</p>
+        }
+      }
+    </div>
+    <button type="button" (click)="store.check()" [disabled]="store.connection() === 'loading'"
+      class="mt-6 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50">
+      {{ store.connection() === 'unavailable' ? text()['retry'] : text()['check'] }}
+    </button>
+  </section>
+  <p class="mt-8 text-sm text-slate-500">{{ text()['footer'] }}</p>
+</main>

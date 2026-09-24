@@ -1,0 +1,15 @@
+{
+  "foundation": {
+    "eyebrow": "APPLICATION FOUNDATION",
+    "title": "BetterF",
+    "intro": "A starting point for what comes next.",
+    "statusLabel": "Backend connection",
+    "loading": "Connecting to the backend\u2026",
+    "connected": "Connected",
+    "unavailable": "Backend unavailable",
+    "help": "Check that the backend and database are running, then try again.",
+    "retry": "Try again",
+    "check": "Check again",
+    "footer": "The application foundation is ready for development."
+  }
+}

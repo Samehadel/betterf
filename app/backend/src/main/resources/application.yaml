@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: betterf
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/betterf}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      data-source-properties:
+        socketTimeout: 3
+        connectTimeout: 2
+      connection-timeout: 2000
+      validation-timeout: 1000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog-master.yaml
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db

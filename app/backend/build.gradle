@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '4.0.8'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+group = 'com.betterf'
+version = '0.0.1-SNAPSHOT'
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+repositories { mavenCentral() }
+dependencyManagement { imports { mavenBom 'org.springframework.modulith:spring-modulith-bom:2.0.8' } }
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+dependencyLocking { lockAllConfigurations() }
+jacoco { toolVersion = '0.8.14' }
+tasks.named('test') { useJUnitPlatform(); finalizedBy jacocoTestReport }
+tasks.named('jacocoTestReport') { dependsOn test; reports { xml.required = true } }

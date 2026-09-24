@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: BetterF foundation API
+  version: 0.0.1
+paths:
+  /api/status:
+    get:
+      operationId: getStatus
+      summary: Check application and database availability
+      security: []
+      responses:
+        '200':
+          description: Application and database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, error]
+                properties:
+                  data:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: {type: string, enum: [UP]}
+                  error: {type: 'null'}
+        '503':
+          description: Database unavailable; safe to retry
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '500':
+          description: Unexpected server failure
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+components:
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [data, error]
+      properties:
+        data: {type: 'null'}
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}

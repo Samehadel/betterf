@@ -1,0 +1,3 @@
+databaseChangeLog:
+  - include:
+      file: db/foundation/20260922-001-baseline.sql
