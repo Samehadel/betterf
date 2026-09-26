@@ -1,7 +1,8 @@
-name: Foundation checks
+name: BetterF checks and deployment
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -57,3 +58,113 @@ jobs:
           path: |
             app/backend/build/reports/
             app/frontend/test-results/
+      - name: Preserve tested backend
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: app/backend/build/libs/backend-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error
+          retention-days: 3
+      - name: Preserve tested frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-browser
+          path: app/frontend/dist/frontend/browser/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+      frontend: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: package/backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-browser
+          path: package/frontend/browser
+      - name: Prepare image contexts
+        run: |
+          mv package/backend/backend-0.0.1-SNAPSHOT.jar package/backend/app.jar
+          cp deploy/aws/backend.Dockerfile package/backend/Dockerfile
+          cp deploy/aws/frontend.Dockerfile package/frontend/Dockerfile
+          cp deploy/aws/nginx.conf package/frontend/nginx.conf
+      - name: Choose lowercase image names
+        id: names
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          repository="${REPOSITORY,,}"
+          echo "backend=ghcr.io/${repository}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${repository}-frontend" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish backend
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: package/backend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.names.outputs.backend }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - name: Publish frontend
+        id: frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: package/frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.names.outputs.frontend }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: development
+    concurrency:
+      group: betterf-development-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          for key in AWS_REGION AWS_DEPLOY_ROLE_ARN EC2_INSTANCE_ID; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Missing development environment variable: $key"
+              exit 1
+            fi
+          done
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Deploy and wait for application health
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          BACKEND_IMAGE: ${{ needs.publish.outputs.backend }}
+          FRONTEND_IMAGE: ${{ needs.publish.outputs.frontend }}
+          AWS_PAGER: ""
+        run: python3 deploy/aws/send-deployment.py

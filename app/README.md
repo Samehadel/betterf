@@ -117,4 +117,8 @@ To intentionally refresh dependency locks after editing versions, run `./gradlew
 
 ## Scope limits
 
+For the first AWS development pipeline and server setup, see
+[AWS deployment](../deploy/aws/README.md). Deployment remains disabled until its
+repository setting and AWS resources are configured.
+
 English is the temporary foundation resource language, not a decision on supported product languages. Authentication, business schema, domain modules, production hosting, and product workflows remain future work. MapStruct/Lombok, JPA, localization, routing, and state tooling are configured without adding demonstration product data.
