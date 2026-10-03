@@ -16,8 +16,9 @@ Deployment is disabled until the repository Actions variable
 2. Install this directory's `compose.yaml` and `deploy.sh` in `/opt/betterf/`
    on the server. Use a root-owned directory with mode 700 and make `deploy.sh`
    executable with mode 700. Create root-only `/opt/betterf/secrets.env` with a
-   generated `DB_PASSWORD` (for example, `openssl rand -hex 32`). Never overwrite an
-   existing database password as part of deployment.
+   Neon `DB_URL` (JDBC URL with TLS), `DB_USER`, and `DB_PASSWORD`. Use the development
+   branch direct endpoint for startup Liquibase migrations. Never overwrite credentials
+   as part of deployment.
 3. Run `sudo docker login ghcr.io --username YOUR_GITHUB_USERNAME` on EC2,
    entering a classic GitHub personal access token with `read:packages` at the
    password prompt. Renew this credential before its expiration.
@@ -53,8 +54,9 @@ There is no automatic rollback. To roll back, review migration compatibility and
 invoke `/opt/betterf/deploy.sh` with the previous two image digests. Never delete
 the database volume to fix a deployment. Use `docker compose` with the same
 Compose and environment files to inspect `ps` and `logs --tail 100`.
-PostgreSQL uses the EC2 disk; off-host backups, HTTPS,
-and a restore rehearsal are needed before real user data.
+PostgreSQL is hosted in Neon; configure and rehearse database recovery there.
+The frontend publishes HTTP port 80 on the host; restrict ingress to your public IP
+for temporary testing. HTTPS is needed before real user data.
 
 AWS uses temporary OIDC credentials ([GitHub documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws)).
 Compose readiness uses [`up --wait`](https://docs.docker.com/reference/cli/docker/compose/up/).
