@@ -20,6 +20,10 @@ jobs:
           node-version: '22.23.1'
           cache: npm
           cache-dependency-path: app/frontend/package-lock.json
+      - name: Check application version metadata
+        run: |
+          node --test scripts/version.test.mjs
+          node scripts/version.mjs --check
       - name: Backend checks and executable JAR
         working-directory: app/backend
         run: ./gradlew check bootJar --no-daemon
@@ -40,7 +44,7 @@ jobs:
           set -a
           source .env
           set +a
-          java -jar backend/build/libs/backend-0.0.1-SNAPSHOT.jar > /tmp/betterf-backend.log 2>&1 &
+          java -jar backend/build/libs/app.jar > /tmp/betterf-backend.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true; docker compose down -v' EXIT
           ready=0
@@ -62,7 +66,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-jar
-          path: app/backend/build/libs/backend-0.0.1-SNAPSHOT.jar
+          path: app/backend/build/libs/app.jar
           if-no-files-found: error
           retention-days: 3
       - name: Preserve tested frontend
@@ -95,7 +99,6 @@ jobs:
           path: package/frontend/browser
       - name: Prepare image contexts
         run: |
-          mv package/backend/backend-0.0.1-SNAPSHOT.jar package/backend/app.jar
           cp deploy/aws/backend.Dockerfile package/backend/Dockerfile
           cp deploy/aws/frontend.Dockerfile package/frontend/Dockerfile
           cp deploy/aws/nginx.conf package/frontend/nginx.conf
