@@ -78,6 +78,17 @@ If changing `DB_PORT`, change the port in `DB_URL` too. If changing `SERVER_PORT
 
 Spring Security permits only GET status and the two probe endpoints. All other routes are denied, CSRF remains enabled, and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
 
+## Application version
+
+The repository root `VERSION` is authoritative. Gradle reads it; frontend package
+metadata is synchronized with `node scripts/version.mjs --sync` from the repository
+root. CI runs `--check` and fails on drift. Ordinary PRs do not need version bumps;
+commits and image digests identify development deployments. See the
+[versioning workflow](../architecture/versioning.md) for daily work and release preparation.
+
+The executable backend artifact is always `backend/build/libs/app.jar` relative
+to this directory, independent of the release number.
+
 ## Verify
 
 Backend checks run against their own disposable PostgreSQL container and do not use `.env` or the local development database:
