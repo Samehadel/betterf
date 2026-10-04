@@ -12,24 +12,52 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 class ApiExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    @ExceptionHandler(com.betterf.identity.api.exception.IdentityException.class)
+    ResponseEntity<ApiEnvelope<Void>> identity(
+            com.betterf.identity.api.exception.IdentityException exception) {
+        return ResponseEntity.status(exception.status())
+                .body(ApiEnvelope.failure(exception.code(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    ResponseEntity<ApiEnvelope<Void>> invalid(
+            org.springframework.web.bind.MethodArgumentNotValidException exception) {
+        var message =
+                exception.getBindingResult().getFieldErrors().stream()
+                        .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                        .distinct()
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining(" "));
+        return ResponseEntity.badRequest().body(ApiEnvelope.failure("INVALID_REQUEST", message));
+    }
+
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<ApiEnvelope<Void>> unavailable(DataAccessException exception) {
         LOG.warn("Database readiness check failed", exception);
-        return ResponseEntity.status(503).body(ApiEnvelope.failure("SERVICE_UNAVAILABLE", "The service is temporarily unavailable."));
+        return ResponseEntity.status(503)
+                .body(
+                        ApiEnvelope.failure(
+                                "SERVICE_UNAVAILABLE", "The service is temporarily unavailable."));
     }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiEnvelope<Void>> handle(Exception exception) {
         int status = exception instanceof ErrorResponse error ? error.getStatusCode().value() : 500;
-        String code = switch (status) {
-            case 400 -> "INVALID_REQUEST";
-            case 403 -> "ACCESS_DENIED";
-            case 404 -> "NOT_FOUND";
-            case 405 -> "METHOD_NOT_ALLOWED";
-            default -> status < 500 ? "INVALID_REQUEST" : "INTERNAL_ERROR";
-        };
+        String code =
+                switch (status) {
+                    case 400 -> "INVALID_REQUEST";
+                    case 403 -> "ACCESS_DENIED";
+                    case 404 -> "NOT_FOUND";
+                    case 405 -> "METHOD_NOT_ALLOWED";
+                    default -> status < 500 ? "INVALID_REQUEST" : "INTERNAL_ERROR";
+                };
         if (status >= 500) LOG.error("Unhandled request failure", exception);
-        return ResponseEntity.status(status).body(ApiEnvelope.failure(code,
-            status >= 500 ? "An unexpected error occurred." : "The request could not be processed."));
+        return ResponseEntity.status(status)
+                .body(
+                        ApiEnvelope.failure(
+                                code,
+                                status >= 500
+                                        ? "An unexpected error occurred."
+                                        : "The request could not be processed."));
     }
 }

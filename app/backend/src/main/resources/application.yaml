@@ -11,6 +11,18 @@ spring:
         connectTimeout: 2
       connection-timeout: 2000
       validation-timeout: 1000
+  mail:
+    host: ${SMTP_HOST:127.0.0.1}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SMTP_AUTH:false}
+      "[mail.smtp.starttls.enable]": ${SMTP_STARTTLS:false}
+      "[mail.smtp.starttls.required]": ${SMTP_STARTTLS:false}
+      "[mail.smtp.connectiontimeout]": 2000
+      "[mail.smtp.timeout]": 2000
+      "[mail.smtp.writetimeout]": 2000
   jpa:
     open-in-view: false
     hibernate:
@@ -20,6 +32,13 @@ spring:
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:true}
   error:
     include-message: never
     include-stacktrace: never
@@ -36,3 +55,8 @@ management:
       group:
         readiness:
           include: readinessState,db
+
+betterf:
+  registration:
+    public-origin: ${PUBLIC_ORIGIN:http://127.0.0.1:4200}
+    mail-from: ${MAIL_FROM:no-reply@betterf.local}

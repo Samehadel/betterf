@@ -115,3 +115,25 @@ h2{margin-bottom:24px}
 button:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
 button{cursor:pointer}
 button:disabled{cursor:wait}
+
+/* Shared account form controls. */
+.identity-input {
+  @apply block w-full mt-2 rounded-md border px-3 py-3;
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.identity-input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.identity-input[aria-invalid="true"] {
+  border-color: #fca5a5;
+}
+
+button:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}

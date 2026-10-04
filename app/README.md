@@ -1,6 +1,6 @@
 # BetterF application foundation
 
-Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot backend, Angular shell, PostgreSQL, Liquibase, and automated checks. Product features and account workflows are intentionally deferred.
+Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot backend, Angular shell, PostgreSQL, Liquibase, and automated checks. BTF-5 adds organization registration, administrator email verification, and password-based account access.
 
 ## Repository layout
 
@@ -76,7 +76,7 @@ Use Ctrl-C in each application terminal and `docker compose down` to stop suppor
 
 If changing `DB_PORT`, change the port in `DB_URL` too. If changing `SERVER_PORT`, update `BACKEND_URL`. Browser requests use relative `/api` URLs. The production frontend build requires a host serving the SPA and proxying `/api` on the same origin; production deployment is not supplied by this story.
 
-Spring Security permits only GET status and the two probe endpoints. All other routes are denied, CSRF remains enabled, and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
+Spring Security permits the status/probe endpoints and the documented registration and authentication endpoints. Mutations require CSRF; company access requires an authenticated account and active account/organization statuses. Unknown endpoints remain denied and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
 
 ## Application version
 
@@ -132,4 +132,43 @@ For the first AWS development pipeline and server setup, see
 [AWS deployment](../deploy/aws/README.md). Deployment remains disabled until its
 repository setting and AWS resources are configured.
 
-English is the temporary foundation resource language, not a decision on supported product languages. Authentication, business schema, domain modules, production hosting, and product workflows remain future work. MapStruct/Lombok, JPA, localization, routing, and state tooling are configured without adding demonstration product data.
+English is the temporary foundation resource language, not a decision on supported product languages. Organization onboarding and session authentication are implemented in the identity module. Invitation/member workflows and password recovery remain separate work. No demonstration product accounts are installed.
+
+
+## Organization registration (BTF-5)
+
+The landing page links to `/register` and `/login`. Registration persists a pending
+organization, pending account, and a separate reusable verification email record.
+Only email verification activates the organization/account and establishes ADMIN
+access. Pending organizations do not reserve domains; only one can become active
+for a domain. Login requires both statuses to be ACTIVE.
+
+This follows the product owner's 2026-10-04 correction to BTF-5's earlier
+no-company-status wording. Architecture baseline: `0765baaa675be6232b9df9c025d415dca1ab3f49`;
+implementation decisions are in architecture ADR 0005.
+
+For local email capture, run `docker compose up -d --wait` with the supplied
+Mailpit service. Open http://127.0.0.1:8025 to read verification emails.
+For local HTTP only, set `SESSION_COOKIE_SECURE=false` in the backend environment.
+Set `PUBLIC_ORIGIN` to the browser origin (default http://127.0.0.1:4200).
+`SMTP_HOST` defaults to 127.0.0.1 and `SMTP_PORT` to 1025. Production requires a
+configured SMTP sender and credentials (`MAIL_FROM`, `SMTP_USER`, `SMTP_PASSWORD`,
+`SMTP_AUTH=true`, `SMTP_STARTTLS=true`) and HTTPS with secure session cookies.
+The deployment compose file must receive these settings before public release.
+
+Email state is PENDING/SENT/FAILED, with attempt count, timestamps, and a safe
+failure code. SENT means SMTP accepted delivery, not confirmed inbox delivery.
+Failed sends retain pending data and a previous working credential. Request a
+new email to retry; successful resends rotate the credential after a 60-second
+cooldown. Links expire at 24 hours. Repeated form submission never overwrites
+an existing pending account's password/profile. Pending data older than 30 days
+is removed in hourly batches of at most 100. Invitations and member views remain
+separate stories. Password recovery ownership and ingress abuse controls are
+release dependencies; this story does not deploy the account-access experience.
+
+The API contract includes CSRF, session login/logout, and the registration routes.
+Run `./gradlew check bootJar` for PostgreSQL integration and module checks, and
+frontend `npm test`, `npm run typecheck`, `npm run build`, and `npm run test:e2e`.
+Onboarding browser tests require Mailpit (HTTP API defaults to localhost:8025;
+override `MAILPIT_URL`) and a fresh disposable database. They send only local
+captured test emails.
