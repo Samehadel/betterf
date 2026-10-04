@@ -29,6 +29,10 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog-master.yaml
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
@@ -39,9 +43,6 @@ server:
         http-only: true
         same-site: lax
         secure: ${SESSION_COOKIE_SECURE:true}
-  error:
-    include-message: never
-    include-stacktrace: never
 management:
   endpoints:
     web:
