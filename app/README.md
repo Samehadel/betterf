@@ -1,6 +1,6 @@
 # BetterF application foundation
 
-Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot backend, Angular shell, PostgreSQL, Liquibase, and automated checks. Product features and account workflows are intentionally deferred.
+Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot backend, Angular shell, PostgreSQL, Liquibase, and automated checks. BTF-5 adds organization registration, administrator email verification, and password-based account access.
 
 ## Repository layout
 
@@ -76,7 +76,7 @@ Use Ctrl-C in each application terminal and `docker compose down` to stop suppor
 
 If changing `DB_PORT`, change the port in `DB_URL` too. If changing `SERVER_PORT`, update `BACKEND_URL`. Browser requests use relative `/api` URLs. The production frontend build requires a host serving the SPA and proxying `/api` on the same origin; production deployment is not supplied by this story.
 
-Spring Security permits only GET status and the two probe endpoints. All other routes are denied, CSRF remains enabled, and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
+Spring Security permits the status/probe endpoints and the documented registration and authentication endpoints. Mutations require CSRF; company access requires an authenticated account and active account/organization statuses. Unknown endpoints remain denied and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
 
 ## Application version
 
@@ -132,4 +132,110 @@ For the first AWS development pipeline and server setup, see
 [AWS deployment](../deploy/aws/README.md). Deployment remains disabled until its
 repository setting and AWS resources are configured.
 
-English is the temporary foundation resource language, not a decision on supported product languages. Authentication, business schema, domain modules, production hosting, and product workflows remain future work. MapStruct/Lombok, JPA, localization, routing, and state tooling are configured without adding demonstration product data.
+English is the temporary foundation resource language, not a decision on supported product languages. Organization onboarding and session authentication are implemented in the identity module. Invitation/member workflows and password recovery remain separate work. No demonstration product accounts are installed.
+
+
+## Organization registration (BTF-5)
+
+The landing page links to `/register` and `/login`. Registration persists a pending
+organization, pending account, and a separate reusable verification email record.
+Only email verification activates the organization/account and establishes ADMIN
+access. Pending organizations do not reserve domains; only one can become active
+for a domain. Login requires both statuses to be ACTIVE.
+
+New passwords require 10–128 characters, an uppercase letter, and a special
+character (punctuation or symbol). Spaces alone do not satisfy the special-character
+requirement. Browser and API apply the same checks; existing login passwords are
+not revalidated against the new registration policy.
+
+Opening a valid email link automatically submits the token to the CSRF-protected
+verification API. First-time verification creates the authenticated session and
+rotates the session ID and CSRF token; the browser goes directly to `/company`.
+The `/verify` route is only a transient link handler, with recovery shown for invalid
+or expired links. No email re-entry or confirmation click is needed for valid links.
+An already-used link cannot create another session: an existing matching session
+returns home, otherwise the page offers password login.
+
+This follows the product owner's 2026-10-04 correction to BTF-5's earlier
+no-company-status wording. Architecture baseline: `0765baaa675be6232b9df9c025d415dca1ab3f49`;
+implementation decisions are in architecture ADR 0005.
+
+For local email capture, run `docker compose up -d --wait` with the supplied
+Mailpit service. Open http://127.0.0.1:8025 to read verification emails.
+For local HTTP only, set `SESSION_COOKIE_SECURE=false` in the backend environment.
+Set `PUBLIC_ORIGIN` to the browser origin (default http://127.0.0.1:4200).
+`SMTP_HOST` defaults to 127.0.0.1 and `SMTP_PORT` to 1025. Production requires a
+configured SMTP sender and credentials (`MAIL_FROM`, `SMTP_USER`, `SMTP_PASSWORD`,
+`SMTP_AUTH=true`, `SMTP_STARTTLS=true`) and HTTPS with secure session cookies.
+The deployment compose file must receive these settings before public release.
+
+Email sending runs in a background worker every five seconds, in batches of 25.
+A PostgreSQL session advisory lock on a dedicated connection prevents overlapping
+runs across application instances. Use direct PostgreSQL or session pooling;
+transaction-mode PgBouncer cannot hold this lock. Allow at least two connections
+per worker instance. `BETTERF_REGISTRATION_DELIVERY_ENABLED=false` disables the
+scheduler; `BETTERF_REGISTRATION_DELIVERY_DELAY` sets its interval in milliseconds.
+
+The additive migration converts existing SENT records to SMTP_ACCEPTED and schedules
+existing PENDING/FAILED records. Stop old application instances before applying it:
+the earlier application cannot read the new delivery statuses.
+
+States are PENDING, SENDING, SMTP_ACCEPTED, FAILED, and CANCELLED. The worker commits
+SENDING before contacting SMTP. SMTP_ACCEPTED means the relay accepted the message,
+**not confirmed inbox delivery**. SMTP_MESSAGE_ID supports provider-log correlation.
+The UI polls status and distinguishes queued, failed/retrying, and accepted.
+Failures record a safe code and retry after 60, 120, 240, 480, then 900 seconds,
+with later delays capped at 900 seconds. Repeated requests coalesce while queued
+or retrying. An accepted replacement rotates the token; a failure preserves the
+previous valid token. Acceptance starts the 60-second resend cooldown; links expire
+after 24 hours. Ineligible registrations are cancelled.
+
+The worker never picks up SENDING rows. A crash or database failure after SMTP
+submission may leave one for investigation. Check provider logs and stop all
+workers before manually returning a confirmed abandoned attempt to FAILED with
+NEXT_ATTEMPT_AT set to CURRENT_TIMESTAMP. Never reset a live attempt. SMTP and
+PostgreSQL cannot commit atomically; an ambiguous network failure can cause duplicate
+messages on retry. No raw token is stored for replay.
+
+Repeated submission never overwrites an existing pending account's profile. Hourly
+cleanup removes pending data older than 30 days in batches of 100, excluding SENDING.
+Invitations, member views, password recovery, and ingress abuse controls remain
+separate release dependencies.
+
+### Brevo SMTP configuration
+
+Supply these in the backend process environment (or source your untracked `app/.env`
+before starting Java; Spring Boot does not automatically load that file):
+
+```dotenv
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=<Brevo SMTP login>
+SMTP_PASSWORD=<Brevo SMTP key, not the API key>
+SMTP_AUTH=true
+SMTP_STARTTLS=true
+MAIL_FROM=<sender address verified in Brevo>
+PUBLIC_ORIGIN=http://127.0.0.1:4200
+SESSION_COOKIE_SECURE=false
+```
+
+Use HTTPS and `SESSION_COOKIE_SECURE=true` outside local HTTP development. The SMTP
+login and MAIL_FROM are different settings. The default `no-reply@betterf.local`
+is rejected for remote SMTP with `SMTP_FROM_NOT_CONFIGURED`. Authentication errors
+use `SMTP_AUTHENTICATION_FAILED`; other submission failures use `SMTP_DELIVERY_FAILED`.
+Fix configuration and restart; FAILED rows retry when due.
+
+If Brevo receives a message but does not deliver it, inspect **Transactional > Logs**
+by recipient/time or SMTP_MESSAGE_ID for bounce, block, and suppression results.
+Check sender/domain verification and whether transactional sending is active.
+Accepted submissions are not retried automatically because downstream delivery
+cannot be inferred from SMTP. Provider webhooks are outside this change. References:
+[Brevo SMTP troubleshooting](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP)
+and [transactional logs](https://help.brevo.com/hc/en-us/articles/360021533839-Manage-your-transactional-logs-and-email-previews).
+
+The API contract includes CSRF, session login/logout, and the registration routes.
+Run `./gradlew check bootJar` for PostgreSQL integration and module checks, and
+frontend `npm test`, `npm run typecheck`, `npm run build`, and `npm run test:e2e`.
+Onboarding browser tests require Mailpit (HTTP API defaults to localhost:8025;
+override `MAILPIT_URL`) and a fresh disposable database. They send only local
+captured test emails.

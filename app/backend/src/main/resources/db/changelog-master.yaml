@@ -1,3 +1,7 @@
 databaseChangeLog:
   - include:
       file: db/foundation/20260922-001-baseline.sql
+  - include:
+      file: db/identity/20261004-001-registration.sql
+  - include:
+      file: db/identity/20261004-002-email-worker.sql

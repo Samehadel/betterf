@@ -1,48 +1,619 @@
 openapi: 3.1.0
 info:
-  title: BetterF foundation API
-  version: 0.0.1
+  title: BetterF API
+  version: 0.1.1
+  description:
+    'BTF-5 implementation follows the product owner correction of 2026-10-04: separate account,
+    organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
+    Secure by default), 30-minute inactivity timeout. All mutations require CSRF.'
 paths:
   /api/status:
     get:
       operationId: getStatus
-      summary: Check application and database availability
+      summary: Application and database availability
       security: []
       responses:
         '200':
-          description: Application and database available
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required: [data, error]
-                properties:
-                  data:
-                    type: object
-                    required: [status]
-                    properties:
-                      status: {type: string, enum: [UP]}
-                  error: {type: 'null'}
+                $ref: '#/components/schemas/StatusEnvelope'
         '503':
-          description: Database unavailable; safe to retry
+          description: Database unavailable
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/registration/roles:
+    get:
+      operationId: getProfessionalRoles
+      summary: Predefined professional roles for onboarding
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesEnvelope'
+  /api/registration:
+    post:
+      operationId: registerOrganization
+      summary:
+        Persist PENDING organization and account and queue verification email. Repeated email submission
+        reuses original data without overwriting credentials or sending again.
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingEnvelope'
+        '400':
+          description: Invalid required input or link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Missing/invalid CSRF or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Database unavailable; queued email delivery happens asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '500':
-          description: Unexpected server failure
+          description:
+            Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
+            behavior.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+  /api/registration/resend:
+    post:
+      operationId: resendVerification
+      summary: Queue a replacement using the same email row. Coalesce pending or retrying requests.
+        The worker retries failures and rotates the token only after SMTP acceptance.
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingEnvelope'
+        '400':
+          description: Invalid required input or link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Missing/invalid CSRF or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Database unavailable; queued email delivery happens asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description:
+            Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
+            behavior.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description:
+            'RESEND_COOLDOWN: wait 60 seconds since the last successful send; current link
+            unchanged'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+  /api/registration/status:
+    post:
+      operationId: getRegistrationDeliveryStatus
+      summary: Read current delivery state; email is in the body to avoid URL access logs.
+      security: []
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf with its session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      responses:
+        '200':
+          description: Current status; SMTP_ACCEPTED does not mean inbox delivery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingEnvelope'
+        '400':
+          description: Invalid input or registration not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Missing or invalid CSRF.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/registration/verify:
+    post:
+      operationId: verifyRegistration
+      summary:
+        Atomically activate pending account and organization and grant ADMIN. First verification
+        establishes a session and rotates session ID and CSRF. Recheck active-domain uniqueness;
+        losing registrant gets no access. Already-used links never create a new session.
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationEnvelope'
+        '400':
+          description: Invalid required input or link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Missing/invalid CSRF or access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: Database unavailable; queued email delivery happens asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description:
+            Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
+            behavior.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - token
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                token:
+                  type: string
+                  maxLength: 100
+                  writeOnly: true
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+  /api/auth/csrf:
+    get:
+      operationId: getCsrf
+      summary: Establish session and retrieve masked CSRF token. Call before mutations.
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfEnvelope'
+  /api/auth/login:
+    post:
+      operationId: login
+      summary:
+        Email/password login; both account and organization must be ACTIVE. Rotate session ID and
+        CSRF.
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountEnvelope'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: 'LOGIN_FAILED: invalid credentials or inactive account/organization'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Invalid CSRF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                password:
+                  type: string
+                  maxLength: 128
+                  writeOnly: true
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+  /api/auth/me:
+    get:
+      operationId: currentAccount
+      summary: Read active authenticated account and organization; recheck both statuses
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountEnvelope'
+        '403':
+          description: Access denied or account/organization no longer active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: Invalidate session and delete session cookie
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Logged out, no body
+        '403':
+          description: Invalid CSRF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
   schemas:
     ErrorEnvelope:
       type: object
-      required: [data, error]
+      required:
+        - data
+        - error
       properties:
-        data: {type: 'null'}
+        data:
+          type: 'null'
         error:
           type: object
-          required: [code, message]
+          required:
+            - code
+            - message
           properties:
-            code: {type: string}
-            message: {type: string}
+            code:
+              type: string
+            message:
+              type: string
+    Role:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+    Pending:
+      type: object
+      required:
+        - email
+        - resendAvailableAt
+        - deliveryStatus
+      properties:
+        email:
+          type: string
+          format: email
+        resendAvailableAt:
+          type: string
+          format: date-time
+        deliveryStatus:
+          type: string
+          enum:
+            - PENDING
+            - SENDING
+            - SMTP_ACCEPTED
+            - FAILED
+            - CANCELLED
+    Verification:
+      type: object
+      required:
+        - status
+        - account
+      properties:
+        status:
+          type: string
+          enum:
+            - VERIFIED
+            - ALREADY_VERIFIED
+        account:
+          description: Authenticated account after first verification or when this browser already holds its session. Null for an already-used link without a matching session; use password login.
+          oneOf:
+            - $ref: '#/components/schemas/Account'
+            - type: 'null'
+    Csrf:
+      type: object
+      required:
+        - token
+        - headerName
+      properties:
+        token:
+          type: string
+        headerName:
+          type: string
+    Account:
+      type: object
+      required:
+        - id
+        - fullName
+        - email
+        - professionalRole
+        - organizationId
+        - organizationName
+        - accessRole
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        professionalRole:
+          type: string
+        organizationId:
+          type: string
+          format: uuid
+        organizationName:
+          type: string
+        accessRole:
+          type: string
+          enum:
+            - ADMIN
+            - MEMBER
+    Registration:
+      type: object
+      required:
+        - companyName
+        - website
+        - specialization
+        - fullName
+        - email
+        - password
+        - professionalRole
+      properties:
+        companyName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        website:
+          type: string
+          maxLength: 253
+          description:
+            HTTPS registry root domain; root slash optional. No subdomain, non-root path, query,
+            fragment, credentials, or explicit port. Valid multi-label registry suffixes supported.
+        specialization:
+          type: string
+          minLength: 1
+          maxLength: 200
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 10
+          maxLength: 128
+          pattern: '^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$'
+          description: At least one uppercase letter and one punctuation or symbol character. Whitespace alone does not count as a special character.
+          writeOnly: true
+        professionalRole:
+          type: string
+          description: ID returned by GET /api/registration/roles. Unrelated to access role.
+    PendingEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          $ref: '#/components/schemas/Pending'
+        error:
+          type: 'null'
+    VerificationEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          $ref: '#/components/schemas/Verification'
+        error:
+          type: 'null'
+    CsrfEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          $ref: '#/components/schemas/Csrf'
+        error:
+          type: 'null'
+    AccountEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          $ref: '#/components/schemas/Account'
+        error:
+          type: 'null'
+    RolesEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        error:
+          type: 'null'
+    StatusEnvelope:
+      type: object
+      required:
+        - data
+        - error
+      properties:
+        data:
+          type: object
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum:
+                - UP
+        error:
+          type: 'null'
