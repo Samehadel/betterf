@@ -154,6 +154,10 @@ export class IdentityPage {
     const control = this.registration.controls[field];
     return control.invalid && control.touched;
   }
+  loginInvalid(field: keyof typeof this.loginForm.controls) {
+    const control = this.loginForm.controls[field];
+    return control.invalid && control.touched;
+  }
   fieldError(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
     if (control.hasError('required')) return 'identity.errors.' + field;

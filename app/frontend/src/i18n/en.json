@@ -137,6 +137,34 @@
       "outro": "Make what you learn today useful tomorrow."
     },
     "verifying": "Verifying your email and signing you in…",
-    "alreadyVerified": "Your email is already verified. Log in to open your organization."
+    "alreadyVerified": "Your email is already verified. Log in to open your organization.",
+    "loginEyebrow": "Your next chapter",
+    "loginIntro": "Log in to your organization and pick up where you left off.",
+    "loginPasswordError": "Enter your password.",
+    "noAccount": "New to BetterF?",
+    "loginStory": {
+      "eyebrow": "Good to have you back",
+      "title": "A little wiser.",
+      "highlight": "A step further.",
+      "intro": "Progress starts with what you already know. Come back to the ideas, context, and lessons that move your team forward.",
+      "outro": "Every day brings something worth remembering."
+    },
+    "home": {
+      "label": "Organization home",
+      "eyebrow": "A place to grow together",
+      "intro": "Your organization has a home. Here’s to making every lesson count and every next step a little smarter.",
+      "active": "Organization active",
+      "artCaption": "Built on what you learn",
+      "nextEyebrow": "The next chapter",
+      "nextTitle": "Great things start with your team.",
+      "nextDescription": "Your organization is ready. Team invitations and member management are coming in a future update.",
+      "comingSoon": "Coming soon",
+      "teamTools": "Invitations & member management",
+      "profileTitle": "Your account",
+      "access": "Organization access",
+      "administrator": "Administrator",
+      "footer": "Keep the context. Build on the experience. Move forward together.",
+      "loading": "Opening your organization…"
+    }
   }
 }

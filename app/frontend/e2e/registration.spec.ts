@@ -82,7 +82,13 @@ test('landing registration, local email verification, password login and logout'
   await expect(page.getByLabel('Organization email', { exact: true })).toHaveValue(email);
   const link = await latestLink(request, email);
   await page.goto('/login');
-  await page.getByLabel('Organization email', { exact: true }).last().fill(email);
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByText('Enter a valid email address.')).toHaveCSS(
+    'color',
+    'rgb(180, 35, 54)',
+  );
+  await expect(page.getByText('Enter your password.', { exact: true })).toBeVisible();
+  await page.getByLabel('Organization email', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('verify your email');
@@ -93,8 +99,16 @@ test('landing registration, local email verification, password login and logout'
   await page.goto(link);
   await expect(page).toHaveURL(/\/company$/);
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.reload();
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto(link);
   await expect(page).toHaveURL(/\/company$/);
   await page.getByRole('button', { name: 'Log out' }).click();
@@ -104,7 +118,7 @@ test('landing registration, local email verification, password login and logout'
     page.getByText('Your email is already verified. Log in to open your organization.'),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Log in', exact: true }).last().click();
-  await page.getByLabel('Organization email', { exact: true }).last().fill(email);
+  await page.getByLabel('Organization email', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/company$/);
@@ -150,4 +164,8 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   await page.goto(replacement);
   await expect(page).toHaveURL(/\/company$/);
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
