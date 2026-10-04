@@ -39,6 +39,11 @@ public class RegistrationController {
         return identity.resend(request.email());
     }
 
+    @PostMapping("/status")
+    public PendingView deliveryStatus(@Valid @RequestBody ResendRequest request) {
+        return identity.deliveryStatus(request.email());
+    }
+
     @PostMapping("/verify")
     public VerificationView verify(@Valid @RequestBody VerifyRequest request) {
         return identity.verify(request.id(), request.token());

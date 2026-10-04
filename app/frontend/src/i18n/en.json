@@ -73,7 +73,7 @@
     "login": "Log in",
     "logout": "Log out",
     "register": "Register your organization",
-    "intro": "Create your administrator account. Your organization is registered only after you verify your email.",
+    "intro": "Create your administrator account. Your organization becomes active after you verify your email.",
     "company": "Company details",
     "administrator": "Administrator details",
     "companyName": "Company name",
@@ -95,7 +95,7 @@
     "rolesError": "The professional roles could not be loaded.",
     "retry": "Try again",
     "checkEmail": "Check your inbox",
-    "pending": "We have sent a verification link. If you previously registered with this email, use your latest email or request another below. Your organization is not registered yet. The link expires after 24 hours.",
+    "pending": "Our email provider has accepted the verification email. Check your inbox and spam folder. Delivery may take a few minutes. Use the latest link; it expires after 24 hours.",
     "verified": "Your organization is ready",
     "verifiedHint": "Your email is verified. Log in with the email and password you used to register.",
     "verifyHint": "Confirm below to verify your email and complete your organization registration.",
@@ -104,11 +104,13 @@
     "resendTitle": "Need a verification email?",
     "resend": "Send another verification email",
     "cooldown": "You can request another email in {{seconds}} seconds.",
-    "emailSent": "Verification email sent. Use the latest link; earlier links no longer work.",
     "welcome": "Welcome, {{name}}.",
     "adminReady": "You are the organization administrator. Team invitations and member management will be available in a later update.",
     "loginRequired": "Log in with a verified account to access your organization.",
-    "deliveryRetry": "Request a verification email",
-    "failedDelivery": "Your registration is saved, but the last email attempt failed. Request another email below. An earlier link, if any, is unchanged."
+    "deliveryRetry": "Email delivery is delayed",
+    "failedDelivery": "The last email attempt failed. We will retry automatically. An earlier link, if any, is unchanged.",
+    "queued": "Your registration is saved and your verification email is queued. We will send it shortly. Your organization remains inactive until you verify your email.",
+    "deliveryCancelled": "This email request is no longer available. Log in if you have verified your account, or register with another organization.",
+    "deliveryQueued": "Verification email status"
   }
 }

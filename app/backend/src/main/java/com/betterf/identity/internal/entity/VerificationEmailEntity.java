@@ -26,8 +26,13 @@ public class VerificationEmailEntity {
     @Column(nullable = false)
     private int attempts;
 
-    @Column(nullable = false)
     private Instant lastAttemptAt;
+    private Instant nextAttemptAt;
+    private int consecutiveFailures;
+    private UUID attemptId;
+
+    @Column(length = 255)
+    private String smtpMessageId;
 
     private Instant lastSentAt;
 

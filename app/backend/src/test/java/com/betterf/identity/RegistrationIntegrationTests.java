@@ -34,7 +34,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 @Testcontainers
-@SpringBootTest
+@SpringBootTest(properties = "betterf.registration.delivery.enabled=false")
 @AutoConfigureMockMvc
 class RegistrationIntegrationTests {
     @Container
@@ -48,6 +48,7 @@ class RegistrationIntegrationTests {
     }
 
     @Autowired IdentityService identity;
+    @Autowired com.betterf.identity.internal.service.VerificationEmailWorker worker;
     @Autowired PendingRegistrationCleanup cleanup;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
@@ -70,7 +71,7 @@ class RegistrationIntegrationTests {
                             links.put(
                                     call.getArgument(0),
                                     new Link(call.getArgument(1), call.getArgument(2)));
-                            return null;
+                            return "<test-message@example.com>";
                         })
                 .when(mail)
                 .send(anyString(), any(), anyString());
@@ -89,6 +90,7 @@ class RegistrationIntegrationTests {
 
     void register(String email, String domain) {
         identity.register(request(email, domain));
+        worker.runOnce();
     }
 
     void verify(String email) {
@@ -123,6 +125,10 @@ class RegistrationIntegrationTests {
                 .isEqualTo("PENDING");
         assertThat(jdbc.queryForObject("SELECT PASSWORD_HASH FROM ACCOUNT", String.class))
                 .doesNotContain(password);
+        assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
+                .isEqualTo("PENDING");
+        verifyNoInteractions(mail);
+        worker.runOnce();
         assertThat(jdbc.queryForObject("SELECT TOKEN_HASH FROM VERIFICATION_EMAIL", String.class))
                 .doesNotContain(links.get("ada@elsewhere.com").token());
         assertThat(jdbc.queryForObject("SELECT DOMAIN FROM ORGANIZATION", String.class))
@@ -303,6 +309,7 @@ class RegistrationIntegrationTests {
         org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
         when(clock.instant()).thenReturn(start.plusSeconds(60));
         identity.resend("ada@example.com");
+        worker.runOnce();
         var second = links.get("ada@example.com");
         assertThat(second.id()).isEqualTo(first.id());
         assertThat(second.token()).isNotEqualTo(first.token());
@@ -334,6 +341,7 @@ class RegistrationIntegrationTests {
                 .hasMessageContaining("expired");
         assertThat(activeOrganizations()).isZero();
         identity.resend("ada@example.com");
+        worker.runOnce();
         verify("ada@example.com");
         assertThat(activeOrganizations()).isEqualTo(1);
     }
@@ -341,8 +349,7 @@ class RegistrationIntegrationTests {
     @Test
     void failedEmailDeliveryPersistsFailureAndPreservesPreviousTokenOnResend() {
         doThrow(new EmailDeliveryException()).when(mail).send(anyString(), any(), anyString());
-        assertThatThrownBy(() -> register("ada@example.com", "company.com"))
-                .hasMessageContaining("could not send");
+        register("ada@example.com", "company.com");
         assertThat(count("ACCOUNT")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
                 .isEqualTo("FAILED");
@@ -354,16 +361,19 @@ class RegistrationIntegrationTests {
                             links.put(
                                     call.getArgument(0),
                                     new Link(call.getArgument(1), call.getArgument(2)));
-                            return null;
+                            return "<test-message@example.com>";
                         })
                 .when(mail)
                 .send(anyString(), any(), anyString());
-        identity.resend("ada@example.com");
-        var first = links.get("ada@example.com");
+        worker.runOnce();
+        verifyNoInteractions(mail);
         when(clock.instant()).thenReturn(start.plusSeconds(60));
+        worker.runOnce();
+        var first = links.get("ada@example.com");
+        when(clock.instant()).thenReturn(start.plusSeconds(120));
         doThrow(new EmailDeliveryException()).when(mail).send(anyString(), any(), anyString());
-        assertThatThrownBy(() -> identity.resend("ada@example.com"))
-                .hasMessageContaining("could not send");
+        identity.resend("ada@example.com");
+        worker.runOnce();
         assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
                 .isEqualTo("FAILED");
         identity.verify(first.id(), first.token());
@@ -405,7 +415,7 @@ class RegistrationIntegrationTests {
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM ACCOUNT WHERE STATUS='PENDING' AND"
-                                    + " ACCESS_ROLE IS NULL",
+                                        + " ACCESS_ROLE IS NULL",
                                 Integer.class))
                 .isEqualTo(1);
     }
@@ -413,10 +423,11 @@ class RegistrationIntegrationTests {
     @Test
     void simultaneousRegistrationsAndResendsDoNotDuplicateAccountsOrEmails() throws Exception {
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            var a = pool.submit(() -> register("ada@example.com", "company.com"));
-            var b = pool.submit(() -> register("ADA@example.com", "company.com"));
+            var a = pool.submit(() -> identity.register(request("ada@example.com", "company.com")));
+            var b = pool.submit(() -> identity.register(request("ADA@example.com", "company.com")));
             a.get(15, TimeUnit.SECONDS);
             b.get(15, TimeUnit.SECONDS);
+            worker.runOnce();
             assertThat(count("ACCOUNT")).isEqualTo(1);
             org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
             when(clock.instant()).thenReturn(start.plusSeconds(60));
@@ -432,7 +443,8 @@ class RegistrationIntegrationTests {
             var c = pool.submit(resend);
             var d = pool.submit(resend);
             assertThat(List.of(c.get(15, TimeUnit.SECONDS), d.get(15, TimeUnit.SECONDS)))
-                    .containsExactlyInAnyOrder("OK", "RESEND_COOLDOWN");
+                    .containsExactly("OK", "OK");
+            worker.runOnce();
             org.mockito.Mockito.verify(mail, times(2)).send(anyString(), any(), anyString());
         }
     }
@@ -477,5 +489,129 @@ class RegistrationIntegrationTests {
         cleanup.deleteAbandoned();
         assertThat(count("ACCOUNT")).isEqualTo(1);
         assertThat(identity.current("active@example.com").email()).isEqualTo("active@example.com");
+    }
+
+    @Test
+    void committedSendingIsSkippedAndDatabaseLockExcludesAnotherWorker() throws Exception {
+        identity.register(request("ada@example.com", "company.com"));
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        doAnswer(
+                        call -> {
+                            entered.countDown();
+                            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                            return "<accepted@example.com>";
+                        })
+                .when(mail)
+                .send(anyString(), any(), anyString());
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = pool.submit(worker::runOnce);
+            try {
+                assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+                assertThat(
+                                jdbc.queryForObject(
+                                        "SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
+                        .isEqualTo("SENDING");
+                assertThat(worker.runOnce()).isFalse();
+                assertThat(identity.resend("ada@example.com").deliveryStatus())
+                        .isEqualTo("SENDING");
+            } finally {
+                release.countDown();
+            }
+            assertThat(first.get(10, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
+                .isEqualTo("SMTP_ACCEPTED");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT SMTP_MESSAGE_ID FROM VERIFICATION_EMAIL", String.class))
+                .isEqualTo("<accepted@example.com>");
+        jdbc.update(
+                "UPDATE VERIFICATION_EMAIL SET STATUS = 'SENDING', NEXT_ATTEMPT_AT = ?",
+                java.sql.Timestamp.from(start));
+        worker.runOnce();
+        org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
+        when(clock.instant()).thenReturn(start.plus(Duration.ofDays(31)));
+        cleanup.deleteAbandoned();
+        assertThat(count("ACCOUNT")).isEqualTo(1);
+    }
+
+    @Test
+    void retryBackoffDoesNotBlockOtherEmailsAndActivatedAccountsAreCancelled() {
+        identity.register(request("failing@example.com", "first.com"));
+        identity.register(request("working@example.com", "second.com"));
+        doThrow(new EmailDeliveryException("SMTP_AUTHENTICATION_FAILED"))
+                .when(mail)
+                .send(eq("failing@example.com"), any(), anyString());
+        worker.runOnce();
+        assertThat(identity.deliveryStatus("working@example.com").deliveryStatus())
+                .isEqualTo("SMTP_ACCEPTED");
+        assertThat(identity.deliveryStatus("failing@example.com").deliveryStatus())
+                .isEqualTo("FAILED");
+        when(clock.instant()).thenReturn(start.plusSeconds(60));
+        worker.runOnce();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT CONSECUTIVE_FAILURES FROM VERIFICATION_EMAIL WHERE"
+                                        + " RECIPIENT = 'failing@example.com'",
+                                Integer.class))
+                .isEqualTo(2);
+        when(clock.instant()).thenReturn(start.plusSeconds(179));
+        worker.runOnce();
+        org.mockito.Mockito.verify(mail, times(2))
+                .send(eq("failing@example.com"), any(), anyString());
+        identity.resend("working@example.com");
+        verify("working@example.com");
+        worker.runOnce();
+        assertThat(identity.deliveryStatus("working@example.com").deliveryStatus())
+                .isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void deliveryStatusRequiresCsrfAndReturnsQueueState() throws Exception {
+        identity.register(request("ada@example.com", "company.com"));
+        mvc.perform(
+                        post("/api/registration/status")
+                                .contentType("application/json")
+                                .content("{\"email\":\"ada@example.com\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/api/registration/status")
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content("{\"email\":\"ada@example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deliveryStatus").value("PENDING"));
+    }
+
+    @Test
+    void persistenceFailureAfterSmtpAcceptanceLeavesSendingAndReleasesWorkerLock() {
+        identity.register(request("ada@example.com", "company.com"));
+        jdbc.execute(
+                """
+                CREATE FUNCTION reject_email_completion() RETURNS TRIGGER AS $$
+                BEGIN
+                    IF NEW.STATUS = 'SMTP_ACCEPTED' THEN
+                        RAISE EXCEPTION 'Simulated completion failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql
+                """);
+        jdbc.execute(
+                """
+                CREATE TRIGGER reject_email_completion BEFORE UPDATE ON VERIFICATION_EMAIL
+                FOR EACH ROW EXECUTE FUNCTION reject_email_completion()
+                """);
+        try {
+            assertThatThrownBy(worker::runOnce).isInstanceOf(RuntimeException.class);
+            assertThat(identity.deliveryStatus("ada@example.com").deliveryStatus())
+                    .isEqualTo("SENDING");
+            assertThat(worker.runOnce()).isTrue();
+            org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
+        } finally {
+            jdbc.execute("DROP TRIGGER reject_email_completion ON VERIFICATION_EMAIL");
+            jdbc.execute("DROP FUNCTION reject_email_completion()");
+        }
     }
 }

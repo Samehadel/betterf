@@ -13,7 +13,7 @@ export interface Registration {
 export interface Pending {
   email: string;
   resendAvailableAt: string;
-  deliveryStatus: 'PENDING' | 'SENT' | 'FAILED';
+  deliveryStatus: 'PENDING' | 'SENDING' | 'SMTP_ACCEPTED' | 'FAILED' | 'CANCELLED';
 }
 export interface Role {
   id: string;
@@ -55,6 +55,9 @@ export class IdentityApi {
   }
   register(body: Registration) {
     return this.post<Pending>('/api/registration', body);
+  }
+  deliveryStatus(email: string) {
+    return this.post<Pending>('/api/registration/status', { email });
   }
   resend(email: string) {
     return this.post<Pending>('/api/registration/resend', { email });

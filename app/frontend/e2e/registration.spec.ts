@@ -8,18 +8,21 @@ async function latestLink(
 ): Promise<string> {
   let link = '';
   await expect
-    .poll(async () => {
-      const response = await request.get(
-        `${mailpit}/api/v1/search?query=${encodeURIComponent('to:' + email)}`,
-      );
-      const list = await response.json();
-      if (!list.messages?.length) return false;
-      const message = await (
-        await request.get(`${mailpit}/api/v1/message/${list.messages[0].ID}`)
-      ).json();
-      link = /http[^\s]+\/verify#[^\s]+/.exec(message.Text)?.[0] ?? '';
-      return !!link && link !== previous;
-    })
+    .poll(
+      async () => {
+        const response = await request.get(
+          `${mailpit}/api/v1/search?query=${encodeURIComponent('to:' + email)}`,
+        );
+        const list = await response.json();
+        if (!list.messages?.length) return false;
+        const message = await (
+          await request.get(`${mailpit}/api/v1/message/${list.messages[0].ID}`)
+        ).json();
+        link = /http[^\s]+\/verify#[^\s]+/.exec(message.Text)?.[0] ?? '';
+        return !!link && link !== previous;
+      },
+      { timeout: 15000 },
+    )
     .toBe(true);
   return link;
 }
@@ -50,7 +53,9 @@ test('landing registration, local email verification, password login and logout'
   await page.getByLabel('Company website', { exact: true }).fill(`https://browser-${unique}.com`);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({
+    timeout: 15000,
+  });
   await expect(
     page.getByRole('button', { name: 'Send another verification email' }),
   ).toBeDisabled();
@@ -92,7 +97,9 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({
+    timeout: 15000,
+  });
   const old = await latestLink(request, email);
   const resend = page.getByRole('button', { name: 'Send another verification email' });
   await expect(resend).toBeEnabled({ timeout: 65000 });

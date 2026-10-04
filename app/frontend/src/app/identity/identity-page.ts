@@ -47,6 +47,21 @@ export class IdentityPage {
         Math.ceil((Date.parse(this.store.pending()?.resendAvailableAt ?? '') - this.now()) / 1000),
       ) || 0,
   );
+  readonly deliveryMessage = computed(() => {
+    switch (this.store.pending()?.deliveryStatus) {
+      case 'SMTP_ACCEPTED':
+        return 'identity.pending';
+      case 'FAILED':
+        return 'identity.failedDelivery';
+      case 'CANCELLED':
+        return 'identity.deliveryCancelled';
+      default:
+        return 'identity.queued';
+    }
+  });
+  readonly deliveryInProgress = computed(() =>
+    ['PENDING', 'SENDING', 'FAILED'].includes(this.store.pending()?.deliveryStatus ?? ''),
+  );
   private verification: { id: string; token: string } | null = null;
   readonly invalidFragment = signal(false);
   constructor() {
@@ -79,7 +94,14 @@ export class IdentityPage {
       });
     }
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    const deliveryTimer = setInterval(() => {
+      const pending = this.store.pending();
+      if (pending && this.deliveryInProgress()) this.store.refreshDelivery(pending.email);
+    }, 5000);
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(timer);
+      clearInterval(deliveryTimer);
+    });
     effect(() => {
       if (this.mode === 'login' && this.store.account()) void this.router.navigateByUrl('/company');
       if (this.mode === 'company' && this.store.signedOut())

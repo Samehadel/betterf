@@ -156,15 +156,69 @@ configured SMTP sender and credentials (`MAIL_FROM`, `SMTP_USER`, `SMTP_PASSWORD
 `SMTP_AUTH=true`, `SMTP_STARTTLS=true`) and HTTPS with secure session cookies.
 The deployment compose file must receive these settings before public release.
 
-Email state is PENDING/SENT/FAILED, with attempt count, timestamps, and a safe
-failure code. SENT means SMTP accepted delivery, not confirmed inbox delivery.
-Failed sends retain pending data and a previous working credential. Request a
-new email to retry; successful resends rotate the credential after a 60-second
-cooldown. Links expire at 24 hours. Repeated form submission never overwrites
-an existing pending account's password/profile. Pending data older than 30 days
-is removed in hourly batches of at most 100. Invitations and member views remain
-separate stories. Password recovery ownership and ingress abuse controls are
-release dependencies; this story does not deploy the account-access experience.
+Email sending runs in a background worker every five seconds, in batches of 25.
+A PostgreSQL session advisory lock on a dedicated connection prevents overlapping
+runs across application instances. Use direct PostgreSQL or session pooling;
+transaction-mode PgBouncer cannot hold this lock. Allow at least two connections
+per worker instance. `BETTERF_REGISTRATION_DELIVERY_ENABLED=false` disables the
+scheduler; `BETTERF_REGISTRATION_DELIVERY_DELAY` sets its interval in milliseconds.
+
+The additive migration converts existing SENT records to SMTP_ACCEPTED and schedules
+existing PENDING/FAILED records. Stop old application instances before applying it:
+the earlier application cannot read the new delivery statuses.
+
+States are PENDING, SENDING, SMTP_ACCEPTED, FAILED, and CANCELLED. The worker commits
+SENDING before contacting SMTP. SMTP_ACCEPTED means the relay accepted the message,
+**not confirmed inbox delivery**. SMTP_MESSAGE_ID supports provider-log correlation.
+The UI polls status and distinguishes queued, failed/retrying, and accepted.
+Failures record a safe code and retry after 60, 120, 240, 480, then 900 seconds,
+with later delays capped at 900 seconds. Repeated requests coalesce while queued
+or retrying. An accepted replacement rotates the token; a failure preserves the
+previous valid token. Acceptance starts the 60-second resend cooldown; links expire
+after 24 hours. Ineligible registrations are cancelled.
+
+The worker never picks up SENDING rows. A crash or database failure after SMTP
+submission may leave one for investigation. Check provider logs and stop all
+workers before manually returning a confirmed abandoned attempt to FAILED with
+NEXT_ATTEMPT_AT set to CURRENT_TIMESTAMP. Never reset a live attempt. SMTP and
+PostgreSQL cannot commit atomically; an ambiguous network failure can cause duplicate
+messages on retry. No raw token is stored for replay.
+
+Repeated submission never overwrites an existing pending account's profile. Hourly
+cleanup removes pending data older than 30 days in batches of 100, excluding SENDING.
+Invitations, member views, password recovery, and ingress abuse controls remain
+separate release dependencies.
+
+### Brevo SMTP configuration
+
+Supply these in the backend process environment (or source your untracked `app/.env`
+before starting Java; Spring Boot does not automatically load that file):
+
+```dotenv
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=<Brevo SMTP login>
+SMTP_PASSWORD=<Brevo SMTP key, not the API key>
+SMTP_AUTH=true
+SMTP_STARTTLS=true
+MAIL_FROM=<sender address verified in Brevo>
+PUBLIC_ORIGIN=http://127.0.0.1:4200
+SESSION_COOKIE_SECURE=false
+```
+
+Use HTTPS and `SESSION_COOKIE_SECURE=true` outside local HTTP development. The SMTP
+login and MAIL_FROM are different settings. The default `no-reply@betterf.local`
+is rejected for remote SMTP with `SMTP_FROM_NOT_CONFIGURED`. Authentication errors
+use `SMTP_AUTHENTICATION_FAILED`; other submission failures use `SMTP_DELIVERY_FAILED`.
+Fix configuration and restart; FAILED rows retry when due.
+
+If Brevo receives a message but does not deliver it, inspect **Transactional > Logs**
+by recipient/time or SMTP_MESSAGE_ID for bounce, block, and suppression results.
+Check sender/domain verification and whether transactional sending is active.
+Accepted submissions are not retried automatically because downstream delivery
+cannot be inferred from SMTP. Provider webhooks are outside this change. References:
+[Brevo SMTP troubleshooting](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP)
+and [transactional logs](https://help.brevo.com/hc/en-us/articles/360021533839-Manage-your-transactional-logs-and-email-previews).
 
 The API contract includes CSRF, session login/logout, and the registration routes.
 Run `./gradlew check bootJar` for PostgreSQL integration and module checks, and

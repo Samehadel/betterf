@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface IdentityService {
     PendingView register(RegistrationRequest request);
 
+    PendingView deliveryStatus(String email);
+
     PendingView resend(String email);
 
     VerificationView verify(UUID id, String token);

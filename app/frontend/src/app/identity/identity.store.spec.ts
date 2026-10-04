@@ -63,12 +63,10 @@ describe('Identity workflow', () => {
     store.run({ kind: 'login', email: 'ada@example.com', password: 'passphrase' });
     store.run({ kind: 'login', email: 'other@example.com', password: 'other' });
     csrf();
-    http
-      .expectOne('/api/auth/login')
-      .flush({
-        data: { id: 'one', email: 'ada@example.com', organizationName: 'Acme' },
-        error: null,
-      });
+    http.expectOne('/api/auth/login').flush({
+      data: { id: 'one', email: 'ada@example.com', organizationName: 'Acme' },
+      error: null,
+    });
     expect(store.account()?.id).toBe('one');
     store.clear();
     expect(store.account()).toBeNull();
@@ -85,5 +83,41 @@ describe('Identity workflow', () => {
       );
     expect(store.account()).toBeNull();
     expect(store.busy()).toBe(false);
+  });
+  it('refreshes queued delivery without blocking the form and ignores a response after leaving', () => {
+    store.run({ kind: 'resend', email: 'ada@example.com' });
+    csrf();
+    http.expectOne('/api/registration/resend').flush({
+      data: {
+        email: 'ada@example.com',
+        deliveryStatus: 'PENDING',
+        resendAvailableAt: '2026-10-04T12:00:00Z',
+      },
+      error: null,
+    });
+    store.refreshDelivery('ada@example.com');
+    expect(store.busy()).toBe(false);
+    csrf();
+    http.expectOne('/api/registration/status').flush({
+      data: {
+        email: 'ada@example.com',
+        deliveryStatus: 'SMTP_ACCEPTED',
+        resendAvailableAt: '2026-10-04T12:01:00Z',
+      },
+      error: null,
+    });
+    expect(store.pending()?.deliveryStatus).toBe('SMTP_ACCEPTED');
+    store.refreshDelivery('ada@example.com');
+    csrf();
+    store.clear();
+    http.expectOne('/api/registration/status').flush({
+      data: {
+        email: 'ada@example.com',
+        deliveryStatus: 'FAILED',
+        resendAvailableAt: '2026-10-04T12:00:00Z',
+      },
+      error: null,
+    });
+    expect(store.pending()).toBeNull();
   });
 });

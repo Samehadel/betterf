@@ -103,6 +103,7 @@ class SecurityConfiguration {
                                                 HttpMethod.POST,
                                                 "/api/registration",
                                                 "/api/registration/resend",
+                                                "/api/registration/status",
                                                 "/api/registration/verify",
                                                 "/api/auth/login")
                                         .permitAll()

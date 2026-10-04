@@ -146,13 +146,10 @@
     </form>
     } @if (mode === 'register' && store.pending()) {
     <h2 class="!text-2xl">
-      {{ t(store.pending()?.deliveryStatus === 'FAILED' ? 'identity.deliveryRetry' :
-      'identity.checkEmail') }}
+      {{ t(store.pending()?.deliveryStatus === 'SMTP_ACCEPTED' ? 'identity.checkEmail' :
+      'identity.deliveryQueued') }}
     </h2>
-    <p>
-      {{ t(store.pending()?.deliveryStatus === 'FAILED' ? 'identity.failedDelivery' :
-      'identity.pending') }}
-    </p>
+    <p>{{ t(deliveryMessage()) }}</p>
     <p class="break-all">{{ store.pending()?.email }}</p>
     } @if (mode === 'verify') { @if (store.verified()) {
     <h2 class="!text-2xl" aria-live="polite">{{ t('identity.verified') }}</h2>
@@ -177,13 +174,16 @@
           autocomplete="email"
           required
         />
-        <button class="button secondary" [disabled]="store.busy() || remaining() > 0">
+        <button
+          class="button secondary"
+          [disabled]="store.busy() || remaining() > 0 || deliveryInProgress()"
+        >
           {{ t('identity.resend') }}
         </button>
         @if (remaining() > 0) {
         <p role="status">{{ t('identity.cooldown', {seconds: remaining()}) }}</p>
         } @if (store.pending() && mode !== 'register') {
-        <p role="status">{{ t('identity.emailSent') }}</p>
+        <p role="status">{{ t(deliveryMessage()) }}</p>
         }
       </form>
     </details>

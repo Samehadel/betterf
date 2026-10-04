@@ -41,7 +41,7 @@ paths:
     post:
       operationId: registerOrganization
       summary:
-        Persist PENDING organization and account and send verification email. Repeated email submission
+        Persist PENDING organization and account and queue verification email. Repeated email submission
         reuses original data without overwriting credentials or sending again.
       security: []
       responses:
@@ -70,9 +70,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
-          description:
-            Database or email unavailable; delivery failure preserves pending records and prior
-            link
+          description: Database unavailable; queued email delivery happens asynchronously.
           content:
             application/json:
               schema:
@@ -101,9 +99,8 @@ paths:
   /api/registration/resend:
     post:
       operationId: resendVerification
-      summary:
-        Reuse email row; record attempt and SENT/FAILED status. Successful send rotates token for
-        24h; failed send preserves old credential.
+      summary: Queue a replacement using the same email row. Coalesce pending or retrying requests.
+        The worker retries failures and rotates the token only after SMTP acceptance.
       security: []
       responses:
         '200':
@@ -131,9 +128,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
-          description:
-            Database or email unavailable; delivery failure preserves pending records and prior
-            link
+          description: Database unavailable; queued email delivery happens asynchronously.
           content:
             application/json:
               schema:
@@ -174,6 +169,49 @@ paths:
           schema:
             type: string
           description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login/logout.
+  /api/registration/status:
+    post:
+      operationId: getRegistrationDeliveryStatus
+      summary: Read current delivery state; email is in the body to avoid URL access logs.
+      security: []
+      parameters:
+        - in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+          description: Masked token from /api/auth/csrf with its session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      responses:
+        '200':
+          description: Current status; SMTP_ACCEPTED does not mean inbox delivery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingEnvelope'
+        '400':
+          description: Invalid input or registration not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Missing or invalid CSRF.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/registration/verify:
     post:
       operationId: verifyRegistration
@@ -207,9 +245,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
-          description:
-            Database or email unavailable; delivery failure preserves pending records and prior
-            link
+          description: Database unavailable; queued email delivery happens asynchronously.
           content:
             application/json:
               schema:
@@ -407,8 +443,10 @@ components:
           type: string
           enum:
             - PENDING
-            - SENT
+            - SENDING
+            - SMTP_ACCEPTED
             - FAILED
+            - CANCELLED
     Verification:
       type: object
       required:

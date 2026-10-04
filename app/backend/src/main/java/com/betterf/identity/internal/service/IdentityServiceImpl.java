@@ -2,7 +2,6 @@ package com.betterf.identity.internal.service;
 
 import com.betterf.identity.api.dto.*;
 import com.betterf.identity.api.dto.IdentityViews.*;
-import com.betterf.identity.api.exception.EmailDeliveryException;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.IdentityService;
 import com.betterf.identity.internal.entity.*;
@@ -27,18 +26,15 @@ public class IdentityServiceImpl implements IdentityService {
     private final VerificationEmailRepository emails;
     private final RegistrationLocks locks;
     private final PasswordEncoder passwords;
-    private final VerificationMail mail;
     private final AccountMapper mapper;
     private final Clock clock;
     private final Validator validator;
-    private final SecureRandom random = new SecureRandom();
 
     public IdentityServiceImpl(
             AccountRepository accounts,
             OrganizationRepository organizations,
             RegistrationLocks locks,
             PasswordEncoder passwords,
-            VerificationMail mail,
             AccountMapper mapper,
             Clock clock,
             Validator validator,
@@ -47,7 +43,6 @@ public class IdentityServiceImpl implements IdentityService {
         this.organizations = organizations;
         this.locks = locks;
         this.passwords = passwords;
-        this.mail = mail;
         this.mapper = mapper;
         this.clock = clock;
         this.validator = validator;
@@ -73,7 +68,7 @@ public class IdentityServiceImpl implements IdentityService {
     }
 
     @Override
-    @Transactional(noRollbackFor = EmailDeliveryException.class)
+    @Transactional
     public PendingView register(RegistrationRequest request) {
         var violations = validator.validate(request);
         if (!violations.isEmpty())
@@ -112,21 +107,20 @@ public class IdentityServiceImpl implements IdentityService {
         organization.setDomain(domain);
         organization.setSpecialization(request.specialization().trim());
         organization.setStatus(OrganizationStatus.PENDING);
-        organization = organizations.saveAndFlush(organization);
+        organization = organizations.save(organization);
         account.setOrganization(organization);
-        account = accounts.saveAndFlush(account);
+        account = accounts.save(account);
         var delivery = new VerificationEmailEntity();
         delivery.setAccountId(account.getId());
         delivery.setRecipient(email);
         delivery.setStatus(EmailDeliveryStatus.PENDING);
-        delivery.setLastAttemptAt(clock.instant());
-        delivery = emails.saveAndFlush(delivery);
-        rotateAndSend(account, delivery);
+        delivery.setNextAttemptAt(clock.instant());
+        emails.save(delivery);
         return pending(account);
     }
 
     @Override
-    @Transactional(noRollbackFor = EmailDeliveryException.class)
+    @Transactional
     public PendingView resend(String rawEmail) {
         String email = normalizeEmail(rawEmail);
         locks.lock("email:" + email);
@@ -154,8 +148,11 @@ public class IdentityServiceImpl implements IdentityService {
         if (organizations.existsByDomainAndStatus(
                 account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
             throw duplicate();
-        rotateAndSend(account, delivery);
-        accounts.flush();
+        if (delivery.getStatus() == EmailDeliveryStatus.SMTP_ACCEPTED) {
+            delivery.setStatus(EmailDeliveryStatus.PENDING);
+            delivery.setNextAttemptAt(clock.instant());
+            account.setUpdatedAt(clock.instant());
+        }
         return pending(account);
     }
 
@@ -170,28 +167,12 @@ public class IdentityServiceImpl implements IdentityService {
                 delivery.getStatus().name());
     }
 
-    private void rotateAndSend(AccountEntity account, VerificationEmailEntity delivery) {
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        delivery.setAttempts(delivery.getAttempts() + 1);
-        delivery.setLastAttemptAt(clock.instant());
-        try {
-            mail.send(delivery.getRecipient(), account.getId(), token);
-        } catch (EmailDeliveryException exception) {
-            delivery.setStatus(EmailDeliveryStatus.FAILED);
-            delivery.setFailureCode("SMTP_DELIVERY_FAILED");
-            emails.flush();
-            throw exception;
-        }
-        Instant now = clock.instant();
-        delivery.setStatus(EmailDeliveryStatus.SENT);
-        delivery.setFailureCode(null);
-        delivery.setTokenHash(hash(token));
-        delivery.setLastSentAt(now);
-        delivery.setTokenExpiresAt(now.plus(Duration.ofHours(24)));
-        account.setUpdatedAt(now);
-        emails.flush();
+    @Override
+    @Transactional(readOnly = true)
+    public PendingView deliveryStatus(String rawEmail) {
+        return pending(
+                accounts.findByEmail(normalizeEmail(rawEmail))
+                        .orElseThrow(IdentityServiceImpl::invalidLink));
     }
 
     @Override
@@ -227,7 +208,6 @@ public class IdentityServiceImpl implements IdentityService {
         account.setAccessRole("ADMIN");
         account.setStatus(AccountStatus.ACTIVE);
         account.setUpdatedAt(clock.instant());
-        accounts.flush();
         return new VerificationView("VERIFIED");
     }
 
@@ -271,7 +251,7 @@ public class IdentityServiceImpl implements IdentityService {
         return ProfessionalRoles.ALL;
     }
 
-    private static String hash(String value) {
+    static String hash(String value) {
         try {
             return HexFormat.of()
                     .formatHex(
