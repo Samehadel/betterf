@@ -30,7 +30,15 @@ export class IdentityPage {
     specialization: ['', [Validators.required, Validators.maxLength(200)]],
     fullName: ['', [Validators.required, Validators.maxLength(200)]],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: ['', [Validators.required, Validators.minLength(15), Validators.maxLength(128)]],
+    password: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(10),
+        Validators.maxLength(128),
+        Validators.pattern(/^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u),
+      ],
+    ],
     professionalRole: ['', Validators.required],
   });
   readonly loginForm = this.fb.group({
@@ -85,12 +93,13 @@ export class IdentityPage {
         this.invalidFragment.set(!match);
 
         // Observe replacement links even when Angular reuses this page for a fragment navigation.
-        // Do not verify on GET: mail scanners must not consume the link.
+        // Complete verification through the CSRF-protected API after reading the link.
         void this.router.navigate([], {
           relativeTo: this.route,
           fragment: undefined,
           replaceUrl: true,
         });
+        if (this.verification) this.verify();
       });
     }
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
@@ -103,6 +112,8 @@ export class IdentityPage {
       clearInterval(deliveryTimer);
     });
     effect(() => {
+      if (this.mode === 'verify' && this.store.verified())
+        void this.router.navigateByUrl('/company', { replaceUrl: true });
       if (this.mode === 'login' && this.store.account()) void this.router.navigateByUrl('/company');
       if (this.mode === 'company' && this.store.signedOut())
         void this.router.navigateByUrl('/login');

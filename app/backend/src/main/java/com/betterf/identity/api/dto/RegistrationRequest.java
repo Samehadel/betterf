@@ -11,6 +11,17 @@ public record RegistrationRequest(
                 @Email(message = "Enter a valid email address.")
                 @Size(max = 254)
                 String email,
-        @NotNull @Size(min = 15, max = 128, message = "Use a password of 15 to 128 characters.")
+        @NotNull
+                @Size(
+                        min = 10,
+                        max = 128,
+                        message =
+                                "Use 10–128 characters, including at least one uppercase letter and"
+                                    + " one special character.")
+                @Pattern(
+                        regexp = "(?s)(?=.*\\p{Lu})(?=.*[\\p{P}\\p{S}]).*",
+                        message =
+                                "Use 10–128 characters, including at least one uppercase letter and"
+                                    + " one special character.")
                 String password,
         @NotBlank(message = "Choose a professional role.") String professionalRole) {}

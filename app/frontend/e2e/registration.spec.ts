@@ -1,6 +1,6 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
 const mailpit = process.env['MAILPIT_URL'] ?? 'http://127.0.0.1:8025';
-const password = 'a long browser passphrase';
+const password = 'Validpass!';
 async function latestLink(
   request: APIRequestContext,
   email: string,
@@ -57,6 +57,15 @@ test('landing registration, local email verification, password login and logout'
     'aria-describedby',
     'passwordHint passwordError',
   );
+  await fillRegistration(page, email, `https://browser-${unique}.com`);
+  const passwordInput = page.getByLabel('Password', { exact: true });
+  for (const invalid of ['shortA!', 'lowercase!', 'Uppercase1']) {
+    await passwordInput.fill(invalid);
+    await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
+    await expect(passwordInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#passwordError')).toContainText('uppercase letter');
+    await expect(page.locator('#passwordError')).toHaveCSS('color', 'rgb(180, 35, 54)');
+  }
   await fillRegistration(page, email, `https://browser-${unique}.com/about`);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
   await expect(page.getByRole('alert').first()).toContainText('HTTPS root website');
@@ -77,18 +86,28 @@ test('landing registration, local email verification, password login and logout'
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('verify your email');
+  await page.route('**/api/registration/verify', async (route) => {
+    await expect(page.getByLabel('Organization email', { exact: true })).toHaveCount(0);
+    await route.continue();
+  });
   await page.goto(link);
-  await expect(page).toHaveURL(/\/verify$/);
-  await page.getByRole('button', { name: 'Verify email and register organization' }).click();
-  await expect(page.getByRole('heading', { name: 'Your organization is ready' })).toBeVisible();
+  await expect(page).toHaveURL(/\/company$/);
+  await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
+  await page.goto(link);
+  await expect(page).toHaveURL(/\/company$/);
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto(link);
+  await expect(
+    page.getByText('Your email is already verified. Log in to open your organization.'),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Log in', exact: true }).last().click();
   await page.getByLabel('Organization email', { exact: true }).last().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/company$/);
-  await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
-  await page.reload();
-  await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/company');
@@ -126,10 +145,9 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   const replacement = await latestLink(request, email, old);
   expect(replacement).not.toBe(old);
   await page.goto(old);
-  await page.getByRole('button', { name: 'Verify email and register organization' }).click();
   await expect(page.getByRole('alert')).toContainText('replaced');
   await expect(page.getByRole('button', { name: 'Send another verification email' })).toBeVisible();
   await page.goto(replacement);
-  await page.getByRole('button', { name: 'Verify email and register organization' }).click();
-  await expect(page.getByRole('heading', { name: 'Your organization is ready' })).toBeVisible();
+  await expect(page).toHaveURL(/\/company$/);
+  await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
 });

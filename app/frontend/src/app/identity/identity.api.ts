@@ -63,7 +63,10 @@ export class IdentityApi {
     return this.post<Pending>('/api/registration/resend', { email });
   }
   verify(id: string, token: string) {
-    return this.post<{ status: string }>('/api/registration/verify', { id, token });
+    return this.post<{ status: 'VERIFIED' | 'ALREADY_VERIFIED'; account: Account | null }>(
+      '/api/registration/verify',
+      { id, token },
+    );
   }
   login(email: string, password: string) {
     return this.post<Account>('/api/auth/login', { email, password });

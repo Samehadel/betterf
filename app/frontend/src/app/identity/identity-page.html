@@ -61,7 +61,7 @@
             {{ store.error() || t('identity.unavailable') }}
           </div>
         }
-        @if (store.busy()) {
+        @if (store.busy() && mode !== 'verify') {
           <p role="status" class="form-hint">{{ t('identity.working') }}</p>
         }
         @if (mode === 'register' && !store.pending()) {
@@ -209,7 +209,7 @@
                     formControlName="password"
                     autocomplete="new-password"
                     required
-                    minlength="15"
+                    minlength="10"
                     maxlength="128"
                     [attr.aria-describedby]="
                       invalid('password') ? 'passwordHint passwordError' : 'passwordHint'
@@ -262,24 +262,22 @@
           </div>
         }
         @if (mode === 'verify') {
-          @if (store.verified()) {
-            <h2 class="!text-2xl" aria-live="polite">{{ t('identity.verified') }}</h2>
-            <p>{{ t('identity.verifiedHint') }}</p>
+          @if (store.alreadyVerified()) {
+            <p>{{ t('identity.alreadyVerified') }}</p>
             <a class="button" routerLink="/login">{{ t('identity.login') }}</a>
+          } @else if (invalidFragment()) {
+            <p role="alert" class="form-alert">{{ t('identity.invalidLink') }}</p>
+          } @else if (store.errorCode()) {
+            <button class="button mb-6" [disabled]="store.busy()" (click)="verify()">
+              {{ t('identity.retry') }}
+            </button>
           } @else {
-            <p>{{ t('identity.verifyHint') }}</p>
-            @if (invalidFragment()) {
-              <p role="alert" class="form-alert">{{ t('identity.invalidLink') }}</p>
-            } @else {
-              <button class="button mb-6" [disabled]="store.busy()" (click)="verify()">
-                {{ t('identity.verify') }}
-              </button>
-            }
+            <p role="status">{{ t('identity.verifying') }}</p>
           }
         }
         @if (
           (mode === 'register' && (store.pending() || store.errorCode() === 'EMAIL_UNAVAILABLE')) ||
-          (mode === 'verify' && !store.verified()) ||
+          (mode === 'verify' && !store.verified() && (invalidFragment() || store.errorCode())) ||
           mode === 'login'
         ) {
           <details class="my-8" [open]="mode !== 'login'">

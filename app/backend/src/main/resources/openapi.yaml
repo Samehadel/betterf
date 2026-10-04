@@ -95,7 +95,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login/logout.
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
   /api/registration/resend:
     post:
       operationId: resendVerification
@@ -168,7 +168,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login/logout.
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
   /api/registration/status:
     post:
       operationId: getRegistrationDeliveryStatus
@@ -216,8 +216,9 @@ paths:
     post:
       operationId: verifyRegistration
       summary:
-        Atomically activate pending account and organization and grant ADMIN. Recheck active-domain
-        uniqueness; losing registrant gets no access.
+        Atomically activate pending account and organization and grant ADMIN. First verification
+        establishes a session and rotates session ID and CSRF. Recheck active-domain uniqueness;
+        losing registrant gets no access. Already-used links never create a new session.
       security: []
       responses:
         '200':
@@ -281,7 +282,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login/logout.
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
   /api/auth/csrf:
     get:
       operationId: getCsrf
@@ -350,7 +351,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login/logout.
+          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
   /api/auth/me:
     get:
       operationId: currentAccount
@@ -451,12 +452,18 @@ components:
       type: object
       required:
         - status
+        - account
       properties:
         status:
           type: string
           enum:
             - VERIFIED
             - ALREADY_VERIFIED
+        account:
+          description: Authenticated account after first verification or when this browser already holds its session. Null for an already-used link without a matching session; use password login.
+          oneOf:
+            - $ref: '#/components/schemas/Account'
+            - type: 'null'
     Csrf:
       type: object
       required:
@@ -533,8 +540,10 @@ components:
           maxLength: 254
         password:
           type: string
-          minLength: 15
+          minLength: 10
           maxLength: 128
+          pattern: '^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$'
+          description: At least one uppercase letter and one punctuation or symbol character. Whitespace alone does not count as a special character.
           writeOnly: true
         professionalRole:
           type: string

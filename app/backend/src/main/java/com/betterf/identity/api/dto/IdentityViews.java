@@ -8,7 +8,7 @@ public final class IdentityViews {
 
     public record PendingView(String email, Instant resendAvailableAt, String deliveryStatus) {}
 
-    public record VerificationView(String status) {}
+    public record VerificationView(String status, AccountView account) {}
 
     public record AccountView(
             UUID id,

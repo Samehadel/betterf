@@ -60,7 +60,7 @@ class RegistrationIntegrationTests {
 
     record Link(UUID id, String token) {}
 
-    final String password = "a long test passphrase";
+    final String password = "Validpass!";
 
     @BeforeEach
     void setup() {
@@ -246,7 +246,7 @@ class RegistrationIntegrationTests {
                         "OTHER");
         assertThatThrownBy(() -> identity.register(bad))
                 .isInstanceOf(IdentityException.class)
-                .hasMessageContaining("15 to 128");
+                .hasMessageContaining("10–128");
         var badRole =
                 new RegistrationRequest(
                         "Acme",
@@ -287,7 +287,7 @@ class RegistrationIntegrationTests {
                         "Wrong",
                         "Wrong",
                         "ADA@example.com",
-                        "another long password",
+                        "Another long password!",
                         "SOFTWARE_ENGINEER"));
         assertThat(count("ACCOUNT")).isEqualTo(1);
         org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
@@ -613,5 +613,139 @@ class RegistrationIntegrationTests {
             jdbc.execute("DROP TRIGGER reject_email_completion ON VERIFICATION_EMAIL");
             jdbc.execute("DROP FUNCTION reject_email_completion()");
         }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("invalidPasswords")
+    void rejectsPasswordsOutsideTheRegistrationPolicyWithoutSavingData(String candidate)
+            throws Exception {
+        var request =
+                new RegistrationRequest(
+                        "Acme",
+                        "https://company.com",
+                        "IT",
+                        "Ada",
+                        "ada@example.com",
+                        candidate,
+                        "OTHER");
+        mvc.perform(
+                        post("/api/registration")
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(json.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.error.message")
+                                .value(org.hamcrest.Matchers.containsString("uppercase letter")));
+        assertThat(count("ACCOUNT")).isZero();
+        assertThat(count("ORGANIZATION")).isZero();
+        assertThat(count("VERIFICATION_EMAIL")).isZero();
+        verifyNoInteractions(mail);
+    }
+
+    static java.util.stream.Stream<String> invalidPasswords() {
+        return java.util.stream.Stream.of(
+                "Abcdefgh!",
+                "abcdefghij!",
+                "Abcdefghij",
+                "Abcdefghi ",
+                "Abcdefghéé",
+                "A!" + "a".repeat(127));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("validPasswords")
+    void acceptsBoundaryPasswordsAndUnicodeUppercaseAndSymbols(String candidate) {
+        identity.register(
+                new RegistrationRequest(
+                        "Acme",
+                        "https://company.com",
+                        "IT",
+                        "Ada",
+                        "ada@example.com",
+                        candidate,
+                        "OTHER"));
+        assertThat(count("ACCOUNT")).isEqualTo(1);
+    }
+
+    static java.util.stream.Stream<String> validPasswords() {
+        return java.util.stream.Stream.of(
+                "Abcdefghi!", "A!" + "a".repeat(126), "Éabcdefg!h", "Abcdefgh€i");
+    }
+
+    @Test
+    void firstVerificationRotatesSessionAndCsrfAndReplayCannotSignInAgain() throws Exception {
+        register("ada@example.com", "company.com");
+        var csrfResult = mvc.perform(get("/api/auth/csrf")).andReturn();
+        var before = (MockHttpSession) csrfResult.getRequest().getSession(false);
+        var oldId = before.getId();
+        var oldCsrf = json.readTree(csrfResult.getResponse().getContentAsString()).path("data");
+        var result =
+                mvc.perform(
+                                post("/api/registration/verify")
+                                        .session(before)
+                                        .header(
+                                                oldCsrf.path("headerName").asText(),
+                                                oldCsrf.path("token").asText())
+                                        .contentType("application/json")
+                                        .content(
+                                                json.writeValueAsString(
+                                                        links.get("ada@example.com"))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.status").value("VERIFIED"))
+                        .andExpect(jsonPath("$.data.account.email").value("ada@example.com"))
+                        .andExpect(jsonPath("$.data.account.accessRole").value("ADMIN"))
+                        .andReturn();
+        var session = (MockHttpSession) result.getRequest().getSession(false);
+        assertThat(session.getId()).isNotEqualTo(oldId);
+        mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isOk());
+        mvc.perform(
+                        post("/api/auth/logout")
+                                .session(session)
+                                .header(
+                                        oldCsrf.path("headerName").asText(),
+                                        oldCsrf.path("token").asText()))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/api/registration/verify")
+                                .session(session)
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(json.writeValueAsString(links.get("ada@example.com"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ALREADY_VERIFIED"))
+                .andExpect(jsonPath("$.data.account.email").value("ada@example.com"));
+        mvc.perform(post("/api/auth/logout").session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+        var replay =
+                mvc.perform(
+                                post("/api/registration/verify")
+                                        .with(csrf())
+                                        .contentType("application/json")
+                                        .content(
+                                                json.writeValueAsString(
+                                                        links.get("ada@example.com"))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.status").value("ALREADY_VERIFIED"))
+                        .andExpect(jsonPath("$.data.account").isEmpty())
+                        .andReturn();
+        mvc.perform(get("/api/auth/me").session((MockHttpSession) replay.getRequest().getSession()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invalidVerificationDoesNotAuthenticateTheBrowser() throws Exception {
+        register("ada@example.com", "company.com");
+        var session = new MockHttpSession();
+        var badLink = new Link(links.get("ada@example.com").id(), "X".repeat(43));
+        mvc.perform(
+                        post("/api/registration/verify")
+                                .session(session)
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(json.writeValueAsString(badLink)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isForbidden());
+        assertThat(activeOrganizations()).isZero();
     }
 }

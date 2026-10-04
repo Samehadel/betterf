@@ -1,5 +1,6 @@
 package com.betterf.foundation.controller;
 
+import com.betterf.foundation.internal.security.SessionLogin;
 import com.betterf.identity.api.dto.IdentityViews.AccountView;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.IdentityService;
@@ -10,9 +11,6 @@ import jakarta.validation.constraints.*;
 
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.*;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,18 +18,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 public class SessionController {
     private final AuthenticationManager authentication;
-    private final SecurityContextRepository contexts;
-    private final SessionAuthenticationStrategy sessions;
+    private final SessionLogin login;
     private final IdentityService identity;
 
     public SessionController(
-            AuthenticationManager authentication,
-            SecurityContextRepository contexts,
-            SessionAuthenticationStrategy sessions,
-            IdentityService identity) {
+            AuthenticationManager authentication, SessionLogin login, IdentityService identity) {
         this.authentication = authentication;
-        this.contexts = contexts;
-        this.sessions = sessions;
+        this.login = login;
         this.identity = identity;
     }
 
@@ -57,18 +50,14 @@ public class SessionController {
                             UsernamePasswordAuthenticationToken.unauthenticated(
                                     body.email().trim().toLowerCase(java.util.Locale.ROOT),
                                     body.password()));
-            sessions.onAuthentication(principal, request, response);
-            var context = SecurityContextHolder.createEmptyContext();
-            context.setAuthentication(principal);
-            SecurityContextHolder.setContext(context);
-            contexts.saveContext(context, request, response);
+            login.establish(principal, request, response);
             return identity.current(principal.getName());
         } catch (AuthenticationException exception) {
             throw new IdentityException(
                     401,
                     "LOGIN_FAILED",
                     "Unable to log in. Check your email and password and verify your email before"
-                        + " trying again.");
+                            + " trying again.");
         }
     }
 

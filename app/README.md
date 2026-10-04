@@ -143,6 +143,19 @@ Only email verification activates the organization/account and establishes ADMIN
 access. Pending organizations do not reserve domains; only one can become active
 for a domain. Login requires both statuses to be ACTIVE.
 
+New passwords require 10–128 characters, an uppercase letter, and a special
+character (punctuation or symbol). Spaces alone do not satisfy the special-character
+requirement. Browser and API apply the same checks; existing login passwords are
+not revalidated against the new registration policy.
+
+Opening a valid email link automatically submits the token to the CSRF-protected
+verification API. First-time verification creates the authenticated session and
+rotates the session ID and CSRF token; the browser goes directly to `/company`.
+The `/verify` route is only a transient link handler, with recovery shown for invalid
+or expired links. No email re-entry or confirmation click is needed for valid links.
+An already-used link cannot create another session: an existing matching session
+returns home, otherwise the page offers password login.
+
 This follows the product owner's 2026-10-04 correction to BTF-5's earlier
 no-company-status wording. Architecture baseline: `0765baaa675be6232b9df9c025d415dca1ab3f49`;
 implementation decisions are in architecture ADR 0005.

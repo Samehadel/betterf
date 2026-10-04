@@ -55,7 +55,12 @@ describe('Identity workflow', () => {
     expect(store.error()).toBe('Expired');
     store.run({ kind: 'verify', id: 'id', token: 'replacement' });
     csrf();
-    http.expectOne('/api/registration/verify').flush({ data: { status: 'VERIFIED' }, error: null });
+    http
+      .expectOne('/api/registration/verify')
+      .flush({
+        data: { status: 'VERIFIED', account: { id: 'one', email: 'ada@example.com' } },
+        error: null,
+      });
     expect(store.verified()).toBe(true);
     expect(store.error()).toBe('');
   });
@@ -119,5 +124,16 @@ describe('Identity workflow', () => {
       error: null,
     });
     expect(store.pending()).toBeNull();
+  });
+  it('does not treat an already-used link as an authenticated session', () => {
+    store.run({ kind: 'verify', id: 'one', token: 'used-token' });
+    csrf();
+    http.expectOne('/api/registration/verify').flush({
+      data: { status: 'ALREADY_VERIFIED', account: null },
+      error: null,
+    });
+    expect(store.verified()).toBe(false);
+    expect(store.alreadyVerified()).toBe(true);
+    expect(store.account()).toBeNull();
   });
 });

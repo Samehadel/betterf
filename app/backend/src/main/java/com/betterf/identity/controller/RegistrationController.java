@@ -22,8 +22,6 @@ public class RegistrationController {
 
     public record ResendRequest(@NotBlank @Email @Size(max = 254) String email) {}
 
-    public record VerifyRequest(@NotNull UUID id, @NotBlank @Size(max = 100) String token) {}
-
     @GetMapping("/roles")
     public List<RoleView> roles() {
         return identity.roles();
@@ -42,10 +40,5 @@ public class RegistrationController {
     @PostMapping("/status")
     public PendingView deliveryStatus(@Valid @RequestBody ResendRequest request) {
         return identity.deliveryStatus(request.email());
-    }
-
-    @PostMapping("/verify")
-    public VerificationView verify(@Valid @RequestBody VerifyRequest request) {
-        return identity.verify(request.id(), request.token());
     }
 }

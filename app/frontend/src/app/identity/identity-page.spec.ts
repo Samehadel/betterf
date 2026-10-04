@@ -12,8 +12,11 @@ describe('Verification link navigation', () => {
     const oldToken = 'a'.repeat(43);
     const newToken = 'b'.repeat(43);
     const fragments = new BehaviorSubject<string | null>(`${id}.${oldToken}`);
-    const store = { clear: jest.fn(), run: jest.fn() };
-    const router = { navigate: jest.fn().mockResolvedValue(true) };
+    const store = { clear: jest.fn(), run: jest.fn(), verified: signal(false) };
+    const router = {
+      navigate: jest.fn().mockResolvedValue(true),
+      navigateByUrl: jest.fn().mockResolvedValue(true),
+    };
     TestBed.configureTestingModule({
       providers: [
         {
@@ -25,22 +28,24 @@ describe('Verification link navigation', () => {
       ],
     });
     const page = TestBed.runInInjectionContext(() => new IdentityPage());
-    fragments.next(null);
-    page.verify();
     expect(store.run).toHaveBeenLastCalledWith({ kind: 'verify', id, token: oldToken });
+    fragments.next(null);
+    expect(store.run).toHaveBeenCalledTimes(1);
 
     fragments.next(`${id}.${newToken}`);
     fragments.next(null);
-    page.verify();
+    expect(store.run).toHaveBeenCalledTimes(2);
     expect(store.run).toHaveBeenLastCalledWith({ kind: 'verify', id, token: newToken });
     expect(page.invalidFragment()).toBe(false);
     expect(router.navigate).toHaveBeenCalledTimes(2);
 
-    fragments.next('invalid');
     store.run.mockClear();
-    page.verify();
+    fragments.next('invalid');
     expect(store.run).not.toHaveBeenCalled();
     expect(page.invalidFragment()).toBe(true);
+    store.verified.set(true);
+    TestBed.tick();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/company', { replaceUrl: true });
   });
 });
 
@@ -103,5 +108,21 @@ describe('Registration email recovery', () => {
     expect(page.fieldError('email')).toBe('identity.emailError');
     expect(page.fieldError('password')).toBe('identity.passwordHint');
     expect(store.run).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['Abcdefgh!', false],
+    ['abcdefghij!', false],
+    ['Abcdefghij', false],
+    ['Abcdefghi ', false],
+    ['Abcdefghéé', false],
+    ['A!' + 'a'.repeat(127), false],
+    ['Abcdefghi!', true],
+    ['A!' + 'a'.repeat(126), true],
+    ['Éabcdefg!h', true],
+    ['Abcdefgh€i', true],
+  ])('validates the registration password %s consistently with the API', (value, valid) => {
+    const { page } = createPage();
+    page.registration.controls.password.setValue(value);
+    expect(page.registration.controls.password.valid).toBe(valid);
   });
 });

@@ -17,6 +17,7 @@ export const IdentityStore = signalStore(
     errorCode: '',
     pending: null as Pending | null,
     verified: false,
+    alreadyVerified: false,
     account: null as Account | null,
     roles: [] as Role[],
     rolesError: false,
@@ -29,6 +30,7 @@ export const IdentityStore = signalStore(
         errorCode: '',
         pending: null,
         verified: false,
+        alreadyVerified: false,
         signedOut: false,
         account: null,
       });
@@ -75,9 +77,15 @@ export const IdentityStore = signalStore(
                 .pipe(tap((pending) => patchState(store, { pending })));
               break;
             case 'verify':
-              operation = api
-                .verify(action.id, action.token)
-                .pipe(tap(() => patchState(store, { verified: true })));
+              operation = api.verify(action.id, action.token).pipe(
+                tap((result) =>
+                  patchState(store, {
+                    verified: !!result.account,
+                    alreadyVerified: result.status === 'ALREADY_VERIFIED' && !result.account,
+                    account: result.account,
+                  }),
+                ),
+              );
               break;
             case 'login':
               operation = api

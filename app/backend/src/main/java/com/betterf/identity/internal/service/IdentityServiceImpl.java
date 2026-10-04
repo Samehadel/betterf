@@ -196,7 +196,7 @@ public class IdentityServiceImpl implements IdentityService {
                     "This link has expired. Request a new verification email.");
         if (account.getStatus() == AccountStatus.ACTIVE
                 && account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
-            return new VerificationView("ALREADY_VERIFIED");
+            return new VerificationView("ALREADY_VERIFIED", null);
         if (account.getStatus() != AccountStatus.PENDING
                 || account.getOrganization().getStatus() != OrganizationStatus.PENDING)
             throw duplicate();
@@ -208,7 +208,7 @@ public class IdentityServiceImpl implements IdentityService {
         account.setAccessRole("ADMIN");
         account.setStatus(AccountStatus.ACTIVE);
         account.setUpdatedAt(clock.instant());
-        return new VerificationView("VERIFIED");
+        return new VerificationView("VERIFIED", mapper.view(account));
     }
 
     @Override
