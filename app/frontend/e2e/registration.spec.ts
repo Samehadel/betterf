@@ -47,6 +47,16 @@ test('landing registration, local email verification, password login and logout'
   await expect(page.getByLabel('Professional role', { exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('correct the required fields');
+  await expect(page.getByText('Enter your company name.')).toHaveCSS('color', 'rgb(180, 35, 54)');
+  await expect(page.getByText('Enter your company website.')).toBeVisible();
+  await expect(page.getByLabel('Company website', { exact: true })).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute(
+    'aria-describedby',
+    'passwordHint passwordError',
+  );
   await fillRegistration(page, email, `https://browser-${unique}.com/about`);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
   await expect(page.getByRole('alert').first()).toContainText('HTTPS root website');
@@ -59,6 +69,8 @@ test('landing registration, local email verification, password login and logout'
   await expect(
     page.getByRole('button', { name: 'Send another verification email' }),
   ).toBeDisabled();
+  await expect(page.getByLabel('Organization email', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Organization email', { exact: true })).toHaveValue(email);
   const link = await latestLink(request, email);
   await page.goto('/login');
   await page.getByLabel('Organization email', { exact: true }).last().fill(email);
@@ -108,6 +120,8 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
     resend.click(),
   ]);
   expect(response.status()).toBe(200);
+  expect(response.request().postDataJSON()).toEqual({ email });
+  await expect(page.getByLabel('Organization email', { exact: true })).toBeDisabled();
   await expect(resend).toBeDisabled();
   const replacement = await latestLink(request, email, old);
   expect(replacement).not.toBe(old);

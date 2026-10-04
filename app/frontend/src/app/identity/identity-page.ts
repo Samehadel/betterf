@@ -126,6 +126,12 @@ export class IdentityPage {
     this.loginForm.controls.password.reset();
   }
   resend() {
+    if (this.store.busy() || this.remaining() > 0 || this.deliveryInProgress()) return;
+    const pending = this.store.pending();
+    if (pending) {
+      this.store.run({ kind: 'resend', email: pending.email });
+      return;
+    }
     this.resendForm.markAllAsTouched();
     if (this.resendForm.valid)
       this.store.run({ kind: 'resend', email: this.resendForm.getRawValue().email });
@@ -136,5 +142,12 @@ export class IdentityPage {
   invalid(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
     return control.invalid && control.touched;
+  }
+  fieldError(field: keyof typeof this.registration.controls) {
+    const control = this.registration.controls[field];
+    if (control.hasError('required')) return 'identity.errors.' + field;
+    if (field === 'email') return 'identity.emailError';
+    if (field === 'password') return 'identity.passwordHint';
+    return 'identity.tooLong';
   }
 }

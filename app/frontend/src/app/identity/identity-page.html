@@ -1,235 +1,388 @@
 <ng-container *transloco="let t">
+  @if (mode === 'register') {
+    <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  }
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
       <a class="brand" routerLink="/">BetterF<span class="text-[var(--accent)]">.</span></a
       ><a routerLink="/login">{{ t('identity.login') }}</a>
     </nav>
   </header>
-  <main class="mx-auto max-w-2xl px-5 py-12" id="main">
-    <p class="eyebrow">{{ t('identity.eyebrow') }}</p>
-    <h1 class="!text-4xl !tracking-tight">{{ t('identity.title.' + mode) }}</h1>
-    @if (store.errorCode()) {
-    <div role="alert" class="mb-6 rounded border border-red-300 bg-red-950/30 p-4">
-      {{ store.error() || t('identity.unavailable') }}
-    </div>
-    } @if (store.busy()) {
-    <p role="status">{{ t('identity.working') }}</p>
-    } @if (mode === 'register' && !store.pending()) {
-    <p class="text-[var(--muted)]">{{ t('identity.intro') }}</p>
-    <form [formGroup]="registration" (ngSubmit)="register()" novalidate class="space-y-5">
-      <fieldset [disabled]="store.busy()" class="space-y-5">
-        <legend class="mb-4 text-xl font-semibold">{{ t('identity.company') }}</legend>
-        <div>
-          <label for="companyName">{{ t('identity.companyName') }}</label
-          ><input
-            class="identity-input"
-            id="companyName"
-            formControlName="companyName"
-            autocomplete="organization"
-            required
-            maxlength="200"
-            [attr.aria-invalid]="invalid('companyName')"
-            aria-describedby="companyNameError"
-          />@if (invalid('companyName')) {
-          <p id="companyNameError" class="text-red-300">{{ t('identity.required') }}</p>
-          }
+  <main
+    class="identity-shell"
+    [class.registration-shell]="mode === 'register'"
+    id="main"
+    tabindex="-1"
+  >
+    @if (mode === 'register') {
+      <aside class="registration-story" aria-labelledby="registration-story-title">
+        <div class="story-content">
+          <p class="eyebrow">{{ t('identity.story.eyebrow') }}</p>
+          <h2 id="registration-story-title">
+            {{ t('identity.story.title') }}
+            <span>{{ t('identity.story.highlight') }}</span>
+          </h2>
+          <p class="story-intro">{{ t('identity.story.intro') }}</p>
+          <div class="memory-illustration" aria-hidden="true">
+            <div class="memory-orbit orbit-one"></div>
+            <div class="memory-orbit orbit-two"></div>
+            <div class="memory-spark spark-one">✦</div>
+            <div class="memory-spark spark-two">✦</div>
+            <div class="memory-note note-back">
+              <span class="note-symbol">◇</span>
+              <span>{{ t('identity.story.context') }}</span>
+              <div class="note-line"></div>
+              <div class="note-line short"></div>
+            </div>
+            <div class="memory-note note-front">
+              <div class="note-top">
+                <span class="note-symbol">↗</span><span class="note-dots">•••</span>
+              </div>
+              <span class="note-label">{{ t('identity.story.lesson') }}</span>
+              <strong>{{ t('identity.story.idea') }}</strong>
+              <div class="note-line"></div>
+              <div class="note-line short"></div>
+              <div class="note-footer">
+                <span class="note-check">✓</span>{{ t('identity.story.kept') }}
+              </div>
+            </div>
+            <span class="memory-caption">{{ t('identity.story.caption') }}</span>
+          </div>
+          <p class="story-outro">{{ t('identity.story.outro') }}</p>
         </div>
-        <div>
-          <label for="website">{{ t('identity.website') }}</label
-          ><input
-            class="identity-input"
-            id="website"
-            formControlName="website"
-            type="url"
-            placeholder="https://company.com"
-            required
-            maxlength="253"
-            [attr.aria-invalid]="invalid('website')"
-            aria-describedby="websiteHint"
-          />
-          <p id="websiteHint" class="small">{{ t('identity.websiteHint') }}</p>
-        </div>
-        <div>
-          <label for="specialization">{{ t('identity.specialization') }}</label
-          ><input
-            class="identity-input"
-            id="specialization"
-            formControlName="specialization"
-            required
-            maxlength="200"
-            [attr.aria-invalid]="invalid('specialization')"
-          />@if (invalid('specialization')) {
-          <p class="text-red-300">{{ t('identity.required') }}</p>
-          }
-        </div>
-      </fieldset>
-      <fieldset [disabled]="store.busy()" class="space-y-5">
-        <legend class="mb-4 text-xl font-semibold">{{ t('identity.administrator') }}</legend>
-        <div>
-          <label for="fullName">{{ t('identity.fullName') }}</label
-          ><input
-            class="identity-input"
-            id="fullName"
-            formControlName="fullName"
-            autocomplete="name"
-            required
-            maxlength="200"
-            [attr.aria-invalid]="invalid('fullName')"
-          />@if (invalid('fullName')) {
-          <p class="text-red-300">{{ t('identity.required') }}</p>
-          }
-        </div>
-        <div>
-          <label for="email">{{ t('identity.email') }}</label
-          ><input
-            class="identity-input"
-            id="email"
-            type="email"
-            formControlName="email"
-            autocomplete="username"
-            required
-            maxlength="254"
-            [attr.aria-invalid]="invalid('email')"
-          />@if (invalid('email')) {
-          <p class="text-red-300">{{ t('identity.emailError') }}</p>
-          }
-        </div>
-        <div>
-          <label for="password">{{ t('identity.password') }}</label
-          ><input
-            class="identity-input"
-            id="password"
-            type="password"
-            formControlName="password"
-            autocomplete="new-password"
-            required
-            minlength="15"
-            maxlength="128"
-            aria-describedby="passwordHint"
-            [attr.aria-invalid]="invalid('password')"
-          />
-          <p id="passwordHint" class="small">{{ t('identity.passwordHint') }}</p>
-        </div>
-        <div>
-          <label for="role">{{ t('identity.role') }}</label
-          ><select
-            class="identity-input"
-            id="role"
-            formControlName="professionalRole"
-            required
-            [attr.aria-invalid]="invalid('professionalRole')"
-          >
-            <option value="">{{ t('identity.chooseRole') }}</option>
-            @for (role of store.roles(); track role.id) {
-            <option [value]="role.id">{{ role.label }}</option>
-            }
-          </select>
-          <p class="small">{{ t('identity.roleHint') }}</p>
-          @if (invalid('professionalRole')) {
-          <p class="text-red-300">{{ t('identity.chooseRole') }}</p>
-          }
-        </div>
-      </fieldset>
-      @if (store.rolesError()) {
-      <p role="alert">
-        {{ t('identity.rolesError') }}
-        <button type="button" class="underline" (click)="store.loadRoles()">
-          {{ t('identity.retry') }}
-        </button>
-      </p>
-      } @if (submitted() && registration.invalid) {
-      <p role="alert">{{ t('identity.correctFields') }}</p>
-      }
-      <button class="button" [disabled]="store.busy() || !store.roles().length">
-        {{ t('identity.register') }}
-      </button>
-    </form>
-    } @if (mode === 'register' && store.pending()) {
-    <h2 class="!text-2xl">
-      {{ t(store.pending()?.deliveryStatus === 'SMTP_ACCEPTED' ? 'identity.checkEmail' :
-      'identity.deliveryQueued') }}
-    </h2>
-    <p>{{ t(deliveryMessage()) }}</p>
-    <p class="break-all">{{ store.pending()?.email }}</p>
-    } @if (mode === 'verify') { @if (store.verified()) {
-    <h2 class="!text-2xl" aria-live="polite">{{ t('identity.verified') }}</h2>
-    <p>{{ t('identity.verifiedHint') }}</p>
-    <a class="button" routerLink="/login">{{ t('identity.login') }}</a> } @else {
-    <p>{{ t('identity.verifyHint') }}</p>
-    @if (invalidFragment()) {
-    <p role="alert">{{ t('identity.invalidLink') }}</p>
-    } @else {<button class="button mb-6" [disabled]="store.busy()" (click)="verify()">
-      {{ t('identity.verify') }}</button
-    >} } } @if ((mode === 'register' && (store.pending() || store.errorCode() ===
-    'EMAIL_UNAVAILABLE')) || (mode === 'verify' && !store.verified()) || mode === 'login') {
-    <details class="my-8" [open]="mode !== 'login'">
-      <summary>{{ t('identity.resendTitle') }}</summary>
-      <form [formGroup]="resendForm" (ngSubmit)="resend()" class="mt-4 space-y-3">
-        <label for="resendEmail">{{ t('identity.email') }}</label
-        ><input
-          class="identity-input"
-          id="resendEmail"
-          formControlName="email"
-          type="email"
-          autocomplete="email"
-          required
-        />
-        <button
-          class="button secondary"
-          [disabled]="store.busy() || remaining() > 0 || deliveryInProgress()"
-        >
-          {{ t('identity.resend') }}
-        </button>
-        @if (remaining() > 0) {
-        <p role="status">{{ t('identity.cooldown', {seconds: remaining()}) }}</p>
-        } @if (store.pending() && mode !== 'register') {
-        <p role="status">{{ t(deliveryMessage()) }}</p>
+      </aside>
+    }
+    <section class="identity-content" aria-labelledby="identity-title">
+      <div class="identity-form-wrap">
+        <p class="eyebrow">{{ t('identity.eyebrow') }}</p>
+        <h1 id="identity-title">{{ t('identity.title.' + mode) }}</h1>
+        @if (store.errorCode()) {
+          <div role="alert" class="form-alert">
+            {{ store.error() || t('identity.unavailable') }}
+          </div>
         }
-      </form>
-    </details>
-    } @if (mode === 'login') {
-    <form [formGroup]="loginForm" (ngSubmit)="login()" class="space-y-5">
-      <div>
-        <label for="loginEmail">{{ t('identity.email') }}</label
-        ><input
-          class="identity-input"
-          id="loginEmail"
-          type="email"
-          formControlName="email"
-          autocomplete="username"
-          required
-        />
+        @if (store.busy()) {
+          <p role="status" class="form-hint">{{ t('identity.working') }}</p>
+        }
+        @if (mode === 'register' && !store.pending()) {
+          <p class="form-intro">{{ t('identity.intro') }}</p>
+          <form
+            [formGroup]="registration"
+            (ngSubmit)="register()"
+            novalidate
+            class="registration-form"
+          >
+            <fieldset [disabled]="store.busy()">
+              <legend>
+                <span class="section-number" aria-hidden="true">01</span>{{ t('identity.company') }}
+              </legend>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="companyName">{{ t('identity.companyName') }}</label>
+                  <input
+                    class="identity-input"
+                    id="companyName"
+                    formControlName="companyName"
+                    autocomplete="organization"
+                    required
+                    maxlength="200"
+                    [attr.aria-invalid]="invalid('companyName')"
+                    [attr.aria-describedby]="invalid('companyName') ? 'companyNameError' : null"
+                  />
+                  @if (invalid('companyName')) {
+                    <p id="companyNameError" class="field-error">
+                      {{ t(fieldError('companyName')) }}
+                    </p>
+                  }
+                </div>
+                <div class="form-field">
+                  <label for="specialization">{{ t('identity.specialization') }}</label>
+                  <input
+                    class="identity-input"
+                    id="specialization"
+                    formControlName="specialization"
+                    required
+                    maxlength="200"
+                    [attr.aria-invalid]="invalid('specialization')"
+                    [attr.aria-describedby]="
+                      invalid('specialization') ? 'specializationError' : null
+                    "
+                  />
+                  @if (invalid('specialization')) {
+                    <p id="specializationError" class="field-error">
+                      {{ t(fieldError('specialization')) }}
+                    </p>
+                  }
+                </div>
+                <div class="form-field field-full">
+                  <label for="website">{{ t('identity.website') }}</label>
+                  <input
+                    class="identity-input"
+                    id="website"
+                    formControlName="website"
+                    type="url"
+                    placeholder="https://company.com"
+                    required
+                    maxlength="253"
+                    [attr.aria-invalid]="
+                      invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
+                    "
+                    [attr.aria-describedby]="
+                      invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
+                        ? 'websiteHint websiteError'
+                        : 'websiteHint'
+                    "
+                  />
+                  <p id="websiteHint" class="form-hint">{{ t('identity.websiteHint') }}</p>
+                  @if (invalid('website')) {
+                    <p id="websiteError" class="field-error">{{ t(fieldError('website')) }}</p>
+                  } @else if (store.errorCode() === 'INVALID_WEBSITE') {
+                    <p id="websiteError" class="field-error">{{ store.error() }}</p>
+                  }
+                </div>
+              </div>
+            </fieldset>
+            <fieldset [disabled]="store.busy()">
+              <legend>
+                <span class="section-number" aria-hidden="true">02</span
+                >{{ t('identity.administrator') }}
+              </legend>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="fullName">{{ t('identity.fullName') }}</label>
+                  <input
+                    class="identity-input"
+                    id="fullName"
+                    formControlName="fullName"
+                    autocomplete="name"
+                    required
+                    maxlength="200"
+                    [attr.aria-invalid]="invalid('fullName')"
+                    [attr.aria-describedby]="invalid('fullName') ? 'fullNameError' : null"
+                  />
+                  @if (invalid('fullName')) {
+                    <p id="fullNameError" class="field-error">{{ t(fieldError('fullName')) }}</p>
+                  }
+                </div>
+                <div class="form-field">
+                  <label for="role">{{ t('identity.role') }}</label>
+                  <select
+                    class="identity-input"
+                    id="role"
+                    formControlName="professionalRole"
+                    required
+                    [attr.aria-invalid]="invalid('professionalRole')"
+                    [attr.aria-describedby]="invalid('professionalRole') ? 'roleError' : null"
+                  >
+                    <option value="">{{ t('identity.chooseRole') }}</option>
+                    @for (role of store.roles(); track role.id) {
+                      <option [value]="role.id">{{ role.label }}</option>
+                    }
+                  </select>
+                  @if (invalid('professionalRole')) {
+                    <p id="roleError" class="field-error">{{ t('identity.chooseRole') }}</p>
+                  }
+                </div>
+                <div class="form-field field-full">
+                  <label for="email">{{ t('identity.email') }}</label>
+                  <input
+                    class="identity-input"
+                    id="email"
+                    type="email"
+                    formControlName="email"
+                    autocomplete="username"
+                    required
+                    maxlength="254"
+                    [attr.aria-invalid]="invalid('email')"
+                    [attr.aria-describedby]="invalid('email') ? 'emailError' : null"
+                  />
+                  @if (invalid('email')) {
+                    <p id="emailError" class="field-error">{{ t(fieldError('email')) }}</p>
+                  }
+                </div>
+                <div class="form-field field-full">
+                  <label for="password">{{ t('identity.password') }}</label>
+                  <input
+                    class="identity-input"
+                    id="password"
+                    type="password"
+                    formControlName="password"
+                    autocomplete="new-password"
+                    required
+                    minlength="15"
+                    maxlength="128"
+                    [attr.aria-describedby]="
+                      invalid('password') ? 'passwordHint passwordError' : 'passwordHint'
+                    "
+                    [attr.aria-invalid]="invalid('password')"
+                  />
+                  <p id="passwordHint" class="form-hint">{{ t('identity.passwordHint') }}</p>
+                  @if (invalid('password')) {
+                    <p id="passwordError" class="field-error">{{ t(fieldError('password')) }}</p>
+                  }
+                </div>
+              </div>
+            </fieldset>
+            @if (store.rolesError()) {
+              <p role="alert" class="form-alert">
+                {{ t('identity.rolesError') }}
+                <button type="button" class="text-link" (click)="store.loadRoles()">
+                  {{ t('identity.retry') }}
+                </button>
+              </p>
+            }
+            @if (submitted() && registration.invalid) {
+              <p role="alert" class="field-error">{{ t('identity.correctFields') }}</p>
+            }
+            <button
+              class="button register-submit"
+              [disabled]="store.busy() || !store.roles().length"
+            >
+              {{ t('identity.register') }}<span aria-hidden="true">→</span>
+            </button>
+            <p class="form-signin">
+              {{ t('identity.alreadyRegistered') }}
+              <a class="text-link" routerLink="/login">{{ t('identity.login') }}</a>
+            </p>
+          </form>
+        }
+        @if (mode === 'register' && store.pending()) {
+          <div class="delivery-card" aria-live="polite">
+            <span class="delivery-icon" aria-hidden="true">✉</span>
+            <h2>
+              {{
+                t(
+                  store.pending()?.deliveryStatus === 'SMTP_ACCEPTED'
+                    ? 'identity.checkEmail'
+                    : 'identity.deliveryQueued'
+                )
+              }}
+            </h2>
+            <p>{{ t(deliveryMessage()) }}</p>
+          </div>
+        }
+        @if (mode === 'verify') {
+          @if (store.verified()) {
+            <h2 class="!text-2xl" aria-live="polite">{{ t('identity.verified') }}</h2>
+            <p>{{ t('identity.verifiedHint') }}</p>
+            <a class="button" routerLink="/login">{{ t('identity.login') }}</a>
+          } @else {
+            <p>{{ t('identity.verifyHint') }}</p>
+            @if (invalidFragment()) {
+              <p role="alert" class="form-alert">{{ t('identity.invalidLink') }}</p>
+            } @else {
+              <button class="button mb-6" [disabled]="store.busy()" (click)="verify()">
+                {{ t('identity.verify') }}
+              </button>
+            }
+          }
+        }
+        @if (
+          (mode === 'register' && (store.pending() || store.errorCode() === 'EMAIL_UNAVAILABLE')) ||
+          (mode === 'verify' && !store.verified()) ||
+          mode === 'login'
+        ) {
+          <details class="my-8" [open]="mode !== 'login'">
+            <summary>{{ t('identity.resendTitle') }}</summary>
+            <form [formGroup]="resendForm" (ngSubmit)="resend()" class="mt-4 space-y-3">
+              <label for="resendEmail">{{ t('identity.email') }}</label>
+              @if (store.pending(); as pending) {
+                <input
+                  class="identity-input locked-email"
+                  id="resendEmail"
+                  type="email"
+                  [value]="pending.email"
+                  disabled
+                  aria-describedby="emailLockedHint"
+                />
+                <p id="emailLockedHint" class="form-hint">{{ t('identity.emailLocked') }}</p>
+              } @else {
+                <input
+                  class="identity-input"
+                  id="resendEmail"
+                  formControlName="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  [attr.aria-invalid]="
+                    resendForm.controls.email.invalid && resendForm.controls.email.touched
+                  "
+                  [attr.aria-describedby]="
+                    resendForm.controls.email.invalid && resendForm.controls.email.touched
+                      ? 'resendEmailError'
+                      : null
+                  "
+                />
+                @if (resendForm.controls.email.invalid && resendForm.controls.email.touched) {
+                  <p id="resendEmailError" class="field-error">{{ t('identity.emailError') }}</p>
+                }
+              }
+              <button
+                class="button secondary"
+                [disabled]="store.busy() || remaining() > 0 || deliveryInProgress()"
+              >
+                {{ t('identity.resend') }}
+              </button>
+              @if (remaining() > 0) {
+                <p role="status">{{ t('identity.cooldown', { seconds: remaining() }) }}</p>
+              }
+              @if (store.pending() && mode !== 'register') {
+                <p role="status">{{ t(deliveryMessage()) }}</p>
+              }
+            </form>
+          </details>
+        }
+        @if (mode === 'login') {
+          <form [formGroup]="loginForm" (ngSubmit)="login()" class="space-y-5">
+            <div>
+              <label for="loginEmail">{{ t('identity.email') }}</label
+              ><input
+                class="identity-input"
+                id="loginEmail"
+                type="email"
+                formControlName="email"
+                autocomplete="username"
+                required
+              />
+            </div>
+            <div>
+              <label for="loginPassword">{{ t('identity.password') }}</label
+              ><input
+                class="identity-input"
+                id="loginPassword"
+                type="password"
+                formControlName="password"
+                autocomplete="current-password"
+                required
+                maxlength="128"
+              />
+            </div>
+            <button class="button" [disabled]="store.busy()">{{ t('identity.login') }}</button>
+          </form>
+          <p class="mt-6">
+            <a routerLink="/register" class="underline">{{ t('identity.register') }}</a>
+          </p>
+        }
+        @if (mode === 'company') {
+          @if (store.account(); as account) {
+            <section class="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
+              <h2 class="!text-2xl break-words">{{ account.organizationName }}</h2>
+              <p>{{ t('identity.welcome', { name: account.fullName }) }}</p>
+              <p>{{ t('identity.adminReady') }}</p>
+              <button
+                class="button secondary"
+                [disabled]="store.busy()"
+                (click)="store.run({ kind: 'logout' })"
+              >
+                {{ t('identity.logout') }}
+              </button>
+            </section>
+          } @else if (!store.busy()) {
+            <p>{{ t('identity.loginRequired') }}</p>
+            <a class="button" routerLink="/login">{{ t('identity.login') }}</a>
+          }
+        }
       </div>
-      <div>
-        <label for="loginPassword">{{ t('identity.password') }}</label
-        ><input
-          class="identity-input"
-          id="loginPassword"
-          type="password"
-          formControlName="password"
-          autocomplete="current-password"
-          required
-          maxlength="128"
-        />
-      </div>
-      <button class="button" [disabled]="store.busy()">{{ t('identity.login') }}</button>
-    </form>
-    <p class="mt-6"><a routerLink="/register" class="underline">{{ t('identity.register') }}</a></p>
-    } @if (mode === 'company') { @if (store.account(); as account) {
-    <section class="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6">
-      <h2 class="!text-2xl break-words">{{ account.organizationName }}</h2>
-      <p>{{ t('identity.welcome', {name: account.fullName}) }}</p>
-      <p>{{ t('identity.adminReady') }}</p>
-      <button
-        class="button secondary"
-        [disabled]="store.busy()"
-        (click)="store.run({kind: 'logout'})"
-      >
-        {{ t('identity.logout') }}
-      </button>
     </section>
-    } @else if (!store.busy()) {
-    <p>{{ t('identity.loginRequired') }}</p>
-    <a class="button" routerLink="/login">{{ t('identity.login') }}</a>} }
   </main>
 </ng-container>

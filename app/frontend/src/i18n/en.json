@@ -84,11 +84,11 @@
     "password": "Password",
     "role": "Professional role",
     "required": "This field is required (maximum 200 characters).",
-    "websiteHint": "Use the HTTPS root website, for example https://company.co.uk. Do not include www, other subdomains, page paths, query strings, fragments, credentials, or ports.",
+    "websiteHint": "Use your HTTPS root website, e.g. https://company.com.",
     "passwordHint": "Use 15–128 characters. Spaces and passphrases are welcome.",
     "chooseRole": "Choose a professional role",
     "roleHint": "Your professional role does not affect your administrator access.",
-    "emailError": "Enter a valid email address. It does not need to match the company website.",
+    "emailError": "Enter a valid email address.",
     "correctFields": "Please correct the required fields above.",
     "working": "Working…",
     "unavailable": "The service could not complete the request. Check your connection and try again.",
@@ -111,6 +111,30 @@
     "failedDelivery": "The last email attempt failed. We will retry automatically. An earlier link, if any, is unchanged.",
     "queued": "Your registration is saved and your verification email is queued. We will send it shortly. Your organization remains inactive until you verify your email.",
     "deliveryCancelled": "This email request is no longer available. Log in if you have verified your account, or register with another organization.",
-    "deliveryQueued": "Verification email status"
+    "deliveryQueued": "Verification email status",
+    "alreadyRegistered": "Already have an account?",
+    "emailLocked": "This is the email saved with your registration. It cannot be changed here.",
+    "tooLong": "Please shorten this value.",
+    "errors": {
+      "companyName": "Enter your company name.",
+      "specialization": "Enter your company’s specialization.",
+      "website": "Enter your company website.",
+      "fullName": "Enter your full name.",
+      "email": "Enter your email address.",
+      "password": "Create a password with at least 15 characters.",
+      "professionalRole": "Choose your professional role."
+    },
+    "story": {
+      "eyebrow": "A better starting point",
+      "title": "Great teams",
+      "highlight": "keep growing.",
+      "intro": "Every challenge teaches your team something. Give those lessons a place to live—and your next idea a head start.",
+      "context": "Keep the context.",
+      "lesson": "A lesson worth keeping",
+      "idea": "We figured it out.\nLet’s remember how.",
+      "kept": "Ready for what comes next",
+      "caption": "Experience → shared understanding",
+      "outro": "Make what you learn today useful tomorrow."
+    }
   }
 }
