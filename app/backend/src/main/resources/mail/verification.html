@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your BetterF email</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f3f0f7;
+      color: #252331;
+      font-family: Arial, Helvetica, sans-serif;
+    "
+  >
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0; mso-hide: all">
+      One more step to your organization's home. Verify your email to get started.
+    </div>
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="background-color: #f3f0f7"
+    >
+      <tr>
+        <td align="center" style="padding: 32px 16px">
+          <!--[if mso]>
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+          <![endif]-->
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="
+              max-width: 600px;
+              background-color: #ffffff;
+              border: 1px solid #e2dce9;
+              border-radius: 16px;
+            "
+          >
+            <tr>
+              <td
+                style="padding: 30px 28px; background-color: #23212d; border-radius: 16px 16px 0 0"
+              >
+                <p
+                  style="
+                    margin: 0 0 30px;
+                    color: #ffffff;
+                    font-size: 25px;
+                    line-height: 32px;
+                    font-weight: bold;
+                  "
+                >
+                  BetterF<span style="color: #beadff">.</span>
+                </p>
+                <p
+                  style="
+                    margin: 0 0 12px;
+                    color: #beadff;
+                    font-size: 11px;
+                    line-height: 18px;
+                    font-weight: bold;
+                    letter-spacing: 2px;
+                    text-transform: uppercase;
+                  "
+                >
+                  A better starting point
+                </p>
+                <p
+                  style="
+                    margin: 0;
+                    color: #ffffff;
+                    font-size: 32px;
+                    line-height: 40px;
+                    font-weight: bold;
+                  "
+                >
+                  Great teams<br /><span style="color: #beadff">keep growing.</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px 28px">
+                <h1 style="margin: 0 0 16px; color: #252331; font-size: 26px; line-height: 34px">
+                  Verify your email
+                </h1>
+                <p style="margin: 0 0 24px; color: #62616f; font-size: 16px; line-height: 26px">
+                  You're one step away. Confirm your email to complete your organization
+                  registration, activate your organization, and sign in automatically.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td
+                      align="center"
+                      bgcolor="#6850c3"
+                      style="border-radius: 8px; mso-padding-alt: 16px 24px"
+                    >
+                      <a
+                        th:href="${verificationUrl}"
+                        style="
+                          display: inline-block;
+                          padding: 16px 24px;
+                          border: 1px solid #6850c3;
+                          border-radius: 8px;
+                          color: #ffffff;
+                          font-size: 16px;
+                          line-height: 22px;
+                          font-weight: bold;
+                          text-decoration: none;
+                        "
+                        >Verify my email &rarr;</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+                <p
+                  style="
+                    margin: 24px 0;
+                    padding: 16px;
+                    background-color: #f3effb;
+                    border-left: 3px solid #6850c3;
+                    color: #514565;
+                    font-size: 14px;
+                    line-height: 22px;
+                  "
+                >
+                  <strong>This link expires in 24 hours.</strong><br />If you requested another
+                  verification email, use the link in the latest email.
+                </p>
+                <p style="margin: 0 0 8px; color: #62616f; font-size: 13px; line-height: 21px">
+                  Button not working? Copy and paste this link into your browser:
+                </p>
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 13px;
+                    line-height: 21px;
+                    overflow-wrap: anywhere;
+                    word-break: break-all;
+                  "
+                >
+                  <a
+                    th:href="${verificationUrl}"
+                    style="
+                      color: #5841ae;
+                      text-decoration: underline;
+                      overflow-wrap: anywhere;
+                      word-break: break-all;
+                    "
+                    th:text="${verificationUrl}"
+                    >Verification link</a
+                  >
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 24px 28px; border-top: 1px solid #e8e3ef">
+                <p style="margin: 0 0 12px; color: #62616f; font-size: 13px; line-height: 21px">
+                  If you did not register with BetterF, you can safely ignore this email.
+                </p>
+                <p style="margin: 0; color: #6850c3; font-size: 13px; line-height: 21px">
+                  Make what you learn today useful tomorrow.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <!--[if mso]>
+          </td></tr></table>
+          <![endif]-->
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

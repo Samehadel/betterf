@@ -1,0 +1,16 @@
+BetterF
+
+Great teams keep growing.
+
+Verify your email to complete your organization registration. Your organization
+will become active, and you will be signed in automatically.
+
+Verify my email:
+[(${verificationUrl})]
+
+This link expires in 24 hours. If you requested another verification email,
+use the link in the latest email.
+
+If you did not register with BetterF, you can safely ignore this email.
+
+Make what you learn today useful tomorrow.

@@ -169,6 +169,16 @@ configured SMTP sender and credentials (`MAIL_FROM`, `SMTP_USER`, `SMTP_PASSWORD
 `SMTP_AUTH=true`, `SMTP_STARTTLS=true`) and HTTPS with secure session cookies.
 The deployment compose file must receive these settings before public release.
 
+Verification emails use Thymeleaf to render the packaged backend resources
+`backend/src/main/resources/mail/verification.html` and `verification.txt`.
+The HTML version matches the application branding and includes a verification
+button, a copyable fallback link, and the 24-hour expiry notice. Each message
+contains UTF-8 HTML and plain-text alternatives. Thymeleaf caches the parsed
+templates; template changes require rebuilding and deploying the backend.
+HTML uses escaped `th:href` and `th:text` bindings, while the TEXT-mode template
+preserves the URL verbatim; it never changes the credential
+or the fragment-based verification flow. No external image or stylesheet is needed.
+
 Email sending runs in a background worker every five seconds, in batches of 25.
 A PostgreSQL session advisory lock on a dedicated connection prevents overlapping
 runs across application instances. Use direct PostgreSQL or session pooling;

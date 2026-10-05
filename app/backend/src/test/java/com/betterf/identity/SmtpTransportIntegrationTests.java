@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.betterf.identity.api.exception.EmailDeliveryException;
 import com.betterf.identity.internal.service.SmtpVerificationMail;
+import com.betterf.identity.internal.service.VerificationEmailTemplate;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -32,6 +33,7 @@ class SmtpTransportIntegrationTests {
             var mail =
                     new SmtpVerificationMail(
                             sender,
+                            new VerificationEmailTemplate(),
                             "http://localhost:4200",
                             "verified@example.com",
                             sender.getHost());
@@ -49,7 +51,11 @@ class SmtpTransportIntegrationTests {
                                                 .isEqualTo("SMTP_DELIVERY_FAILED"));
             }
             String payload = received.get(5, TimeUnit.SECONDS);
-            assertThat(payload).contains("/verify#" + id + ".test-token");
+            assertThat(payload)
+                    .contains("/verify#" + id + ".test-token", "multipart/alternative")
+                    .containsPattern("Content-Type: text/plain;\\s*charset=UTF-8")
+                    .containsPattern("Content-Type: text/html;\\s*charset=UTF-8")
+                    .doesNotContain("${verificationUrl}");
             if (accept) {
                 assertThat(payload).contains("Message-ID: " + messageId);
             }
