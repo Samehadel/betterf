@@ -132,7 +132,7 @@ For the first AWS development pipeline and server setup, see
 [AWS deployment](../deploy/aws/README.md). Deployment remains disabled until its
 repository setting and AWS resources are configured.
 
-English is the temporary foundation resource language, not a decision on supported product languages. Organization onboarding and session authentication are implemented in the identity module. Invitation/member workflows and password recovery remain separate work. No demonstration product accounts are installed.
+English is the temporary foundation resource language, not a decision on supported product languages. Organization onboarding and session authentication are implemented in the identity module. Member acceptance, invitation management, and password recovery remain separate work. No demonstration product accounts are installed.
 
 
 ## Organization registration (BTF-5)
@@ -199,7 +199,7 @@ messages on retry. No raw token is stored for replay.
 
 Repeated submission never overwrites an existing pending account's profile. Hourly
 cleanup removes pending data older than 30 days in batches of 100, excluding SENDING.
-Invitations, member views, password recovery, and ingress abuse controls remain
+Member acceptance, invitation management, member views, password recovery, and ingress abuse controls remain
 separate release dependencies.
 
 ### Brevo SMTP configuration
@@ -239,3 +239,26 @@ frontend `npm test`, `npm run typecheck`, `npm run build`, and `npm run test:e2e
 Onboarding browser tests require Mailpit (HTTP API defaults to localhost:8025;
 override `MAILPIT_URL`) and a fresh disposable database. They send only local
 captured test emails.
+
+## Team invitations
+
+Verified administrators can open **Invite a colleague** from the company home.
+`/company/invitations` sends one email per row. A successful relay submission locks
+its row and exposes **Add another invitation**; failed sends remain editable.
+Uncertain responses offer **Check send status** rather than an automatic resend.
+SMTP acceptance does not guarantee inbox delivery.
+
+`INVITATION_MAX_ACTIVE_ACCOUNTS` sets the default active-account cap (10). A positive
+`ORGANIZATION.MAX_ACTIVE_ACCOUNTS` overrides it for an individual organization.
+Active administrators count toward the cap; pending invitations do not. Invitation
+links expire after seven days; administrator verification retains its 24-hour expiry.
+HTML invitation emails are stored in backend `resources/mail/team-invitation.html`
+and use the same SMTP and PUBLIC_ORIGIN configuration as verification emails.
+
+Member acceptance/account setup is delivered separately by BTF-7; the acceptance
+link targets `/invitation/accept`, which that story must implement. Pending-management
+navigation currently explains that resend/revoke tools arrive with BTF-8. Invitation
+sending is available for integration, but the recipient journey is not release-ready
+until BTF-7 is delivered. Provider submission and database commits cannot be atomic;
+SENDING records left by a crash or persistence failure require operator investigation
+before retry. See [invitation architecture](../architecture/backend/team-invitations.md).

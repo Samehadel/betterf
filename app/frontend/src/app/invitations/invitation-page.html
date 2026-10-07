@@ -1,0 +1,43 @@
+<ng-container *transloco="let t">
+<a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+<header class="top"><nav class="wrap" aria-label="Main navigation">
+<a class="brand" routerLink="/company">BetterF<span class="text-[var(--accent)]">.</span></a>
+<a routerLink="/company">{{ t('invitations.back') }}</a>
+</nav></header>
+<main id="main" tabindex="-1" class="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-16">
+@if (loading()) { <p role="status">{{ t('invitations.loading') }}</p> }
+@else if (loadFailed()) { <p role="alert">{{ t('invitations.loadFailed') }}</p><button type="button" class="button mt-6" (click)="load()">{{ t('foundation.retry') }}</button> }
+@else if (account()?.accessRole !== 'ADMIN') {
+<section class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-8">
+<h1 class="text-3xl font-semibold">{{ t('invitations.title') }}</h1>
+<p role="alert" class="my-6">{{ t('invitations.denied') }}</p><a class="button" routerLink="/login">{{ t('identity.login') }}</a>
+</section>
+} @else {
+<div class="workspace-breadcrumb"><a routerLink="/company">{{ account()?.organizationName }}</a><span aria-hidden="true">/</span>{{ t('invitations.team') }}</div>
+<div class="mb-9"><p class="eyebrow">{{ t('invitations.eyebrow') }}</p>
+<h1 class="mb-4 text-4xl font-semibold tracking-tight sm:text-5xl">{{ t('invitations.title') }}</h1>
+<p class="max-w-xl text-[var(--muted)]">{{ t('invitations.intro') }}</p></div>
+<section class="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-8" aria-labelledby="invitation-form-title">
+<div class="mb-7 flex items-center gap-4"><span aria-hidden="true" class="workspace-icon">↗</span><div>
+<h2 id="invitation-form-title" class="text-xl font-semibold">{{ t('invitations.formTitle') }}</h2>
+<p class="mt-1 text-sm text-[var(--muted)]">{{ t('invitations.formHint') }}</p></div></div>
+@for (row of store.rows(); track row.id) {
+<form #form="ngForm" (ngSubmit)="send(row, !!form.valid)" novalidate class="border-t border-[var(--line)] py-6" [attr.aria-busy]="row.state === 'sending'">
+<label [for]="'invitation-email-' + row.id" class="mb-2 block text-sm font-medium">{{ t('invitations.email') }} {{ row.id }}</label>
+<div class="flex flex-col gap-3 sm:flex-row">
+<input [id]="'invitation-email-' + row.id" class="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-[var(--text)] disabled:opacity-70" type="email" name="email" required email maxlength="254" autocomplete="email" [ngModel]="row.email" (ngModelChange)="store.updateEmail(row.id, $event)" [disabled]="row.state === 'sent' || row.state === 'sending' || row.state === 'uncertain'" [attr.aria-invalid]="row.state === 'error' && row.message === 'invitations.invalid'" [attr.aria-describedby]="'invitation-result-' + row.id" placeholder="colleague@example.com" />
+<button class="button" type="submit" [disabled]="row.state === 'sent' || row.state === 'sending' || row.state === 'uncertain'">{{ t(row.state === 'sending' ? 'invitations.sending' : row.state === 'sent' ? 'invitations.sent' : 'invitations.send') }}</button>
+</div>
+<div [id]="'invitation-result-' + row.id" role="status" aria-live="polite" aria-atomic="true" class="mt-3 text-sm" [class.text-green-300]="row.state === 'sent'" [class.text-red-300]="row.state === 'error'" [class.text-amber-200]="row.state === 'pending' || row.state === 'uncertain'">
+@if (row.state === 'sending') { {{ t('invitations.sending') }} }
+@else if (row.message) { {{ row.message.startsWith('invitations.') ? t(row.message) : row.message }} }
+</div>
+@if (row.state === 'uncertain') { <button type="button" class="button secondary mt-3" (click)="store.check(row.id)">{{ t('invitations.check') }}</button> }
+@if (row.state === 'pending') { <a class="mt-3 inline-block underline" routerLink="/company/invitations/pending">{{ t('invitations.manage') }}</a> }
+@if (row.state === 'sent' && $last) { <button class="button secondary mt-5" type="button" (click)="add(row.id)" [attr.aria-label]="t('invitations.add')"><span aria-hidden="true">＋</span> {{ t('invitations.add') }}</button> }
+</form>
+}
+</section>
+<p class="mt-6 max-w-xl text-sm text-[var(--muted)]">{{ t('invitations.footer') }}</p>
+}
+</main></ng-container>
