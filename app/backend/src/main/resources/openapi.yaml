@@ -8,6 +8,27 @@ info:
     Secure by default), 30-minute inactivity timeout. All mutations require CSRF.'
 paths:
   /api/invitations:
+    get:
+      operationId: getInvitationHistory
+      summary: Load saved invitation records for the verified administrator's company.
+      description: Returns 25 records per page, newest attempt first. Read-only; does not send email or expose tokens.
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, maximum: 85899345, default: 0 }
+      responses:
+        '200':
+          description: Company-scoped invitation records and whether older records exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationHistoryEnvelope'
+        '400':
+          description: Invalid page.
+        '403':
+          description: Authentication or verified-administrator authorization denied.
     post:
       operationId: sendTeamInvitation
       summary: Send one team invitation as a verified company administrator.
@@ -472,6 +493,21 @@ components:
       in: cookie
       name: JSESSIONID
   schemas:
+    InvitationHistoryEnvelope:
+      type: object
+      required: [data, error]
+      properties:
+        error: { type: 'null' }
+        data:
+          type: object
+          required: [invitations, hasMore]
+          properties:
+            invitations:
+              type: array
+              maxItems: 25
+              items:
+                $ref: '#/components/schemas/InvitationEnvelope/properties/data'
+            hasMore: { type: boolean }
     InvitationEnvelope:
       type: object
       required: [data, error]

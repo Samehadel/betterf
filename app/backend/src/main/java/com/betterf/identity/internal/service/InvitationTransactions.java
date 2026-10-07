@@ -8,6 +8,8 @@ import com.betterf.identity.internal.repository.*;
 import jakarta.validation.Validator;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,12 +48,18 @@ public class InvitationTransactions {
 
     private AccountEntity administrator(String email) {
         return accounts.findByEmail(IdentityServiceImpl.normalizeEmail(email))
-                .filter(a -> a.getStatus() == AccountStatus.ACTIVE
-                        && a.getOrganization().getStatus() == OrganizationStatus.ACTIVE
-                        && "ADMIN".equals(a.getAccessRole()))
-                .orElseThrow(() -> new IdentityException(
-                        403, "ACCESS_DENIED",
-                        "Only a verified administrator can invite team members."));
+                .filter(
+                        a ->
+                                a.getStatus() == AccountStatus.ACTIVE
+                                        && a.getOrganization().getStatus()
+                                                == OrganizationStatus.ACTIVE
+                                        && "ADMIN".equals(a.getAccessRole()))
+                .orElseThrow(
+                        () ->
+                                new IdentityException(
+                                        403,
+                                        "ACCESS_DENIED",
+                                        "Only a verified administrator can invite team members."));
     }
 
     private String recipient(InvitationRequest request) {
@@ -70,35 +78,49 @@ public class InvitationTransactions {
         // Acceptance must acquire these locks in the same order.
         locks.lock("email:" + email);
         locks.lock("organization:" + admin.getOrganization().getId());
-        var member = accounts.findByEmail(email)
-                .filter(a -> a.getAccessRole() != null
-                        || a.getStatus() == AccountStatus.ACTIVE
-                        || a.getOrganization().getStatus() == OrganizationStatus.ACTIVE);
+        var member =
+                accounts.findByEmail(email)
+                        .filter(
+                                a ->
+                                        a.getAccessRole() != null
+                                                || a.getStatus() == AccountStatus.ACTIVE
+                                                || a.getOrganization().getStatus()
+                                                        == OrganizationStatus.ACTIVE);
         if (member.isPresent()) {
-            boolean same = member.get().getOrganization().getId()
-                    .equals(admin.getOrganization().getId());
+            boolean same =
+                    member.get().getOrganization().getId().equals(admin.getOrganization().getId());
             throw new IdentityException(
                     409,
                     same ? "ALREADY_MEMBER" : "OTHER_COMPANY_MEMBER",
-                    same ? "Already a member."
-                            : "This email already belongs to another company. Use a different email address.");
+                    same
+                            ? "Already a member."
+                            : "This email already belongs to another company. Use a different email"
+                                    + " address.");
         }
-        var existing = invitations.findByOrganizationIdAndEmail(
-                admin.getOrganization().getId(), email).orElse(null);
+        var existing =
+                invitations
+                        .findByOrganizationIdAndEmail(admin.getOrganization().getId(), email)
+                        .orElse(null);
         if (existing != null && "SENDING".equals(existing.getStatus())) {
             return new Claim(view(existing), null, null);
         }
-        if (existing != null && "SMTP_ACCEPTED".equals(existing.getStatus())
+        if (existing != null
+                && "SMTP_ACCEPTED".equals(existing.getStatus())
                 && clock.instant().isBefore(existing.getExpiresAt())) {
             throw new IdentityException(409, "INVITATION_PENDING", "Invitation already pending");
         }
-        int limit = admin.getOrganization().getMaxActiveAccounts() == null
-                ? defaultLimit : admin.getOrganization().getMaxActiveAccounts();
+        int limit =
+                admin.getOrganization().getMaxActiveAccounts() == null
+                        ? defaultLimit
+                        : admin.getOrganization().getMaxActiveAccounts();
         if (accounts.countByOrganizationIdAndStatus(
-                admin.getOrganization().getId(), AccountStatus.ACTIVE) >= limit) {
+                        admin.getOrganization().getId(), AccountStatus.ACTIVE)
+                >= limit) {
             throw new IdentityException(
-                    409, "ACCOUNT_LIMIT",
-                    "Your organization has reached its limit of " + limit
+                    409,
+                    "ACCOUNT_LIMIT",
+                    "Your organization has reached its limit of "
+                            + limit
                             + " active accounts. You cannot send invitations.");
         }
         var invitation = existing == null ? new InvitationEntity() : existing;
@@ -141,24 +163,49 @@ public class InvitationTransactions {
     }
 
     @Transactional(readOnly = true)
+    public InvitationPageView history(String actor, int page) {
+        var admin = administrator(actor);
+        if (page < 0 || page > Integer.MAX_VALUE / 25) {
+            throw new IdentityException(400, "INVALID_REQUEST", "Choose a valid invitation page.");
+        }
+        var invitationsPage =
+                invitations.findByOrganizationId(
+                        admin.getOrganization().getId(),
+                        PageRequest.of(
+                                page, 25, Sort.by(Sort.Direction.DESC, "attemptedAt", "id")));
+        return new InvitationPageView(
+                invitationsPage.getContent().stream().map(this::view).toList(),
+                invitationsPage.hasNext());
+    }
+
+    @Transactional(readOnly = true)
     public InvitationView status(String actor, InvitationRequest request) {
         var admin = administrator(actor);
-        return invitations.findByOrganizationIdAndEmail(
-                admin.getOrganization().getId(), recipient(request))
+        return invitations
+                .findByOrganizationIdAndEmail(admin.getOrganization().getId(), recipient(request))
                 .map(this::view)
-                .orElseThrow(() -> new IdentityException(
-                        404, "INVITATION_NOT_FOUND", "No invitation was found. You can retry sending."));
+                .orElseThrow(
+                        () ->
+                                new IdentityException(
+                                        404,
+                                        "INVITATION_NOT_FOUND",
+                                        "No invitation was found. You can retry sending."));
     }
 
     private InvitationView view(InvitationEntity invitation) {
-        String message = switch (invitation.getStatus()) {
-            case "SMTP_ACCEPTED" -> "Invitation sent. The email service accepted it for delivery.";
-            case "FAILED" -> "The email could not be sent. Check the address and retry.";
-            case "SENDING" -> "Sending invitation. Please wait.";
-            default -> "Invitation is no longer pending.";
-        };
+        String message =
+                switch (invitation.getStatus()) {
+                    case "SMTP_ACCEPTED" ->
+                            "Invitation sent. The email service accepted it for delivery.";
+                    case "FAILED" -> "The email could not be sent. Check the address and retry.";
+                    case "SENDING" -> "Sending invitation. Please wait.";
+                    default -> "Invitation is no longer pending.";
+                };
         return new InvitationView(
-                invitation.getId(), invitation.getEmail(), invitation.getStatus(),
-                invitation.getExpiresAt(), message);
+                invitation.getId(),
+                invitation.getEmail(),
+                invitation.getStatus(),
+                invitation.getExpiresAt(),
+                message);
     }
 }

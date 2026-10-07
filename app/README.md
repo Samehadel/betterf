@@ -245,6 +245,9 @@ captured test emails.
 Verified administrators can open **Invite a colleague** from the company home.
 `/company/invitations` sends one email per row. A successful relay submission locks
 its row and exposes **Add another invitation**; failed sends remain editable.
+**Previous invitations** loads saved company records each time the page opens,
+including after navigation or refresh. Older records are available with **Load more
+invitations**; this section is read-only and never resends email.
 Uncertain responses offer **Check send status** rather than an automatic resend.
 SMTP acceptance does not guarantee inbox delivery.
 

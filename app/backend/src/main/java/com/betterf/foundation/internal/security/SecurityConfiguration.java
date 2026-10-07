@@ -109,7 +109,12 @@ class SecurityConfiguration {
                                         .permitAll()
                                         .requestMatchers(HttpMethod.GET, "/api/auth/me")
                                         .authenticated()
-                                        .requestMatchers(HttpMethod.POST, "/api/invitations", "/api/invitations/status")
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/api/invitations",
+                                                "/api/invitations/status")
+                                        .hasRole("ADMIN")
+                                        .requestMatchers(HttpMethod.GET, "/api/invitations")
                                         .hasRole("ADMIN")
                                         .anyRequest()
                                         .denyAll())

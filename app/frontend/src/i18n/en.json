@@ -191,6 +191,21 @@
     "pendingTitle": "Pending invitations",
     "pendingHint": "Resending and managing pending invitations will be available in a future update. Your existing invitation remains unchanged.",
     "backToInvitations": "Back to invitations",
-    "loadFailed": "We could not load your account. Please try again."
+    "loadFailed": "We could not load your account. Please try again.",
+    "historyTitle": "Previous invitations",
+    "historyHint": "Saved invitations for your organization, newest first.",
+    "historyEmpty": "No previous invitations yet.",
+    "historyLoading": "Loading previous invitations…",
+    "historyError": "Previous invitations could not be loaded. Please try again.",
+    "linkExpiry": "Link expiry:",
+    "loadMore": "Load more invitations",
+    "status": {
+      "sent": "Sent",
+      "failed": "Failed",
+      "sending": "Sending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "recorded": "Recorded"
+    }
   }
 }

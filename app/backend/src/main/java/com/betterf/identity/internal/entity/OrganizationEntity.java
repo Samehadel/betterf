@@ -12,7 +12,8 @@ import java.util.UUID;
 @Getter
 @Setter
 public class OrganizationEntity {
-    @Id private UUID id;
+    @Id
+    private UUID id;
 
     @Column(nullable = false, length = 200)
     private String name;
