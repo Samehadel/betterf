@@ -78,6 +78,25 @@ If changing `DB_PORT`, change the port in `DB_URL` too. If changing `SERVER_PORT
 
 Spring Security permits the status/probe endpoints and the documented registration and authentication endpoints. Mutations require CSRF; company access requires an authenticated account and active account/organization statuses. Unknown endpoints remain denied and no default development user is generated. The handwritten OpenAPI contract is `backend/src/main/resources/openapi.yaml`; it is packaged as a resource, not exposed as a public documentation endpoint.
 
+## Verification email scheduling
+
+Verification delivery uses JDBC ShedLock and the Liquibase-managed `SHEDLOCK` table.
+The scheduler calls the worker through its Spring proxy so `@SchedulerLock` also
+protects direct worker invocations. Competing invocations skip work; the lease is
+released after completion or failure. Database time controls lease expiry.
+
+`betterf.registration.delivery.enabled=false` disables automatic delivery, and
+`betterf.registration.delivery.delay` defaults to 5000 milliseconds.
+`betterf.registration.delivery.lock-at-most-for` defaults to `10m`; keep it longer
+than the maximum duration of a 25-email batch, including SMTP and database calls.
+An invocation still running after lease expiry can overlap another worker.
+
+When upgrading from the advisory-lock worker, stop or disable delivery on all old
+instances before enabling the new worker: the two locking mechanisms do not
+coordinate. Liquibase creates the lock table at startup. Rolling back the code can
+leave this additive table in place; dropping it requires all ShedLock workers to
+be stopped.
+
 ## Application version
 
 The repository root `VERSION` is authoritative. Gradle reads it; frontend package

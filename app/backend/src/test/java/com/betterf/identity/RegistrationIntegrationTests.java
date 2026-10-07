@@ -512,7 +512,7 @@ class RegistrationIntegrationTests {
                                 jdbc.queryForObject(
                                         "SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
                         .isEqualTo("SENDING");
-                assertThat(worker.runOnce()).isFalse();
+                assertThat(worker.runOnce()).isNull();
                 assertThat(identity.resend("ada@example.com").deliveryStatus())
                         .isEqualTo("SENDING");
             } finally {
@@ -534,6 +534,30 @@ class RegistrationIntegrationTests {
         when(clock.instant()).thenReturn(start.plus(Duration.ofDays(31)));
         cleanup.deleteAbandoned();
         assertThat(count("ACCOUNT")).isEqualTo(1);
+    }
+
+    @Test
+    void unexpiredLeaseSkipsWorkAndExpiredLeaseAllowsRecovery() {
+        assertThat(worker.runOnce()).isTrue();
+        identity.register(request("ada@example.com", "company.com"));
+        jdbc.update(
+                "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '1 minute'"
+                        + " WHERE NAME = 'verification-email-worker'");
+        try {
+            assertThat(worker.runOnce()).isNull();
+            verifyNoInteractions(mail);
+        } finally {
+            jdbc.update(
+                    "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 second'"
+                            + " WHERE NAME = 'verification-email-worker'");
+        }
+        assertThat(worker.runOnce()).isTrue();
+        assertThat(identity.deliveryStatus("ada@example.com").deliveryStatus())
+                .isEqualTo("SMTP_ACCEPTED");
+        assertThat(jdbc.queryForObject(
+                        "SELECT LOCK_UNTIL <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') FROM SHEDLOCK"
+                                + " WHERE NAME = 'verification-email-worker'", Boolean.class))
+                .isTrue();
     }
 
     @Test

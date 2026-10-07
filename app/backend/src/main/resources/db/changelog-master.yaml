@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/identity/20261004-001-registration.sql
   - include:
       file: db/identity/20261004-002-email-worker.sql
+  - include:
+      file: db/foundation/20261007-001-shedlock.sql
