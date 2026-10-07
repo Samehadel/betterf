@@ -1,3 +1,4 @@
+import { InvitationStore } from './invitations/invitation.store';
 import { IdentityStore } from './identity/identity.store';
 import { Routes } from '@angular/router';
 import { StatusStore } from './foundation/status.store';
@@ -12,6 +13,16 @@ export const routes: Routes = [
     path: 'status',
     providers: [StatusStore],
     loadComponent: () => import('./foundation/status-page').then((m) => m.StatusPage),
+  },
+  {
+    path: 'company/invitations/pending',
+    providers: [InvitationStore],
+    loadComponent: () => import('./invitations/invitation-handoff-page').then((m) => m.InvitationHandoffPage),
+  },
+  {
+    path: 'company/invitations',
+    providers: [InvitationStore],
+    loadComponent: () => import('./invitations/invitation-page').then((m) => m.InvitationPage),
   },
   ...(['register', 'verify', 'login', 'company'] as const).map((mode) => ({
     path: mode,

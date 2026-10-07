@@ -61,3 +61,5 @@ betterf:
   registration:
     public-origin: ${PUBLIC_ORIGIN:http://127.0.0.1:4200}
     mail-from: ${MAIL_FROM:no-reply@betterf.local}
+  invitations:
+    max-active-accounts: ${INVITATION_MAX_ACTIVE_ACCOUNTS:10}

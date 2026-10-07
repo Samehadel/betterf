@@ -7,6 +7,83 @@ info:
     organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
     Secure by default), 30-minute inactivity timeout. All mutations require CSRF.'
 paths:
+  /api/invitations:
+    get:
+      operationId: getInvitationHistory
+      summary: Load saved invitation records for the verified administrator's company.
+      description: Returns 25 records per page, newest attempt first. Read-only; does not send email or expose tokens.
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, maximum: 85899345, default: 0 }
+      responses:
+        '200':
+          description: Company-scoped invitation records and whether older records exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationHistoryEnvelope'
+        '400':
+          description: Invalid page.
+        '403':
+          description: Authentication or verified-administrator authorization denied.
+    post:
+      operationId: sendTeamInvitation
+      summary: Send one team invitation as a verified company administrator.
+      description: |
+        Recipient membership is checked before pending invitation status. New sends
+        check the organization's configured active-account cap (default 10), including
+        its administrator. Pending invitations reserve neither membership nor capacity.
+        SENDING is persisted before SMTP; SMTP_ACCEPTED is success after relay acceptance
+        and persistence, not guaranteed inbox delivery. FAILED remains retryable.
+        Repeated requests during SENDING do not submit another email. Lost responses
+        must be reconciled with /api/invitations/status before retrying.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        $ref: '#/components/requestBodies/InvitationEmail'
+      responses:
+        '200':
+          description: SMTP_ACCEPTED, FAILED, or an already SENDING attempt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationEnvelope'
+        '400':
+          description: Invalid email; INVALID_REQUEST.
+        '403':
+          description: Authentication, CSRF, or verified-administrator authorization denied.
+        '409':
+          description: ALREADY_MEMBER, OTHER_COMPANY_MEMBER, INVITATION_PENDING, or ACCOUNT_LIMIT. No email sent.
+        '500':
+          description: Persistence failure; outcome may be uncertain. Check status before retry.
+  /api/invitations/status:
+    post:
+      operationId: getTeamInvitationSendStatus
+      summary: Reconcile a send outcome within the authenticated administrator's company.
+      security:
+        - SessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        $ref: '#/components/requestBodies/InvitationEmail'
+      responses:
+        '200':
+          description: Current send state; does not send email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationEnvelope'
+        '400':
+          description: Invalid email.
+        '403':
+          description: Authentication, CSRF, or verified-administrator authorization denied.
+        '404':
+          description: INVITATION_NOT_FOUND in this company; safe to retry sending.
   /api/status:
     get:
       operationId: getStatus
@@ -393,12 +470,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
+  parameters:
+    InvitationCsrf:
+      in: header
+      name: X-CSRF-TOKEN
+      required: true
+      schema: { type: string }
+      description: Token from /api/auth/csrf with its session cookie.
+  requestBodies:
+    InvitationEmail:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email: { type: string, format: email, maxLength: 254 }
   securitySchemes:
     SessionCookie:
       type: apiKey
       in: cookie
       name: JSESSIONID
   schemas:
+    InvitationHistoryEnvelope:
+      type: object
+      required: [data, error]
+      properties:
+        error: { type: 'null' }
+        data:
+          type: object
+          required: [invitations, hasMore]
+          properties:
+            invitations:
+              type: array
+              maxItems: 25
+              items:
+                $ref: '#/components/schemas/InvitationEnvelope/properties/data'
+            hasMore: { type: boolean }
+    InvitationEnvelope:
+      type: object
+      required: [data, error]
+      properties:
+        error: { type: 'null' }
+        data:
+          type: object
+          required: [id, email, status, expiresAt, message]
+          properties:
+            id: { type: string, format: uuid }
+            email: { type: string, format: email }
+            status: { type: string, enum: [SENDING, SMTP_ACCEPTED, FAILED, REVOKED, ACCEPTED] }
+            expiresAt: { type: string, format: date-time }
+            message: { type: string }
     ErrorEnvelope:
       type: object
       required:

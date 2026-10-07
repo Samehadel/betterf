@@ -114,6 +114,9 @@
               <p class="eyebrow">{{ t('identity.home.nextEyebrow') }}</p>
               <h2 id="workspace-note-title">{{ t('identity.home.nextTitle') }}</h2>
               <p>{{ t('identity.home.nextDescription') }}</p>
+              @if (account.accessRole === 'ADMIN') {
+                <a class="button" routerLink="/company/invitations">{{ t('invitations.formTitle') }}</a>
+              }
               <div class="workspace-upcoming">
                 <span>{{ t('identity.home.comingSoon') }}</span
                 >{{ t('identity.home.teamTools') }}
