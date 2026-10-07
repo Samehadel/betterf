@@ -15,6 +15,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-liquibase'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
     implementation 'com.google.guava:guava:33.4.8-jre'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
