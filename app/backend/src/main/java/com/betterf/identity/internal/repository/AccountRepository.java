@@ -11,6 +11,8 @@ import java.util.*;
 public interface AccountRepository extends JpaRepository<AccountEntity, UUID> {
     Optional<AccountEntity> findByEmail(String email);
 
+    long countByOrganizationIdAndStatus(UUID organizationId, AccountStatus status);
+
     @Query("select a.email from AccountEntity a where a.id = :id")
     Optional<String> emailForId(UUID id);
 

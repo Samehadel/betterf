@@ -12,7 +12,8 @@ import java.util.UUID;
 @Getter
 @Setter
 public class OrganizationEntity {
-    @Id private UUID id;
+    @Id
+    private UUID id;
 
     @Column(nullable = false, length = 200)
     private String name;
@@ -22,6 +23,9 @@ public class OrganizationEntity {
 
     @Column(nullable = false, length = 200)
     private String specialization;
+
+    // Null uses the configured default; an organization may override its active-account cap.
+    private Integer maxActiveAccounts;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
