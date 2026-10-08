@@ -1,13 +1,20 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { IdentityStore } from './identity.store';
 describe('Identity workflow', () => {
   let store: InstanceType<typeof IdentityStore>;
   let http: HttpTestingController;
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [IdentityStore, provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        IdentityStore,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
     store = TestBed.inject(IdentityStore);
     http = TestBed.inject(HttpTestingController);
@@ -25,7 +32,10 @@ describe('Identity workflow', () => {
     const first = http.expectOne('/api/registration/resend');
     expect(first.request.headers.get('X-CSRF-TOKEN')).toBe('masked-token');
     first.flush({
-      data: { email: 'ada@example.com', resendAvailableAt: '2026-10-04T12:01:00Z' },
+      data: {
+        email: 'ada@example.com',
+        resendAvailableAt: '2026-10-04T12:01:00Z',
+      },
       error: null,
     });
     expect(store.pending()?.email).toBe('ada@example.com');
@@ -35,7 +45,10 @@ describe('Identity workflow', () => {
     const second = http.expectOne('/api/registration/resend');
     expect(second.request.headers.get('X-CSRF-TOKEN')).toBe('new-token');
     second.flush(
-      { data: null, error: { code: 'RESEND_COOLDOWN', message: 'Wait 60 seconds.' } },
+      {
+        data: null,
+        error: { code: 'RESEND_COOLDOWN', message: 'Wait 60 seconds.' },
+      },
       { status: 429, statusText: 'Too many requests' },
     );
     expect(store.pending()?.resendAvailableAt).toBe('2026-10-04T12:01:00Z');
@@ -48,24 +61,32 @@ describe('Identity workflow', () => {
     http
       .expectOne('/api/registration/verify')
       .flush(
-        { data: null, error: { code: 'EXPIRED_VERIFICATION', message: 'Expired' } },
+        {
+          data: null,
+          error: { code: 'EXPIRED_VERIFICATION', message: 'Expired' },
+        },
         { status: 400, statusText: 'Bad request' },
       );
     expect(store.verified()).toBe(false);
     expect(store.error()).toBe('Expired');
     store.run({ kind: 'verify', id: 'id', token: 'replacement' });
     csrf();
-    http
-      .expectOne('/api/registration/verify')
-      .flush({
-        data: { status: 'VERIFIED', account: { id: 'one', email: 'ada@example.com' } },
-        error: null,
-      });
+    http.expectOne('/api/registration/verify').flush({
+      data: {
+        status: 'VERIFIED',
+        account: { id: 'one', email: 'ada@example.com' },
+      },
+      error: null,
+    });
     expect(store.verified()).toBe(true);
     expect(store.error()).toBe('');
   });
-  it('does not submit concurrent actions and clears stale account when entering a page again', () => {
-    store.run({ kind: 'login', email: 'ada@example.com', password: 'passphrase' });
+  it('does not submit concurrent actions and preserves the shared account on page reset', () => {
+    store.run({
+      kind: 'login',
+      email: 'ada@example.com',
+      password: 'passphrase',
+    });
     store.run({ kind: 'login', email: 'other@example.com', password: 'other' });
     csrf();
     http.expectOne('/api/auth/login').flush({
@@ -74,20 +95,35 @@ describe('Identity workflow', () => {
     });
     expect(store.account()?.id).toBe('one');
     store.clear();
-    expect(store.account()).toBeNull();
+    expect(store.account()?.id).toBe('one');
   });
-  it('clears the account when a later current-account check denies access', () => {
+  it('reuses the account on later current-account checks', () => {
     store.run({ kind: 'current' });
     http.expectOne('/api/auth/me').flush({ data: { id: 'one' }, error: null });
     store.run({ kind: 'current' });
-    http
-      .expectOne('/api/auth/me')
-      .flush(
-        { data: null, error: { code: 'ACCESS_DENIED', message: 'Denied' } },
-        { status: 403, statusText: 'Forbidden' },
-      );
-    expect(store.account()).toBeNull();
+    http.expectNone('/api/auth/me');
+    expect(store.account()?.id).toBe('one');
     expect(store.busy()).toBe(false);
+  });
+  it('clears shared account only after successful logout', () => {
+    store.run({
+      kind: 'login',
+      email: 'ada@example.com',
+      password: 'passphrase',
+    });
+    csrf();
+    http.expectOne('/api/auth/login').flush({ data: { id: 'one' } });
+    store.run({ kind: 'logout' });
+    csrf();
+    http
+      .expectOne('/api/auth/logout')
+      .flush({}, { status: 500, statusText: 'Failure' });
+    expect(store.account()?.id).toBe('one');
+    store.run({ kind: 'logout' });
+    csrf();
+    http.expectOne('/api/auth/logout').flush(null);
+    expect(store.account()).toBeNull();
+    expect(store.signedOut()).toBe(true);
   });
   it('refreshes queued delivery without blocking the form and ignores a response after leaving', () => {
     store.run({ kind: 'resend', email: 'ada@example.com' });

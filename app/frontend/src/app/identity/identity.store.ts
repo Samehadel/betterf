@@ -1,8 +1,15 @@
 import { inject } from '@angular/core';
-import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
+import {
+  patchState,
+  signalStore,
+  withComputed,
+  withMethods,
+  withState,
+} from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, Observable, pipe, tap } from 'rxjs';
-import { Account, IdentityApi, Pending, Registration, Role } from './identity.api';
+import { IdentityApi, Pending, Registration, Role } from './identity.api';
+import { AuthStore } from '../core/auth.store';
 type Action =
   | { kind: 'register'; body: Registration }
   | { kind: 'resend'; email: string }
@@ -18,12 +25,12 @@ export const IdentityStore = signalStore(
     pending: null as Pending | null,
     verified: false,
     alreadyVerified: false,
-    account: null as Account | null,
     roles: [] as Role[],
     rolesError: false,
     signedOut: false,
   }),
-  withMethods((store, api = inject(IdentityApi)) => ({
+  withComputed(() => ({ account: inject(AuthStore).account })),
+  withMethods((store, api = inject(IdentityApi), auth = inject(AuthStore)) => ({
     clear() {
       patchState(store, {
         error: '',
@@ -32,7 +39,6 @@ export const IdentityStore = signalStore(
         verified: false,
         alreadyVerified: false,
         signedOut: false,
-        account: null,
       });
     },
     loadRoles: rxMethod<void>(
@@ -53,7 +59,8 @@ export const IdentityStore = signalStore(
         exhaustMap((email) =>
           api.deliveryStatus(email).pipe(
             tap((pending) => {
-              if (store.pending()?.email === email) patchState(store, { pending });
+              if (store.pending()?.email === email)
+                patchState(store, { pending });
             }),
             catchError(() => EMPTY),
           ),
@@ -63,7 +70,12 @@ export const IdentityStore = signalStore(
     run: rxMethod<Action>(
       pipe(
         exhaustMap((action) => {
-          patchState(store, { busy: true, error: '', errorCode: '', signedOut: false });
+          patchState(store, {
+            busy: true,
+            error: '',
+            errorCode: '',
+            signedOut: false,
+          });
           let operation: Observable<unknown>;
           switch (action.kind) {
             case 'register':
@@ -78,27 +90,40 @@ export const IdentityStore = signalStore(
               break;
             case 'verify':
               operation = api.verify(action.id, action.token).pipe(
-                tap((result) =>
+                tap((result) => {
+                  if (result.account) auth.setAccount(result.account);
                   patchState(store, {
                     verified: !!result.account,
-                    alreadyVerified: result.status === 'ALREADY_VERIFIED' && !result.account,
-                    account: result.account,
-                  }),
-                ),
+                    alreadyVerified:
+                      result.status === 'ALREADY_VERIFIED' && !result.account,
+                  });
+                }),
               );
               break;
             case 'login':
               operation = api
                 .login(action.email, action.password)
-                .pipe(tap((account) => patchState(store, { account })));
+                .pipe(tap((account) => auth.setAccount(account)));
               break;
             case 'current':
-              operation = api.current().pipe(tap((account) => patchState(store, { account })));
+              operation = auth
+                .load()
+                .pipe(
+                  tap(() =>
+                    patchState(store, {
+                      error: auth.error(),
+                      errorCode: auth.errorCode(),
+                    }),
+                  ),
+                );
               break;
             case 'logout':
-              operation = api
-                .logout()
-                .pipe(tap(() => patchState(store, { account: null, signedOut: true })));
+              operation = api.logout().pipe(
+                tap(() => {
+                  auth.clear();
+                  patchState(store, { signedOut: true });
+                }),
+              );
               break;
           }
           return operation.pipe(
@@ -106,7 +131,6 @@ export const IdentityStore = signalStore(
             catchError((error) => {
               patchState(store, {
                 busy: false,
-                ...(action.kind === 'current' ? { account: null } : {}),
                 error: error?.error?.error?.message ?? '',
                 errorCode: error?.error?.error?.code ?? 'UNAVAILABLE',
               });

@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   inject,
-  signal,
+  computed,
   DestroyRef,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -10,7 +10,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { IdentityApi, Account } from '../identity/identity.api';
+import { AuthStore } from '../core/auth.store';
 import { InvitationStore, InvitationRow } from './invitation.store';
 @Component({
   selector: 'app-invitation-page',
@@ -20,32 +20,25 @@ import { InvitationStore, InvitationRow } from './invitation.store';
 })
 export class InvitationPage {
   readonly store = inject(InvitationStore);
-  readonly account = signal<Account | null>(null);
-  readonly loading = signal(true);
-  readonly loadFailed = signal(false);
-  private readonly identity = inject(IdentityApi);
+  private readonly auth = inject(AuthStore);
+  readonly account = this.auth.account;
+  readonly loading = this.auth.loading;
+  readonly loadFailed = computed(
+    () => !!this.auth.errorCode() && !this.auth.initialized(),
+  );
   private readonly destroyRef = inject(DestroyRef);
   constructor() {
     this.load();
   }
   load() {
-    this.loading.set(true);
-    this.loadFailed.set(false);
-    this.identity
-      .current()
+    this.auth
+      .load()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (account) => {
-          this.account.set(account);
-          this.loading.set(false);
-          if (account.accessRole === 'ADMIN') this.store.loadHistory();
-        },
-        error: (error) => {
-          this.loadFailed.set(error?.status !== 403);
-          this.loading.set(false);
-        },
+      .subscribe(() => {
+        if (this.account()?.accessRole === 'ADMIN') this.store.loadHistory();
       });
   }
+
   historyStatus(status: string) {
     const labels: Record<string, string> = {
       SMTP_ACCEPTED: 'invitations.status.sent',
