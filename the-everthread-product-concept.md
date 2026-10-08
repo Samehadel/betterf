@@ -1,9 +1,18 @@
-# BetterF --- Initial Product Concept
+# The Everthread --- Initial Product Concept
+
+## Product Identity
+
+- **Product name:** The Everthread
+- **Domain:** [theeverthread.com](https://theeverthread.com)
+
+The name represents the enduring thread connecting an organization's
+problems, solutions, decisions, reasoning, and lessons across people,
+projects, and tools. "The" is part of the product name.
 
 ## Product Vision
 
-**BetterF helps people and teams become better functions within their
-organizations by preserving and reusing the knowledge generated through
+**The Everthread helps people and teams carry knowledge forward by
+preserving, connecting, and reusing the context generated through
 everyday work.**
 
 Organizations generate valuable knowledge continuously: problems are
@@ -12,7 +21,7 @@ alternatives are discussed, and lessons are learned.
 
 Much of that knowledge is eventually fragmented across tools or lost.
 
-BetterF aims to turn this accumulated work experience into **usable
+The Everthread aims to turn this accumulated work experience into **usable
 organizational memory**.
 
 ## Problem Statement
@@ -97,13 +106,13 @@ projects.
 
 ## Core Business Hypothesis
 
-The central hypothesis behind BetterF is:
+The central hypothesis behind The Everthread is:
 
 > **Organizations already possess much of the knowledge their employees
 > need, but cannot efficiently recover and reuse it because that
 > knowledge is fragmented, contextual, and poorly connected.**
 
-Therefore, BetterF should not initially be positioned as another
+Therefore, The Everthread should not initially be positioned as another
 documentation or note-taking system.
 
 The opportunity is to create a **memory layer for organizational work**
@@ -115,7 +124,7 @@ solutions, reasoning, and lessons generated around them.
 Consider an engineer encountering a production problem.
 
 Instead of searching documentation, tickets, Git history, Slack
-conversations, and the internet independently, BetterF could eventually
+conversations, and the internet independently, The Everthread could eventually
 enable the organization to answer:
 
 > "We encountered a similar problem eight months ago in Project X. Ahmed
@@ -128,12 +137,12 @@ Likewise, a product manager could ask:
 > "Why don't we allow customers to cancel orders after payment
 > settlement?"
 
-Rather than merely finding the requirement, BetterF should recover the
+Rather than merely finding the requirement, The Everthread should recover the
 **decision history and supporting context**.
 
 ## Business Outcome
 
-If the hypothesis is correct, BetterF could create value by:
+If the hypothesis is correct, The Everthread could create value by:
 
 -   Reducing repeated investigation
 -   Shortening problem-resolution time
@@ -151,7 +160,7 @@ The economic proposition can eventually be summarized as:
 ### Personal Knowledge Management
 
 Personal knowledge management can become a natural consequence of
-BetterF: an employee builds a professional memory from their work
+The Everthread: an employee builds a professional memory from their work
 without maintaining a separate knowledge base.
 
 It should not initially become a standalone note-taking product.
@@ -166,7 +175,7 @@ evidence that it belongs to the same product.
 
 ## Current Product Thesis
 
-> **BetterF is an organizational knowledge and memory platform that
+> **The Everthread is an organizational knowledge and memory platform that
 > captures, connects, and makes reusable the context generated during
 > everyday work---including problems, solutions, decisions, reasoning,
 > and lessons---so teams don't repeatedly rediscover knowledge they

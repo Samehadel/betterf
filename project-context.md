@@ -4,7 +4,9 @@ This file maps project work to its business and architecture sources. Working in
 
 ## Project and paths
 
-- Project name: `betterf`
+- Project name: **The Everthread**
+- Product domain: `theeverthread.com`
+- Product concept: [The Everthread — Initial Product Concept](the-everthread-product-concept.md)
 - Application repository URL: `https://github.com/Samehadel/betterf.git`
 - Application checkout: workspace root (`./`); implementation directories remain under `app/`.
 - Layout override: the current application Git repository is at the workspace root; `architecture/` remains a separate ignored repository. Run application Git commands from the workspace root. CI workflows live in `.github/workflows/`.
