@@ -64,7 +64,7 @@ class RegistrationIntegrationTests {
 
     @BeforeEach
     void setup() {
-        jdbc.execute("TRUNCATE VERIFICATION_EMAIL, ACCOUNT, ORGANIZATION CASCADE");
+        jdbc.execute("TRUNCATE REFRESH_SESSION, VERIFICATION_EMAIL, ACCOUNT, ORGANIZATION CASCADE");
         when(clock.instant()).thenReturn(start);
         doAnswer(
                         call -> {
@@ -149,8 +149,8 @@ class RegistrationIntegrationTests {
                                                         password))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("LOGIN_FAILED"));
-        mvc.perform(get("/api/auth/me")).andExpect(status().isForbidden());
-        mvc.perform(post("/api/invitations").with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/invitations").with(csrf())).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -195,7 +195,7 @@ class RegistrationIntegrationTests {
         mvc.perform(post("/api/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isNoContent());
         assertThat(session.isInvalid()).isTrue();
-        mvc.perform(get("/api/auth/me")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -754,7 +754,7 @@ class RegistrationIntegrationTests {
                         .andExpect(jsonPath("$.data.account").isEmpty())
                         .andReturn();
         mvc.perform(get("/api/auth/me").session((MockHttpSession) replay.getRequest().getSession()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -769,7 +769,124 @@ class RegistrationIntegrationTests {
                                 .contentType("application/json")
                                 .content(json.writeValueAsString(badLink)))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isUnauthorized());
         assertThat(activeOrganizations()).isZero();
+    }
+    jakarta.servlet.http.Cookie loginRefresh() throws Exception {
+        register("ada@example.com", "company.com");
+        verify("ada@example.com");
+        var result = mvc.perform(post("/api/auth/login").with(csrf())
+                .contentType("application/json")
+                .content(json.writeValueAsString(Map.of("email", "ada@example.com", "password", password))))
+                .andExpect(status().isOk()).andReturn();
+        var cookie = result.getResponse().getCookie("BETTERF_REFRESH");
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/api/auth");
+        assertThat(result.getResponse().getHeader("Set-Cookie")).contains("SameSite=Strict");
+        assertThat(jdbc.queryForObject("SELECT TOKEN_HASH FROM REFRESH_SESSION", String.class))
+                .doesNotContain(cookie.getValue().substring(37));
+        return cookie;
+    }
+
+    @Test
+    void expiredSessionRefreshRotatesCookieAndRestoresAccessWithRealCsrf() throws Exception {
+        var cookie = loginRefresh();
+        // No authenticated JSESSIONID: reproduce an expired browser session.
+        mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
+        var csrfResponse = mvc.perform(get("/api/auth/csrf")).andReturn();
+        var anonymous = (MockHttpSession) csrfResponse.getRequest().getSession();
+        var oldId = anonymous.getId();
+        var token = json.readTree(csrfResponse.getResponse().getContentAsString()).path("data");
+        var result = mvc.perform(post("/api/auth/refresh").cookie(cookie).session(anonymous)
+                .header(token.path("headerName").asText(), token.path("token").asText()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.email").value("ada@example.com"))
+                .andReturn();
+        var replacement = result.getResponse().getCookie("BETTERF_REFRESH");
+        assertThat(replacement.getValue()).isNotEqualTo(cookie.getValue());
+        var restored = (MockHttpSession) result.getRequest().getSession();
+        assertThat(restored.getId()).isNotEqualTo(oldId);
+        mvc.perform(get("/api/auth/me").session(restored)).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/logout").session(restored).cookie(replacement)
+                .header(token.path("headerName").asText(), token.path("token").asText()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+        mvc.perform(post("/api/auth/logout").session(restored).cookie(replacement).with(csrf()))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/api/auth/refresh").cookie(replacement).with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshRequiresCsrfAndRejectsExpiredMissingAndTamperedCookies() throws Exception {
+        var cookie = loginRefresh();
+        mvc.perform(post("/api/auth/refresh").cookie(cookie)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/auth/refresh").with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/refresh").with(csrf()).cookie(new jakarta.servlet.http.Cookie("BETTERF_REFRESH", "bad")))
+                .andExpect(status().isUnauthorized());
+        when(clock.instant()).thenReturn(start.plus(Duration.ofDays(14)));
+        mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("SESSION_EXPIRED"));
+        assertThat(count("REFRESH_SESSION")).isZero();
+    }
+
+    @Test
+    void replayRevokesReplacementAndPasswordChangesPreventRefresh() throws Exception {
+        var cookie = loginRefresh();
+        var first = mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getCookie("BETTERF_REFRESH");
+        mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/refresh").cookie(first).with(csrf())).andExpect(status().isUnauthorized());
+        assertThat(count("REFRESH_SESSION")).isZero();
+        var newLogin = mvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("email", "ada@example.com", "password", password))))
+                .andExpect(status().isOk()).andReturn().getResponse().getCookie("BETTERF_REFRESH");
+        jdbc.update("UPDATE ACCOUNT SET PASSWORD_HASH = 'changed'");
+        mvc.perform(post("/api/auth/refresh").cookie(newLogin).with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshRechecksOrganizationStatusAndCurrentRole() throws Exception {
+        var cookie = loginRefresh();
+        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE = 'MEMBER'");
+        var result = mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.accessRole").value("MEMBER")).andReturn();
+        mvc.perform(get("/api/invitations").session((MockHttpSession) result.getRequest().getSession()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+        jdbc.update("UPDATE ORGANIZATION SET STATUS = 'PENDING'");
+        mvc.perform(post("/api/auth/refresh").cookie(result.getResponse().getCookie("BETTERF_REFRESH")).with(csrf()))
+                .andExpect(status().isUnauthorized());
+    }
+    @Test
+    void logoutAfterSessionExpiryStillRevokesRefreshCookie() throws Exception {
+        var cookie = loginRefresh();
+        mvc.perform(post("/api/auth/logout").cookie(cookie).with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("BETTERF_REFRESH", 0));
+        mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                .andExpect(status().isUnauthorized());
+        assertThat(count("REFRESH_SESSION")).isZero();
+    }
+
+    @Test
+    void concurrentConsumptionCannotIssueTwoReplacementTokens() throws Exception {
+        var cookie = loginRefresh();
+        var ready = new CountDownLatch(2);
+        var startRefresh = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Callable<Integer> consume = () -> {
+                ready.countDown();
+                assertThat(startRefresh.await(5, TimeUnit.SECONDS)).isTrue();
+                return mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                        .andReturn().getResponse().getStatus();
+            };
+            var first = executor.submit(consume);
+            var second = executor.submit(consume);
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            startRefresh.countDown();
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(200, 401);
+        }
+        assertThat(count("REFRESH_SESSION")).isZero();
     }
 }

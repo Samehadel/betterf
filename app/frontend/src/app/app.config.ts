@@ -3,6 +3,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 import { routes } from './app.routes';
+import { sessionRefreshInterceptor } from './core/session-refresh.interceptor';
 import { apiTimeoutInterceptor } from './core/api-timeout.interceptor';
 import { TranslationLoader } from './core/translation-loader';
 
@@ -11,7 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([apiTimeoutInterceptor])),
+    provideHttpClient(withInterceptors([sessionRefreshInterceptor, apiTimeoutInterceptor])),
     provideTransloco({
       config: { availableLangs: ['en'], defaultLang: 'en', fallbackLang: 'en', prodMode: !isDevMode() },
       loader: TranslationLoader,

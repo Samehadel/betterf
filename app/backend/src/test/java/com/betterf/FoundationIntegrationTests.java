@@ -56,11 +56,11 @@ class FoundationIntegrationTests {
             assertThat(mapper.readTree(response.body()).has("data")).isFalse();
         }
         var denied = get("/api/private");
-        assertThat(denied.statusCode()).isEqualTo(403);
-        assertThat(mapper.readTree(denied.body()).path("error").path("code").asText()).isEqualTo("ACCESS_DENIED");
+        assertThat(denied.statusCode()).isEqualTo(401);
+        assertThat(mapper.readTree(denied.body()).path("error").path("code").asText()).isEqualTo("AUTHENTICATION_REQUIRED");
         var post = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/status")).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
         assertThat(post.statusCode()).isEqualTo(403);
-        assertThat(mapper.readTree(post.body()).path("error").path("code").asText()).isEqualTo("ACCESS_DENIED");
+        assertThat(mapper.readTree(post.body()).path("error").path("code").asText()).isEqualTo("CSRF_INVALID");
     }
     @Test
     void databaseOutageFailsReadinessButNotLivenessAndRecovers() throws Exception {
