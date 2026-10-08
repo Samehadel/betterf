@@ -106,6 +106,8 @@ class SecurityConfiguration {
                                                 "/api/registration/resend",
                                                 "/api/registration/status",
                                                 "/api/registration/verify",
+                                                "/api/auth/invitation/preview",
+                                                "/api/auth/invitation/accept",
                                                 "/api/auth/login",
                                                 "/api/auth/refresh")
                                         .permitAll()
@@ -124,10 +126,11 @@ class SecurityConfiguration {
                         logout ->
                                 logout.logoutUrl("/api/auth/logout")
                                         .deleteCookies("JSESSIONID")
-                                        .addLogoutHandler((request, response, auth) -> {
-                                            refresh.revoke(request);
-                                            refresh.write(response, null);
-                                        })
+                                        .addLogoutHandler(
+                                                (request, response, auth) -> {
+                                                    refresh.revoke(request);
+                                                    refresh.write(response, null);
+                                                })
                                         .logoutSuccessHandler(
                                                 (request, response, auth) ->
                                                         response.setStatus(204)))
@@ -135,19 +138,34 @@ class SecurityConfiguration {
                         errors ->
                                 errors.authenticationEntryPoint(
                                                 (request, response, exception) ->
-                                                        failure(response, mapper, 401, "AUTHENTICATION_REQUIRED", "Please log in to continue."))
+                                                        failure(
+                                                                response,
+                                                                mapper,
+                                                                401,
+                                                                "AUTHENTICATION_REQUIRED",
+                                                                "Please log in to continue."))
                                         .accessDeniedHandler(
                                                 (request, response, exception) ->
-                                                        failure(response, mapper, 403, exception instanceof CsrfException ? "CSRF_INVALID" : "ACCESS_DENIED", "Access is denied.")))
+                                                        failure(
+                                                                response,
+                                                                mapper,
+                                                                403,
+                                                                exception instanceof CsrfException
+                                                                        ? "CSRF_INVALID"
+                                                                        : "ACCESS_DENIED",
+                                                                "Access is denied.")))
                 .build();
     }
 
-    private void failure(HttpServletResponse response, JsonMapper mapper, int status, String code, String message)
+    private void failure(
+            HttpServletResponse response,
+            JsonMapper mapper,
+            int status,
+            String code,
+            String message)
             throws java.io.IOException {
         response.setStatus(status);
         response.setContentType("application/json");
-        mapper.writeValue(
-                response.getOutputStream(),
-                ApiEnvelope.failure(code, message));
+        mapper.writeValue(response.getOutputStream(), ApiEnvelope.failure(code, message));
     }
 }

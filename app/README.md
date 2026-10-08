@@ -277,13 +277,13 @@ links expire after seven days; administrator verification retains its 24-hour ex
 HTML invitation emails are stored in backend `resources/mail/team-invitation.html`
 and use the same SMTP and PUBLIC_ORIGIN configuration as verification emails.
 
-Member acceptance/account setup is delivered separately by BTF-7; the acceptance
-link targets `/invitation/accept`, which that story must implement. Pending-management
-navigation currently explains that resend/revoke tools arrive with BTF-8. Invitation
-sending is available for integration, but the recipient journey is not release-ready
-until BTF-7 is delivered. Provider submission and database commits cannot be atomic;
+The invitation link opens member registration at `/invitation/accept`. Recipients
+explicitly accept and create their member account, then sign in automatically.
+Pending-management navigation explains that resend/revoke tools arrive with BTF-8.
+Acceptance cancels any unfinished administrator signup for the invited email and invalidates its verification links.
+Used links provide a password-login next step and cannot repeat registration. Provider submission and database commits cannot be atomic;
 SENDING records left by a crash or persistence failure require operator investigation
-before retry. See [invitation architecture](../architecture/backend/team-invitations.md).
+before retry. See [invitation acceptance](../architecture/backend/invitation-acceptance.md).
 
 ## Session expiry recovery
 

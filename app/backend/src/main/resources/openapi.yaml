@@ -7,6 +7,91 @@ info:
     organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
     Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
 paths:
+  /api/auth/invitation/preview:
+    post:
+      operationId: previewInvitationAcceptance
+      summary: Inspect an invitation without registering or activating the recipient.
+      description: |
+        Requires CSRF. Returns READY or a safe invitation outcome. Checks expiry,
+        membership and configured active-account capacity. A recognized link clears
+        a different browser account's session and refresh credential. No-store response.
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationLink'
+      responses:
+        '200':
+          description: Invitation status, message, and recipient/company for recognized credentials.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, error]
+                properties:
+                  error: { type: 'null' }
+                  data:
+                    type: object
+                    required: [status, message, companyName, email]
+                    properties:
+                      status:
+                        type: string
+                        enum: [READY, INVALID_INVITATION, INVITATION_UNUSABLE, INVITATION_USED, ALREADY_MEMBER, OTHER_COMPANY_MEMBER, ACCOUNT_LIMIT]
+                      message: { type: string }
+                      companyName: { type: [string, 'null'] }
+                      email: { type: [string, 'null'] }
+        '400':
+          description: Malformed invitation identifier or token.
+        '403':
+          description: CSRF_INVALID.
+  /api/auth/invitation/accept:
+    post:
+      operationId: acceptInvitation
+      summary: Explicitly register an invited member and establish a browser session.
+      description: |
+        Rechecks invitation, membership and capacity atomically. The company/email
+        come only from the invitation. Uses administrator password and role conventions.
+        Cancels an unfinished recipient administrator signup and invalidates its links.
+        Assigns MEMBER regardless of professional role. Commits before session creation.
+        Used links cannot log in, overwrite data or reactivate accounts. If session setup
+        or the response fails after commit, reconcile via preview and use password login.
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation, fullName, professionalRole, password]
+              properties:
+                invitation:
+                  $ref: '#/components/schemas/InvitationLink'
+                fullName: { type: string, minLength: 1, maxLength: 200 }
+                professionalRole: { type: string, description: Identifier from registration roles. }
+                password:
+                  type: string
+                  minLength: 10
+                  maxLength: 128
+                  description: At least one Unicode uppercase letter and punctuation or symbol.
+      responses:
+        '200':
+          description: Activated member and new session/refresh cookies. No-store response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountEnvelope'
+        '400':
+          description: INVALID_REQUEST or INVALID_ROLE; invitation unchanged.
+        '403':
+          description: CSRF_INVALID.
+        '409':
+          description: INVALID_INVITATION, INVITATION_UNUSABLE, INVITATION_USED, ALREADY_MEMBER, OTHER_COMPANY_MEMBER or ACCOUNT_LIMIT. No membership or account changes.
+        '500':
+          description: Registration or session failure; preview status before retrying, or log in if already accepted.
   /api/invitations:
     get:
       operationId: getInvitationHistory
@@ -534,6 +619,12 @@ components:
       in: cookie
       name: JSESSIONID
   schemas:
+    InvitationLink:
+      type: object
+      required: [id, token]
+      properties:
+        id: { type: string, format: uuid }
+        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$', writeOnly: true }
     InvitationHistoryEnvelope:
       type: object
       required: [data, error]

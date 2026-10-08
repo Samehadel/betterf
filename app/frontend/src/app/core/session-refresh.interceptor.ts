@@ -169,7 +169,8 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
         return throwError(() => error);
       }),
     );
-  return request.url === '/api/auth/logout'
+  return request.url === '/api/auth/logout' ||
+    request.url === '/api/auth/invitation/preview'
     ? sessions.beforeLogout().pipe(
         switchMap(() => sessions.csrf()),
         switchMap((csrf) => next(withCsrf(csrf))),

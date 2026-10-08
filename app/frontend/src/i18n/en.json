@@ -164,7 +164,11 @@
       "access": "Organization access",
       "administrator": "Administrator",
       "footer": "Keep the context. Build on the experience. Move forward together.",
-      "loading": "Opening your organization…"
+      "loading": "Opening your organization…",
+      "member": "Member",
+      "memberTitle": "You’re in good company.",
+      "memberDescription": "You have joined your team’s shared space. More ways to learn and grow together are coming soon.",
+      "memberTools": "Team knowledge tools"
     }
   },
   "invitations": {
@@ -207,5 +211,23 @@
       "revoked": "Revoked",
       "recorded": "Recorded"
     }
+  },
+  "acceptance": {
+    "eyebrow": "Your team is waiting",
+    "title": "Make yourself at home.",
+    "intro": "Accept your invitation and start your next chapter with your team.",
+    "invalid": "This invitation is invalid. Please contact the organization administrator for a valid invitation.",
+    "loading": "Checking your invitation…",
+    "loadFailed": "We could not check your invitation. Please try again.",
+    "uncertain": "We could not confirm registration. Check the invitation status before trying again. If it was accepted, log in with the password you just chose.",
+    "success": "You’re part of the team.",
+    "welcome": "Your account is active and you are signed in to {{company}}.",
+    "continue": "Continue to your organization",
+    "bound": "This email and organization come from your invitation and cannot be changed.",
+    "details": "Your account details",
+    "nameError": "Enter your full name, up to 200 characters.",
+    "submit": "Accept invitation & create account",
+    "submitting": "Creating your account…",
+    "check": "Check invitation status"
   }
 }

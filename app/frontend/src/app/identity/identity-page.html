@@ -112,14 +112,14 @@
             <section class="workspace-note" aria-labelledby="workspace-note-title">
               <span class="workspace-icon" aria-hidden="true">↗</span>
               <p class="eyebrow">{{ t('identity.home.nextEyebrow') }}</p>
-              <h2 id="workspace-note-title">{{ t('identity.home.nextTitle') }}</h2>
-              <p>{{ t('identity.home.nextDescription') }}</p>
+              <h2 id="workspace-note-title">{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextTitle' : 'identity.home.memberTitle') }}</h2>
+              <p>{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextDescription' : 'identity.home.memberDescription') }}</p>
               @if (account.accessRole === 'ADMIN') {
                 <a class="button" routerLink="/company/invitations">{{ t('invitations.formTitle') }}</a>
               }
               <div class="workspace-upcoming">
                 <span>{{ t('identity.home.comingSoon') }}</span
-                >{{ t('identity.home.teamTools') }}
+                >{{ t(account.accessRole === 'ADMIN' ? 'identity.home.teamTools' : 'identity.home.memberTools') }}
               </div>
             </section>
             <section class="workspace-profile" aria-labelledby="workspace-profile-title">
@@ -139,7 +139,7 @@
                     {{
                       account.accessRole === 'ADMIN'
                         ? t('identity.home.administrator')
-                        : account.accessRole
+                        : t('identity.home.member')
                     }}
                   </dd>
                 </div>

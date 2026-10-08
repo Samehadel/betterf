@@ -13,8 +13,7 @@ import java.util.UUID;
 @Getter
 @Setter
 public class InvitationEntity {
-    @Id
-    private UUID id;
+    @Id private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ORGANIZATION_ID", nullable = false)
@@ -42,6 +41,11 @@ public class InvitationEntity {
     private Instant attemptedAt;
 
     private Instant sentAt;
+
+    private Instant acceptedAt;
+
+    @Column(length = 64)
+    private String acceptedTokenHash;
 
     @Column(length = 255)
     private String smtpMessageId;

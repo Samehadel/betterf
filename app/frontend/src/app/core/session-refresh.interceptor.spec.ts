@@ -142,20 +142,23 @@ describe('Session recovery', () => {
       .expectOne('https://other.example/api/auth/me')
       .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
   });
-  it('waits for in-flight refresh before logout revokes its replacement cookie', () => {
-    client.get('/api/auth/me').subscribe();
-    http
-      .expectOne('/api/auth/me')
-      .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
-    client.post('/api/auth/logout', {}).subscribe();
-    http.expectNone('/api/auth/logout');
-    refresh();
-    http.expectOne('/api/auth/me').flush({});
-    csrf('logout');
-    const logout = http.expectOne('/api/auth/logout');
-    expect(logout.request.headers.get('X-CSRF-TOKEN')).toBe('logout');
-    logout.flush(null);
-  });
+  it.each(['/api/auth/logout', '/api/auth/invitation/preview'])(
+    'waits for in-flight refresh before %s revokes its replacement cookie',
+    (url) => {
+      client.get('/api/auth/me').subscribe();
+      http
+        .expectOne('/api/auth/me')
+        .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
+      client.post(url, {}).subscribe();
+      http.expectNone(url);
+      refresh();
+      http.expectOne('/api/auth/me').flush({});
+      csrf('logout');
+      const logout = http.expectOne(url);
+      expect(logout.request.headers.get('X-CSRF-TOKEN')).toBe('logout');
+      logout.flush(null);
+    },
+  );
 });
 
 describe('Cross-tab session recovery', () => {

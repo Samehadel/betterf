@@ -1,0 +1,126 @@
+<ng-container *transloco="let t">
+  <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  <header class="top">
+    <nav class="wrap" aria-label="Main navigation">
+      <a class="brand" routerLink="/">BetterF<span class="text-[var(--accent)]">.</span></a>
+      <a routerLink="/login">{{ t('identity.login') }}</a>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1" class="mx-auto max-w-2xl px-5 py-10 sm:py-16">
+    <p class="eyebrow">{{ t('acceptance.eyebrow') }}</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight">{{ t('acceptance.title') }}</h1>
+    <p class="my-5 text-[var(--muted)]">{{ t('acceptance.intro') }}</p>
+    <section
+      class="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-8"
+      [attr.aria-busy]="store.loading() || store.submitting()"
+    >
+      @if (invalidLink()) {
+      <p role="alert">{{ t('acceptance.invalid') }}</p>
+      } @else if (store.loading()) {
+      <p role="status">{{ t('acceptance.loading') }}</p>
+      } @else if (store.account(); as account) {
+      <div role="status">
+        <h2 class="text-2xl font-semibold">{{ t('acceptance.success') }}</h2>
+        <p class="my-4">{{ t('acceptance.welcome', { company: account.organizationName }) }}</p>
+      </div>
+      <a class="button" routerLink="/company">{{ t('acceptance.continue') }}</a>
+      } @else { @if (store.error()) {
+      <p role="alert" class="form-alert">{{ t(store.error()) }}</p>
+      <div class="my-5 flex flex-wrap gap-4">
+        <button class="button secondary" type="button" (click)="load()">
+          {{ t('acceptance.check') }}
+        </button>
+        <a class="button secondary" routerLink="/login">{{ t('identity.login') }}</a>
+      </div>
+      } @if (store.preview(); as preview) { @if (preview.status === 'READY') {
+      <h2 class="text-2xl font-semibold break-words">{{ preview.companyName }}</h2>
+      <div class="form-field my-6">
+        <label for="invited-email">{{ t('invitations.email') }}</label>
+        <input
+          id="invited-email"
+          class="identity-input"
+          type="email"
+          [value]="preview.email"
+          readonly
+          aria-describedby="invited-email-hint"
+        />
+        <p id="invited-email-hint" class="form-hint">{{ t('acceptance.bound') }}</p>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <fieldset [disabled]="store.submitting()" class="grid gap-5">
+          <legend class="sr-only">{{ t('acceptance.details') }}</legend>
+          <div class="form-field">
+            <label for="fullName">{{ t('identity.fullName') }}</label>
+            <input
+              id="fullName"
+              class="identity-input"
+              formControlName="fullName"
+              autocomplete="name"
+              required
+              maxlength="200"
+              [attr.aria-invalid]="invalid('fullName')"
+              [attr.aria-describedby]="invalid('fullName') ? 'name-error' : null"
+            />
+            @if (invalid('fullName')) {
+            <p id="name-error" class="field-error">{{ t('acceptance.nameError') }}</p>
+            }
+          </div>
+          <div class="form-field">
+            <label for="professionalRole">{{ t('identity.role') }}</label>
+            <select
+              id="professionalRole"
+              class="identity-input"
+              formControlName="professionalRole"
+              required
+              [attr.aria-invalid]="invalid('professionalRole')"
+              [attr.aria-describedby]="invalid('professionalRole') ? 'role-error' : null"
+            >
+              <option value="">{{ t('identity.chooseRole') }}</option>
+              @for (role of store.roles(); track role.id) {
+              <option [value]="role.id">{{ role.label }}</option>
+              }
+            </select>
+            @if (invalid('professionalRole')) {
+            <p id="role-error" class="field-error">{{ t('identity.chooseRole') }}</p>
+            }
+          </div>
+          <div class="form-field">
+            <label for="password">{{ t('identity.password') }}</label>
+            <input
+              id="password"
+              class="identity-input"
+              type="password"
+              formControlName="password"
+              autocomplete="new-password"
+              required
+              minlength="10"
+              maxlength="128"
+              aria-describedby="password-hint"
+              [attr.aria-invalid]="invalid('password')"
+            />
+            <p id="password-hint" [class.field-error]="invalid('password')" class="form-hint">
+              {{ t('identity.passwordHint') }}
+            </p>
+          </div>
+          <button class="button mt-2" type="submit" [disabled]="store.submitting()">
+            {{ t(store.submitting() ? 'acceptance.submitting' : 'acceptance.submit') }}
+          </button>
+          @if (store.submitting()) {
+          <p role="status">{{ t('acceptance.submitting') }}</p>
+          }
+        </fieldset>
+      </form>
+      } @else {
+      <p role="alert">{{ preview.message }}</p>
+      <div class="mt-6 flex flex-wrap gap-4">
+        @if (preview.status === 'ACCOUNT_LIMIT') {
+        <button class="button secondary" type="button" (click)="load()">
+          {{ t('identity.retry') }}
+        </button>
+        }
+        <a class="button secondary" routerLink="/login">{{ t('identity.login') }}</a>
+      </div>
+      } } }
+    </section>
+  </main>
+</ng-container>
