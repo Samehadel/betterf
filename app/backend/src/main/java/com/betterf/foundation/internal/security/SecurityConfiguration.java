@@ -82,7 +82,8 @@ class SecurityConfiguration {
             HttpSecurity http,
             JsonMapper mapper,
             SecurityContextRepository contexts,
-            CsrfTokenRepository csrf)
+            CsrfTokenRepository csrf,
+            RefreshSessions refresh)
             throws Exception {
         return http.sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
@@ -105,7 +106,8 @@ class SecurityConfiguration {
                                                 "/api/registration/resend",
                                                 "/api/registration/status",
                                                 "/api/registration/verify",
-                                                "/api/auth/login")
+                                                "/api/auth/login",
+                                                "/api/auth/refresh")
                                         .permitAll()
                                         .requestMatchers(HttpMethod.GET, "/api/auth/me")
                                         .authenticated()
@@ -122,6 +124,10 @@ class SecurityConfiguration {
                         logout ->
                                 logout.logoutUrl("/api/auth/logout")
                                         .deleteCookies("JSESSIONID")
+                                        .addLogoutHandler((request, response, auth) -> {
+                                            refresh.revoke(request);
+                                            refresh.write(response, null);
+                                        })
                                         .logoutSuccessHandler(
                                                 (request, response, auth) ->
                                                         response.setStatus(204)))
@@ -129,21 +135,19 @@ class SecurityConfiguration {
                         errors ->
                                 errors.authenticationEntryPoint(
                                                 (request, response, exception) ->
-                                                        forbidden(response, mapper))
+                                                        failure(response, mapper, 401, "AUTHENTICATION_REQUIRED", "Please log in to continue."))
                                         .accessDeniedHandler(
                                                 (request, response, exception) ->
-                                                        forbidden(response, mapper)))
+                                                        failure(response, mapper, 403, exception instanceof CsrfException ? "CSRF_INVALID" : "ACCESS_DENIED", "Access is denied.")))
                 .build();
     }
 
-    private void forbidden(HttpServletResponse response, JsonMapper mapper)
+    private void failure(HttpServletResponse response, JsonMapper mapper, int status, String code, String message)
             throws java.io.IOException {
-        response.setStatus(403);
+        response.setStatus(status);
         response.setContentType("application/json");
         mapper.writeValue(
                 response.getOutputStream(),
-                ApiEnvelope.failure(
-                        "ACCESS_DENIED",
-                        "Access is denied. Refresh the page and log in if needed."));
+                ApiEnvelope.failure(code, message));
     }
 }

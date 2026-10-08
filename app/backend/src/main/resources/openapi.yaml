@@ -5,7 +5,7 @@ info:
   description:
     'BTF-5 implementation follows the product owner correction of 2026-10-04: separate account,
     organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
-    Secure by default), 30-minute inactivity timeout. All mutations require CSRF.'
+    Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
 paths:
   /api/invitations:
     get:
@@ -28,7 +28,9 @@ paths:
         '400':
           description: Invalid page.
         '403':
-          description: Authentication or verified-administrator authorization denied.
+          description: Verified-administrator authorization denied.
+        '401':
+          description: AUTHENTICATION_REQUIRED; session absent or expired.
     post:
       operationId: sendTeamInvitation
       summary: Send one team invitation as a verified company administrator.
@@ -56,7 +58,9 @@ paths:
         '400':
           description: Invalid email; INVALID_REQUEST.
         '403':
-          description: Authentication, CSRF, or verified-administrator authorization denied.
+          description: CSRF_INVALID or verified-administrator authorization denied.
+        '401':
+          description: AUTHENTICATION_REQUIRED; session absent or expired.
         '409':
           description: ALREADY_MEMBER, OTHER_COMPANY_MEMBER, INVITATION_PENDING, or ACCOUNT_LIMIT. No email sent.
         '500':
@@ -81,7 +85,9 @@ paths:
         '400':
           description: Invalid email.
         '403':
-          description: Authentication, CSRF, or verified-administrator authorization denied.
+          description: CSRF_INVALID or verified-administrator authorization denied.
+        '401':
+          description: AUTHENTICATION_REQUIRED; session absent or expired.
         '404':
           description: INVITATION_NOT_FOUND in this company; safe to retry sending.
   /api/status:
@@ -377,7 +383,7 @@ paths:
       operationId: login
       summary:
         Email/password login; both account and organization must be ACTIVE. Rotate session ID and
-        CSRF.
+        CSRF and issue a rotating refresh cookie.
       security: []
       responses:
         '200':
@@ -429,6 +435,34 @@ paths:
           schema:
             type: string
           description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+  /api/auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: Restore a session and rotate the refresh cookie without extending its absolute expiry
+      description: |
+        Fetch /api/auth/csrf first, including the anonymous session cookie and masked token.
+        Rechecks account and organization status, current role, and password fingerprint.
+        On success rotates JSESSIONID, invalidates the CSRF token, and replaces BETTERF_REFRESH.
+        Fetch CSRF again before retrying a rejected mutation. Never retry uncertain network/server failures.
+      security:
+        - RefreshCookie: []
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      responses:
+        '200':
+          description: Session restored; Cache-Control no-store and rotated HttpOnly cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountEnvelope'
+        '401':
+          description: SESSION_EXPIRED; refresh cookie absent, invalid, expired, replayed, revoked, or account no longer eligible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: CSRF_INVALID; fetch a new masked CSRF token before submission.
   /api/auth/me:
     get:
       operationId: currentAccount
@@ -442,6 +476,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountEnvelope'
+        '401':
+          description: AUTHENTICATION_REQUIRED; session absent or expired.
         '403':
           description: Access denied or account/organization no longer active
           content:
@@ -451,7 +487,7 @@ paths:
   /api/auth/logout:
     post:
       operationId: logout
-      summary: Invalidate session and delete session cookie
+      summary: Revoke the browser refresh credential, invalidate session, and delete both cookies
       security:
         - SessionCookie: []
       parameters:
@@ -488,6 +524,11 @@ components:
             properties:
               email: { type: string, format: email, maxLength: 254 }
   securitySchemes:
+    RefreshCookie:
+      type: apiKey
+      in: cookie
+      name: BETTERF_REFRESH
+      description: HttpOnly, Secure by default, SameSite Strict, Path /api/auth; absolute 14-day lifetime by default.
     SessionCookie:
       type: apiKey
       in: cookie

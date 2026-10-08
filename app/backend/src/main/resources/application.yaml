@@ -58,6 +58,8 @@ management:
           include: readinessState,db
 
 betterf:
+  auth:
+    refresh-lifetime: ${REFRESH_TOKEN_LIFETIME:14d}
   registration:
     public-origin: ${PUBLIC_ORIGIN:http://127.0.0.1:4200}
     mail-from: ${MAIL_FROM:no-reply@betterf.local}

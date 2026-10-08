@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/identity/20261007-001-invitations.sql
   - include:
       file: db/foundation/20261007-001-shedlock.sql
+  - include:
+      file: db/foundation/20261008-001-refresh-session.sql

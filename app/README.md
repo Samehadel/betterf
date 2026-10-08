@@ -284,3 +284,23 @@ sending is available for integration, but the recipient journey is not release-r
 until BTF-7 is delivered. Provider submission and database commits cannot be atomic;
 SENDING records left by a crash or persistence failure require operator investigation
 before retry. See [invitation architecture](../architecture/backend/team-invitations.md).
+
+## Session expiry recovery
+
+The browser now restores expired sessions through `POST /api/auth/refresh` and retries
+requests rejected by authentication before execution. Refresh credentials rotate and
+live in a Secure, HttpOnly, SameSite=Strict cookie scoped to `/api/auth`; the database
+stores only hashes. `REFRESH_TOKEN_LIFETIME` defaults to `14d` with an absolute expiry.
+Logout revokes this browser's refresh credential. Password changes and inactive
+accounts/organizations prevent renewal. Sessions established before this deployment
+need one new login to obtain a refresh cookie.
+
+Anonymous protected requests now return `401 AUTHENTICATION_REQUIRED`; CSRF rejection
+returns `403 CSRF_INVALID`, and permission denial remains `403 ACCESS_DENIED`. The UI
+refreshes CSRF after restoration and does not replay network failures or generic
+permission errors. Exhausted refresh credentials lead to login. Concurrent requests
+share recovery; browsers supporting Web Locks also coordinate across tabs.
+
+Apply the additive refresh-session migration with the backend deployment and deploy
+the matching frontend. Architecture consulted: `16a2955` on architecture `origin/main`;
+the proposed decision is in `architecture/decisions/0005-session-refresh.md`.

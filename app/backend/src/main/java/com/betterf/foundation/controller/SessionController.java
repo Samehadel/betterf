@@ -1,6 +1,7 @@
 package com.betterf.foundation.controller;
 
 import com.betterf.foundation.internal.security.SessionLogin;
+import com.betterf.foundation.internal.security.RefreshSessions;
 import com.betterf.identity.api.dto.IdentityViews.AccountView;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.IdentityService;
@@ -20,9 +21,11 @@ public class SessionController {
     private final AuthenticationManager authentication;
     private final SessionLogin login;
     private final IdentityService identity;
+    private final RefreshSessions refresh;
 
     public SessionController(
-            AuthenticationManager authentication, SessionLogin login, IdentityService identity) {
+            AuthenticationManager authentication, SessionLogin login, IdentityService identity, RefreshSessions refresh) {
+        this.refresh = refresh;
         this.authentication = authentication;
         this.login = login;
         this.identity = identity;
@@ -59,6 +62,20 @@ public class SessionController {
                     "Unable to log in. Check your email and password and verify your email before"
                             + " trying again.");
         }
+    }
+
+    @PostMapping("/refresh")
+    public AccountView refresh(HttpServletRequest request, HttpServletResponse response) {
+        var grant = refresh.consume(request);
+        if (grant == null) {
+            refresh.write(response, null);
+            throw new IdentityException(401, "SESSION_EXPIRED", "Your session has expired. Please log in again.");
+        }
+        var principal = UsernamePasswordAuthenticationToken.authenticated(grant.email(), null,
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + grant.role())));
+        login.restore(principal, request, response);
+        refresh.write(response, grant);
+        return identity.current(grant.email());
     }
 
     @GetMapping("/me")

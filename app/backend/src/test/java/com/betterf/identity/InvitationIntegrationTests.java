@@ -253,7 +253,7 @@ class InvitationIntegrationTests {
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"email\":\"new@gmail.com\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mvc.perform(
                         post("/api/invitations")
                                 .with(user("admin@example.com").roles("ADMIN"))
@@ -330,7 +330,7 @@ class InvitationIntegrationTests {
     @Test
     void historyRejectsAnonymousUnverifiedAndNonAdministratorAccessAndInvalidPages()
             throws Exception {
-        mvc.perform(get("/api/invitations")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/invitations")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/invitations").with(user("admin@example.com").roles("MEMBER")))
                 .andExpect(status().isForbidden());
         mvc.perform(
