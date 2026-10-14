@@ -17,6 +17,21 @@ import java.security.Principal;
 public class InvitationController {
     private final InvitationService invitations;
 
+    @GetMapping("/sent")
+    public java.util.List<InvitationView> sent(Principal principal) {
+        return invitations.sent(principal.getName());
+    }
+
+    @GetMapping("/members")
+    public java.util.List<ActiveMemberView> members(Principal principal) {
+        return invitations.members(principal.getName());
+    }
+
+    @PostMapping("/{id}/resend")
+    public InvitationView resend(Principal principal, @PathVariable java.util.UUID id) {
+        return invitations.resend(principal.getName(), id);
+    }
+
     @GetMapping
     public InvitationPageView history(
             Principal principal, @RequestParam(defaultValue = "0") int page) {

@@ -42,6 +42,13 @@ public class InvitationEntity {
 
     private Instant sentAt;
 
+    @Column(length = 64)
+    private String replacementTokenHash;
+
+    private Instant replacementExpiresAt;
+
+    private Instant replacementAttemptedAt;
+
     private Instant acceptedAt;
 
     @Column(length = 64)

@@ -41,23 +41,14 @@ class InvitationIntegrationTests {
         registry.add("spring.datasource.password", database::getPassword);
     }
 
-    @Autowired
-
-    IdentityService identity;
-    @Autowired
-    InvitationService invitations;
-    @Autowired
-    VerificationEmailWorker worker;
-    @Autowired
-    JdbcTemplate jdbc;
-    @Autowired
-    MockMvc mvc;
-    @MockitoBean
-    VerificationMail verification;
-    @MockitoBean
-    InvitationMail mail;
-    @MockitoBean
-    Clock clock;
+    @Autowired IdentityService identity;
+    @Autowired InvitationService invitations;
+    @Autowired VerificationEmailWorker worker;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mvc;
+    @MockitoBean VerificationMail verification;
+    @MockitoBean InvitationMail mail;
+    @MockitoBean Clock clock;
     final Instant now = Instant.parse("2026-10-07T08:00:00Z");
 
     @BeforeEach
@@ -343,5 +334,213 @@ class InvitationIntegrationTests {
                 .isInstanceOfSatisfying(
                         IdentityException.class,
                         error -> assertThat(error.status()).isEqualTo(403));
+    }
+
+    @Autowired InvitationAcceptanceService acceptance;
+
+    @Test
+    void resendCooldownSuccessAndFailurePreserveCorrectLink() {
+        var tokens = new ArrayList<String>();
+        doAnswer(
+                        call -> {
+                            tokens.add(call.getArgument(1));
+                            return "<mail@test>";
+                        })
+                .when(mail)
+                .send(any(), anyString());
+        var original = send("resend@example.com");
+        assertThat(original.sentAt()).isEqualTo(now);
+        assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+                .isInstanceOfSatisfying(
+                        IdentityException.class,
+                        e -> assertThat(e.code()).isEqualTo("RESEND_COOLDOWN"));
+        when(clock.instant()).thenReturn(now.plusSeconds(60));
+        var replacement = invitations.resend("admin@example.com", original.id());
+        assertThat(replacement.expiresAt()).isEqualTo(now.plusSeconds(60).plus(Duration.ofDays(7)));
+        assertThat(replacement.sentAt()).isEqualTo(now.plusSeconds(60));
+        assertThat(
+                        acceptance
+                                .preview(
+                                        new InvitationLinkRequest(original.id(), tokens.getFirst()))
+                                .status())
+                .isEqualTo("INVALID_INVITATION");
+        assertThat(acceptance.preview(new InvitationLinkRequest(original.id(), tokens.getLast())))
+                .isNotNull();
+        when(clock.instant()).thenReturn(now.plusSeconds(120));
+        doThrow(new EmailDeliveryException()).when(mail).send(any(), anyString());
+        var failed = invitations.resend("admin@example.com", original.id());
+        assertThat(failed.deliveryFailed()).isTrue();
+        assertThat(failed.status()).isEqualTo("SMTP_ACCEPTED");
+        assertThat(failed.sentAt()).isEqualTo(replacement.sentAt());
+        assertThat(failed.expiresAt()).isEqualTo(replacement.expiresAt());
+        assertThat(acceptance.preview(new InvitationLinkRequest(original.id(), tokens.getLast())))
+                .isNotNull();
+    }
+
+    @Test
+    void failedInvitationsAreListedWithNoSentDateAndRetryChecksCapacityAndEligibility() {
+        doThrow(new EmailDeliveryException()).when(mail).send(any(), anyString());
+        var failed = send("retry@example.com");
+        assertThat(invitations.sent("admin@example.com").getFirst().sentAt()).isNull();
+        when(clock.instant()).thenReturn(now.plusSeconds(60));
+        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=1");
+        assertThatThrownBy(() -> invitations.resend("admin@example.com", failed.id()))
+                .hasMessageContaining("limit of 1 active accounts");
+        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=10");
+        doReturn("<retry@test>").when(mail).send(any(), anyString());
+        assertThat(invitations.resend("admin@example.com", failed.id()).status())
+                .isEqualTo("SMTP_ACCEPTED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TEAM_INVITATION", Integer.class))
+                .isEqualTo(1);
+        admin("other@example.com", "other.com");
+        when(clock.instant()).thenReturn(now.plusSeconds(120));
+        assertThatThrownBy(() -> invitations.resend("other@example.com", failed.id()))
+                .isInstanceOfSatisfying(
+                        IdentityException.class, e -> assertThat(e.status()).isEqualTo(404));
+        jdbc.update("UPDATE ACCOUNT SET EMAIL='retry@example.com' WHERE EMAIL='other@example.com'");
+        assertThatThrownBy(() -> invitations.resend("admin@example.com", failed.id()))
+                .isInstanceOfSatisfying(
+                        IdentityException.class,
+                        e -> assertThat(e.code()).isEqualTo("OTHER_COMPANY_MEMBER"));
+    }
+
+    @Test
+    void acceptanceDuringDeliveryWinsAndCannotBeReopened() {
+        var token = new String[1];
+        doAnswer(
+                        call -> {
+                            token[0] = call.getArgument(1);
+                            return "<initial@test>";
+                        })
+                .when(mail)
+                .send(any(), anyString());
+        var original = send("accepted@example.com");
+        when(clock.instant()).thenReturn(now.plusSeconds(60));
+        doAnswer(
+                        call -> {
+                            acceptance.accept(
+                                    new MemberRegistrationRequest(
+                                            new InvitationLinkRequest(original.id(), token[0]),
+                                            "Member Name",
+                                            "SOFTWARE_ENGINEER",
+                                            "Validpass!"));
+                            return "<replacement@test>";
+                        })
+                .when(mail)
+                .send(any(), anyString());
+        var result = invitations.resend("admin@example.com", original.id());
+        assertThat(result.status()).isEqualTo("ACCEPTED");
+        assertThat(result.sentAt()).isEqualTo(original.sentAt());
+        assertThat(invitations.sent("admin@example.com").getFirst().status()).isEqualTo("ACCEPTED");
+        assertThat(invitations.members("admin@example.com"))
+                .containsExactly(
+                        new ActiveMemberView(
+                                "Member Name", "accepted@example.com", "Software Engineer"));
+        assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+                .isInstanceOf(IdentityException.class);
+    }
+
+    @Test
+    void listsAreCompleteOrderedCompanyScopedAndExcludeUnusableLinks() throws Exception {
+        for (int i = 0; i < 30; i++) {
+            when(clock.instant()).thenReturn(now.plusSeconds(i));
+            send("listed" + i + "@example.com");
+        }
+        assertThat(invitations.sent("admin@example.com")).hasSize(30);
+        assertThat(invitations.sent("admin@example.com").getFirst().email())
+                .isEqualTo("listed29@example.com");
+        jdbc.update(
+                "UPDATE TEAM_INVITATION SET STATUS='REVOKED' WHERE EMAIL='listed0@example.com'");
+        jdbc.update(
+                "UPDATE TEAM_INVITATION SET EXPIRES_AT=? WHERE EMAIL='listed1@example.com'",
+                java.sql.Timestamp.from(now));
+        assertThat(invitations.sent("admin@example.com")).hasSize(28);
+        assertThat(invitations.members("admin@example.com")).isEmpty();
+        admin("other@example.com", "other.com");
+        assertThat(invitations.sent("other@example.com")).isEmpty();
+        mvc.perform(get("/api/invitations/sent")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/invitations/members").with(user("admin@example.com").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/api/invitations/"
+                                        + invitations.sent("admin@example.com").getFirst().id()
+                                        + "/resend")
+                                .with(user("admin@example.com").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE='MEMBER' WHERE EMAIL='admin@example.com'");
+        assertThatThrownBy(() -> invitations.sent("admin@example.com"))
+                .isInstanceOf(IdentityException.class);
+        assertThatThrownBy(() -> invitations.members("admin@example.com"))
+                .isInstanceOf(IdentityException.class);
+    }
+
+    @Test
+    void concurrentResendDoesNotSubmitDuplicateAndOldLinkWorksDuringDelivery() throws Exception {
+        var token = new String[1];
+        doAnswer(
+                        call -> {
+                            token[0] = call.getArgument(1);
+                            return "<original@test>";
+                        })
+                .when(mail)
+                .send(any(), anyString());
+        var original = send("race@example.com");
+        when(clock.instant()).thenReturn(now.plusSeconds(60));
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        doAnswer(
+                        call -> {
+                            entered.countDown();
+                            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                            return "<replacement@test>";
+                        })
+                .when(mail)
+                .send(any(), anyString());
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = pool.submit(() -> invitations.resend("admin@example.com", original.id()));
+            try {
+                assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+                assertThat(
+                                acceptance
+                                        .preview(new InvitationLinkRequest(original.id(), token[0]))
+                                        .status())
+                        .isEqualTo("READY");
+                assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+                        .isInstanceOfSatisfying(
+                                IdentityException.class,
+                                e -> assertThat(e.code()).isEqualTo("RESEND_IN_PROGRESS"));
+            } finally {
+                release.countDown();
+            }
+            assertThat(first.get(10, TimeUnit.SECONDS).status()).isEqualTo("SMTP_ACCEPTED");
+        }
+        verify(mail, times(2)).send(any(), anyString());
+    }
+
+    @Test
+    void memberListIsCompleteOrderedAndExcludesInactiveAdministratorsAndOtherCompanies() {
+        var org = identity.current("admin@example.com").organizationId();
+        for (int i = 0; i < 30; i++) {
+            jdbc.update(
+                    "INSERT INTO ACCOUNT(ID, EMAIL, FULL_NAME, PASSWORD_HASH, PROFESSIONAL_ROLE,"
+                        + " STATUS, ORGANIZATION_ID, ACCESS_ROLE, UPDATED_AT) VALUES (?, ?,"
+                        + " 'Member', 'unused', 'OTHER', 'ACTIVE', ?, 'MEMBER', ?)",
+                    UUID.randomUUID(),
+                    "member" + i + "@example.com",
+                    org,
+                    java.sql.Timestamp.from(now.plusSeconds(i)));
+        }
+        assertThat(invitations.members("admin@example.com")).hasSize(30);
+        assertThat(invitations.members("admin@example.com").getFirst().email())
+                .isEqualTo("member29@example.com");
+        jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='member0@example.com'");
+        admin("other@example.com", "other.com");
+        assertThat(invitations.members("admin@example.com")).hasSize(29);
+        assertThat(invitations.members("other@example.com")).isEmpty();
+        jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='admin@example.com'");
+        assertThatThrownBy(() -> invitations.members("admin@example.com"))
+                .isInstanceOf(IdentityException.class);
+        assertThatThrownBy(() -> invitations.resend("admin@example.com", UUID.randomUUID()))
+                .isInstanceOf(IdentityException.class);
     }
 }

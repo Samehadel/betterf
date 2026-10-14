@@ -162,78 +162,9 @@
           </form>
         }
       </section>
-      <section
-        class="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-8"
-        aria-labelledby="invitation-history-title"
-        [attr.aria-busy]="store.historyLoading()"
-      >
-        <h2 id="invitation-history-title" class="text-xl font-semibold">
-          {{ t('invitations.historyTitle') }}
-        </h2>
-        <p class="mt-2 text-sm text-[var(--muted)]">
-          {{ t('invitations.historyHint') }}
-        </p>
-        @if (store.historyError()) {
-          <p role="alert" class="mt-4 text-red-300">
-            {{ t('invitations.historyError') }}
-          </p>
-          <button
-            type="button"
-            class="button secondary mt-3"
-            [disabled]="store.historyLoading()"
-            (click)="store.loadHistory()"
-          >
-            {{ t('foundation.retry') }}
-          </button>
-        }
-        @if (store.history().length) {
-          <ul class="mt-5" aria-label="Previous invitations">
-            @for (invitation of store.history(); track invitation.id) {
-              <li
-                class="flex flex-col gap-2 border-t border-[var(--line)] py-4 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div class="min-w-0">
-                  <p class="break-all font-medium">{{ invitation.email }}</p>
-                  <p class="mt-1 text-sm text-[var(--muted)]">
-                    {{ invitation.message }}
-                  </p>
-                  <p class="mt-1 text-xs text-[var(--muted)]">
-                    {{ t('invitations.linkExpiry') }}
-                    <time [attr.datetime]="invitation.expiresAt">{{
-                      invitation.expiresAt | date: 'medium'
-                    }}</time>
-                  </p>
-                </div>
-                <span
-                  class="shrink-0 text-sm font-medium"
-                  [class.text-green-300]="invitation.status === 'SMTP_ACCEPTED'"
-                  [class.text-red-300]="invitation.status === 'FAILED'"
-                  >{{ t(historyStatus(invitation.status)) }}</span
-                >
-              </li>
-            }
-          </ul>
-        } @else if (!store.historyLoading() && !store.historyError()) {
-          <p class="mt-5 text-sm text-[var(--muted)]">
-            {{ t('invitations.historyEmpty') }}
-          </p>
-        }
-        @if (store.historyLoading()) {
-          <p role="status" class="mt-4 text-sm">
-            {{ t('invitations.historyLoading') }}
-          </p>
-        }
-        @if (store.historyHasMore() && !store.historyError()) {
-          <button
-            type="button"
-            class="button secondary mt-4"
-            [disabled]="store.historyLoading()"
-            (click)="store.loadHistory()"
-          >
-            {{ t('invitations.loadMore') }}
-          </button>
-        }
-      </section>
+      <a class="button secondary mt-8" routerLink="/company/team">{{
+        t('team.title')
+      }}</a>
       <p class="mt-6 max-w-xl text-sm text-[var(--muted)]">
         {{ t('invitations.footer') }}
       </p>

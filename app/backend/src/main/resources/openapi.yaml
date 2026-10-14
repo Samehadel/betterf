@@ -150,6 +150,68 @@ paths:
           description: ALREADY_MEMBER, OTHER_COMPANY_MEMBER, INVITATION_PENDING, or ACCOUNT_LIMIT. No email sent.
         '500':
           description: Persistence failure; outcome may be uncertain. Check status before retry.
+  /api/invitations/sent:
+    get:
+      operationId: listSentInvitations
+      summary: All pending, failed and accepted invitations in the verified administrator's company.
+      description: |
+        No truncation or pagination. Ordered by COALESCE(sentAt, attemptedAt) descending,
+        then UUID descending. Expired pending and revoked records are excluded; accepted
+        and failed records remain visible. sentAt is null until a confirmed SMTP submission.
+        resendAvailableAt is the latest send/attempt plus 60 seconds. resending indicates
+        a reserved replacement; deliveryFailed describes a failed delivery attempt without
+        changing the current link status. No tokens are exposed.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: Envelope containing an array of invitation views (id, email, status, expiresAt, message, sentAt, resendAvailableAt, resending, deliveryFailed).
+        '401': { description: Authentication required. }
+        '403': { description: Verified administrator required. }
+  /api/invitations/members:
+    get:
+      operationId: listActiveMembers
+      summary: All active ordinary members of the verified administrator's company.
+      description: |
+        No truncation or pagination. Ordered by activation timestamp (ACCOUNT.UPDATED_AT)
+        descending, then UUID descending. Only ACTIVE accounts with MEMBER access role.
+        Administrator accounts remain included in capacity checks but are not listed here.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: Envelope containing an array with fullName, email and professionalRole (display label).
+        '401': { description: Authentication required. }
+        '403': { description: Verified administrator required. }
+  /api/invitations/{id}/resend:
+    post:
+      operationId: resendInvitation
+      summary: Replace an eligible invitation after a 60-second cooldown.
+      description: |
+        Company isolation, recipient eligibility and active-account capacity are checked
+        under the same recipient/company locks as acceptance. Only FAILED or unexpired
+        SMTP_ACCEPTED invitations are eligible. Reserve a replacement hash separately and
+        send outside the transaction. Confirmed submission promotes the replacement with
+        a fresh seven-day expiry, invalidating the old hash. Failure or SMTP timeout discards
+        the replacement and preserves the old link/expiry; an ambiguously delivered replacement
+        is unusable. Acceptance during delivery wins and completion never reopens it.
+        Persistence failure after SMTP leaves a reserved replacement, blocking duplicate
+        retries while keeping the old link usable; operational reconciliation is required.
+        A lost HTTP response must be reconciled by reloading the sent list before retrying.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/InvitationCsrf'
+      responses:
+        '200':
+          description: Current invitation view and result message. deliveryFailed=true means no replacement promotion; ACCEPTED means acceptance won the race.
+        '401': { description: Authentication required. }
+        '403': { description: Verified administrator required or CSRF invalid. }
+        '404': { description: Invitation absent or belongs to another company. }
+        '409':
+          description: RESEND_COOLDOWN, RESEND_IN_PROGRESS, INVITATION_UNUSABLE, ALREADY_MEMBER, OTHER_COMPANY_MEMBER or ACCOUNT_LIMIT. Existing invitation unchanged.
+        '500': { description: Uncertain persistence outcome; reload list before retry. }
   /api/invitations/status:
     post:
       operationId: getTeamInvitationSendStatus
@@ -654,6 +716,10 @@ components:
             status: { type: string, enum: [SENDING, SMTP_ACCEPTED, FAILED, REVOKED, ACCEPTED] }
             expiresAt: { type: string, format: date-time }
             message: { type: string }
+            sentAt: { type: [string, 'null'], format: date-time }
+            resendAvailableAt: { type: [string, 'null'], format: date-time }
+            resending: { type: boolean }
+            deliveryFailed: { type: boolean }
     ErrorEnvelope:
       type: object
       required:

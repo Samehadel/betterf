@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test('public landing page remains independent of backend availability', async ({ page }) => {
-  let apiRequests = 0;
+  const apiRequests: string[] = [];
   await page.route('**/api/**', (route) => {
-    apiRequests++;
+    apiRequests.push(new URL(route.request().url()).pathname);
     return route.abort();
   });
   await page.goto('/');
@@ -15,7 +15,7 @@ test('public landing page remains independent of backend availability', async ({
   await page.getByRole('link', { name: 'Explore the vision', exact: true }).first().click();
   await expect(page).toHaveURL(/#workflow$/);
   await expect(page.getByRole('region', { name: 'Illustrative product preview' })).toBeInViewport();
-  expect(apiRequests).toBe(0);
+  expect(apiRequests).toEqual(['/api/auth/me']);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

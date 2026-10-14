@@ -125,7 +125,8 @@ test('landing registration, local email verification, password login and logout'
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/company');
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('alert')).toContainText('Please log in again');
+  await expect(page.getByRole('link', { name: 'Log in', exact: true })).toBeVisible();
 });
 test('resend rotates link and invalid link exposes recovery; narrow keyboard-accessible form', async ({
   page,

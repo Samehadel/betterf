@@ -3,6 +3,12 @@ package com.betterf.identity.api.service;
 import com.betterf.identity.api.dto.*;
 
 public interface InvitationService {
+    java.util.List<InvitationView> sent(String administratorEmail);
+
+    java.util.List<ActiveMemberView> members(String administratorEmail);
+
+    InvitationView resend(String administratorEmail, java.util.UUID id);
+
     InvitationPageView history(String administratorEmail, int page);
 
     InvitationView send(String administratorEmail, InvitationRequest request);

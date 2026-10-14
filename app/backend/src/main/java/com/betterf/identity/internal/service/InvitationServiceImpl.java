@@ -10,27 +10,48 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 @Service
+@lombok.RequiredArgsConstructor
 public class InvitationServiceImpl implements InvitationService {
     private final InvitationTransactions transactions;
     private final InvitationMail mail;
     private final SecureRandom random = new SecureRandom();
-
-    public InvitationServiceImpl(InvitationTransactions transactions, InvitationMail mail) {
-        this.transactions = transactions;
-        this.mail = mail;
-    }
 
     @Override
     public InvitationPageView history(String actor, int page) {
         return transactions.history(actor, page);
     }
 
-    public InvitationView send(String actor, InvitationRequest request) {
+    public java.util.List<InvitationView> sent(String actor) {
+        return transactions.sent(actor);
+    }
+
+    public java.util.List<ActiveMemberView> members(String actor) {
+        return transactions.members(actor);
+    }
+
+    public InvitationView resend(String actor, java.util.UUID id) {
+        String token = token();
+        var claim = transactions.claimResend(actor, id, token);
+        try {
+            String messageId = mail.send(claim, token);
+            return transactions.completeResend(id, token, messageId, null);
+        } catch (EmailDeliveryException failure) {
+            return transactions.completeResend(id, token, null, failure.failureCode());
+        }
+    }
+
+    private String token() {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    public InvitationView send(String actor, InvitationRequest request) {
+        String token = token();
         var claim = transactions.claim(actor, request, token);
-        if (claim.companyName() == null) return claim.view();
+        if (claim.companyName() == null) {
+            return claim.view();
+        }
         String messageId;
         try {
             messageId = mail.send(claim, token);

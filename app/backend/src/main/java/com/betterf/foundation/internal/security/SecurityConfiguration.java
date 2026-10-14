@@ -116,9 +116,14 @@ class SecurityConfiguration {
                                         .requestMatchers(
                                                 HttpMethod.POST,
                                                 "/api/invitations",
-                                                "/api/invitations/status")
+                                                "/api/invitations/status",
+                                                "/api/invitations/*/resend")
                                         .hasRole("ADMIN")
-                                        .requestMatchers(HttpMethod.GET, "/api/invitations")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/invitations",
+                                                "/api/invitations/sent",
+                                                "/api/invitations/members")
                                         .hasRole("ADMIN")
                                         .anyRequest()
                                         .denyAll())

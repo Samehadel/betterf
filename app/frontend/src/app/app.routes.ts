@@ -1,3 +1,4 @@
+import { TeamManagementStore } from './invitations/team-management.store';
 import { AcceptanceStore } from './invitations/acceptance.store';
 import { InvitationStore } from './invitations/invitation.store';
 import { IdentityStore } from './identity/identity.store';
@@ -25,10 +26,15 @@ export const routes: Routes = [
   },
   {
     path: 'company/invitations/pending',
-    providers: [InvitationStore],
+    redirectTo: 'company/team',
+    pathMatch: 'full',
+  },
+  {
+    path: 'company/team',
+    providers: [TeamManagementStore],
     loadComponent: () =>
-      import('./invitations/invitation-handoff-page').then(
-        (m) => m.InvitationHandoffPage,
+      import('./invitations/team-management-page').then(
+        (m) => m.TeamManagementPage,
       ),
   },
   {

@@ -3,11 +3,14 @@ package com.betterf.identity.internal.service;
 import com.betterf.identity.api.dto.*;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.internal.entity.*;
+import com.betterf.identity.internal.mapper.AccountMapper;
 import com.betterf.identity.internal.repository.*;
 
 import jakarta.validation.Validator;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -18,31 +21,15 @@ import java.util.*;
 
 /** Short transactions on either side of SMTP, with no network operation inside a transaction. */
 @Service
+@RequiredArgsConstructor
 public class InvitationTransactions {
     private final AccountRepository accounts;
     private final InvitationRepository invitations;
     private final RegistrationLocks locks;
     private final Clock clock;
     private final Validator validator;
-    private final int defaultLimit;
-
-    public InvitationTransactions(
-            AccountRepository accounts,
-            InvitationRepository invitations,
-            RegistrationLocks locks,
-            Clock clock,
-            Validator validator,
-            @Value("${betterf.invitations.max-active-accounts:10}") int defaultLimit) {
-        if (defaultLimit < 1) {
-            throw new IllegalArgumentException("Active-account cap must be positive");
-        }
-        this.accounts = accounts;
-        this.invitations = invitations;
-        this.locks = locks;
-        this.clock = clock;
-        this.validator = validator;
-        this.defaultLimit = defaultLimit;
-    }
+    private final Environment configuration;
+    private final AccountMapper mapper;
 
     public record Claim(InvitationView view, String companyName, String administratorName) {}
 
@@ -78,29 +65,22 @@ public class InvitationTransactions {
         // Acceptance must acquire these locks in the same order.
         locks.lock("email:" + email);
         locks.lock("organization:" + admin.getOrganization().getId());
-        var member =
-                accounts.findByEmail(email)
-                        .filter(
-                                a ->
-                                        a.getAccessRole() != null
-                                                || a.getStatus() == AccountStatus.ACTIVE
-                                                || a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE);
-        if (member.isPresent()) {
-            boolean same =
-                    member.get().getOrganization().getId().equals(admin.getOrganization().getId());
-            throw new IdentityException(
-                    409,
-                    same ? "ALREADY_MEMBER" : "OTHER_COMPANY_MEMBER",
-                    same
-                            ? "Already a member."
-                            : "This email already belongs to another company. Use a different email"
-                                    + " address.");
-        }
+        requireEligibleRecipient(admin, email);
         var existing =
                 invitations
                         .findByOrganizationIdAndEmail(admin.getOrganization().getId(), email)
                         .orElse(null);
+        if (existing != null && existing.getReplacementTokenHash() != null) {
+            throw new IdentityException(
+                    409,
+                    "RESEND_IN_PROGRESS",
+                    "A resend is already in progress. Refresh the sent invitations before"
+                            + " retrying.");
+        }
+        if (existing != null && "ACCEPTED".equals(existing.getStatus())) {
+            throw new IdentityException(
+                    409, "INVITATION_USED", "This invitation has already been accepted.");
+        }
         if (existing != null && "SENDING".equals(existing.getStatus())) {
             return new Claim(view(existing), null, null);
         }
@@ -109,20 +89,7 @@ public class InvitationTransactions {
                 && clock.instant().isBefore(existing.getExpiresAt())) {
             throw new IdentityException(409, "INVITATION_PENDING", "Invitation already pending");
         }
-        int limit =
-                admin.getOrganization().getMaxActiveAccounts() == null
-                        ? defaultLimit
-                        : admin.getOrganization().getMaxActiveAccounts();
-        if (accounts.countByOrganizationIdAndStatus(
-                        admin.getOrganization().getId(), AccountStatus.ACTIVE)
-                >= limit) {
-            throw new IdentityException(
-                    409,
-                    "ACCOUNT_LIMIT",
-                    "Your organization has reached its limit of "
-                            + limit
-                            + " active accounts. You cannot send invitations.");
-        }
+        requireCapacity(admin);
         var invitation = existing == null ? new InvitationEntity() : existing;
         if (existing == null) {
             invitation.setId(UUID.randomUUID());
@@ -144,8 +111,7 @@ public class InvitationTransactions {
 
     @Transactional
     public InvitationView complete(UUID id, String token, String messageId, String failure) {
-        var preliminary = invitations.findById(id).orElseThrow();
-        locks.lock("email:" + preliminary.getEmail());
+        locks.lock("email:" + invitations.emailForId(id).orElseThrow());
         var invitation = invitations.findById(id).orElseThrow();
         if (!"SENDING".equals(invitation.getStatus())
                 || !IdentityServiceImpl.hash(token).equals(invitation.getTokenHash())) {
@@ -160,6 +126,177 @@ public class InvitationTransactions {
             invitation.setTokenHash(null);
         }
         return view(invitation);
+    }
+
+    private void requireEligibleRecipient(AccountEntity admin, String email) {
+        var member =
+                accounts.findByEmail(email)
+                        .filter(
+                                a ->
+                                        a.getAccessRole() != null
+                                                || a.getStatus() == AccountStatus.ACTIVE
+                                                || a.getOrganization().getStatus()
+                                                        == OrganizationStatus.ACTIVE);
+        if (member.isPresent()) {
+            boolean same =
+                    member.get().getOrganization().getId().equals(admin.getOrganization().getId());
+            throw new IdentityException(
+                    409,
+                    same ? "ALREADY_MEMBER" : "OTHER_COMPANY_MEMBER",
+                    same
+                            ? "Already a member."
+                            : "This email already belongs to another company. Use a different email"
+                                    + " address.");
+        }
+    }
+
+    private void requireCapacity(AccountEntity admin) {
+        int defaultLimit =
+                configuration.getProperty(
+                        "betterf.invitations.max-active-accounts", Integer.class, 10);
+        if (defaultLimit < 1) {
+            throw new IllegalArgumentException("Active-account cap must be positive");
+        }
+        int limit =
+                admin.getOrganization().getMaxActiveAccounts() == null
+                        ? defaultLimit
+                        : admin.getOrganization().getMaxActiveAccounts();
+        if (accounts.countByOrganizationIdAndStatus(
+                        admin.getOrganization().getId(), AccountStatus.ACTIVE)
+                >= limit) {
+            throw new IdentityException(
+                    409,
+                    "ACCOUNT_LIMIT",
+                    "Your organization has reached its limit of "
+                            + limit
+                            + " active accounts. You cannot send invitations.");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<InvitationView> sent(String actor) {
+        var admin = administrator(actor);
+        return invitations
+                .managementRecords(admin.getOrganization().getId(), clock.instant())
+                .stream()
+                .map(this::view)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActiveMemberView> members(String actor) {
+        var admin = administrator(actor);
+        return accounts.activeMembers(admin.getOrganization().getId()).stream()
+                .map(mapper::member)
+                .toList();
+    }
+
+    /** Reserves a replacement without changing the current link or its acceptance state. */
+    @Transactional
+    public Claim claimResend(String actor, UUID id, String token) {
+        var admin = administrator(actor);
+        String email = invitations.emailForId(id).orElseThrow(this::notFound);
+        locks.lock("email:" + email);
+        locks.lock("organization:" + admin.getOrganization().getId());
+        var invitation = invitations.findById(id).orElseThrow(this::notFound);
+        if (!invitation.getOrganization().getId().equals(admin.getOrganization().getId())) {
+            throw notFound();
+        }
+        if (!("FAILED".equals(invitation.getStatus())
+                || ("SMTP_ACCEPTED".equals(invitation.getStatus())
+                        && clock.instant().isBefore(invitation.getExpiresAt())))) {
+            throw new IdentityException(
+                    409, "INVITATION_UNUSABLE", "This invitation cannot be resent.");
+        }
+        requireEligibleRecipient(admin, email);
+        requireCapacity(admin);
+        if (invitation.getReplacementTokenHash() != null) {
+            throw new IdentityException(
+                    409,
+                    "RESEND_IN_PROGRESS",
+                    "A resend is already in progress. Refresh the sent invitations before"
+                            + " retrying.");
+        }
+        if (clock.instant().isBefore(resendAvailableAt(invitation))) {
+            throw new IdentityException(
+                    409, "RESEND_COOLDOWN", "Please wait 60 seconds between invitation sends.");
+        }
+        invitation.setReplacementTokenHash(IdentityServiceImpl.hash(token));
+        invitation.setReplacementAttemptedAt(clock.instant());
+        invitation.setReplacementExpiresAt(clock.instant().plus(Duration.ofDays(7)));
+        var current = view(invitation);
+        var replacement =
+                new InvitationView(
+                        current.id(),
+                        current.email(),
+                        current.status(),
+                        invitation.getReplacementExpiresAt(),
+                        current.message());
+        return new Claim(replacement, admin.getOrganization().getName(), admin.getFullName());
+    }
+
+    /** Serializes promotion with acceptance; an accepted invitation can never be reopened. */
+    @Transactional
+    public InvitationView completeResend(UUID id, String token, String messageId, String failure) {
+        locks.lock("email:" + invitations.emailForId(id).orElseThrow(this::notFound));
+        var invitation = invitations.findById(id).orElseThrow(this::notFound);
+        locks.lock("organization:" + invitation.getOrganization().getId());
+        if (!IdentityServiceImpl.hash(token).equals(invitation.getReplacementTokenHash())) {
+            throw new IllegalStateException("Invitation replacement changed");
+        }
+        if (!"ACCEPTED".equals(invitation.getStatus()) && failure == null) {
+            // A recipient may have joined another company while SMTP was in flight.
+            if (accounts.findByEmail(invitation.getEmail())
+                    .filter(a -> a.getAccessRole() != null)
+                    .isPresent()) {
+                failure = "RECIPIENT_REGISTERED";
+            } else {
+                invitation.setTokenHash(invitation.getReplacementTokenHash());
+                invitation.setExpiresAt(invitation.getReplacementExpiresAt());
+                invitation.setSentAt(clock.instant());
+                invitation.setSmtpMessageId(messageId);
+                invitation.setStatus("SMTP_ACCEPTED");
+            }
+        }
+        invitation.setReplacementTokenHash(null);
+        invitation.setReplacementExpiresAt(null);
+        invitation.setFailureCode(failure);
+        var result = view(invitation);
+        String message =
+                "ACCEPTED".equals(invitation.getStatus())
+                        ? "This invitation was accepted while the resend was in progress."
+                        : failure == null
+                                ? "Invitation resent successfully."
+                                : "The replacement could not be confirmed. The previous link and"
+                                        + " expiry are unchanged. Check the recipient address and"
+                                        + " retry after 60 seconds.";
+        return new InvitationView(
+                result.id(),
+                result.email(),
+                result.status(),
+                result.expiresAt(),
+                message,
+                result.sentAt(),
+                result.resendAvailableAt(),
+                result.resending(),
+                failure != null);
+    }
+
+    private IdentityException notFound() {
+        return new IdentityException(
+                404, "INVITATION_NOT_FOUND", "No invitation was found in your company.");
+    }
+
+    private Instant resendAvailableAt(InvitationEntity invitation) {
+        Instant latest = invitation.getAttemptedAt();
+        if (invitation.getSentAt() != null && invitation.getSentAt().isAfter(latest)) {
+            latest = invitation.getSentAt();
+        }
+        if (invitation.getReplacementAttemptedAt() != null
+                && invitation.getReplacementAttemptedAt().isAfter(latest)) {
+            latest = invitation.getReplacementAttemptedAt();
+        }
+        return latest.plusSeconds(60);
     }
 
     @Transactional(readOnly = true)
@@ -206,6 +343,10 @@ public class InvitationTransactions {
                 invitation.getEmail(),
                 invitation.getStatus(),
                 invitation.getExpiresAt(),
-                message);
+                message,
+                invitation.getSentAt(),
+                resendAvailableAt(invitation),
+                invitation.getReplacementTokenHash() != null,
+                invitation.getFailureCode() != null);
     }
 }

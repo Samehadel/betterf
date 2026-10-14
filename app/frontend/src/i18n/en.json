@@ -229,5 +229,28 @@
     "submit": "Accept invitation & create account",
     "submitting": "Creating your account…",
     "check": "Check invitation status"
+  },
+  "team": {
+    "title": "Manage your team",
+    "eyebrow": "Your company workspace",
+    "intro": "See who has joined your company and follow up on invitations.",
+    "invitations": "Sent invitations",
+    "members": "Active members",
+    "status": "Status",
+    "lastSent": "Last sent date",
+    "expiry": "Expiry",
+    "resend": "Resend",
+    "pending": "Pending",
+    "notSent": "Not sent",
+    "role": "Professional role",
+    "loading": "Loading records…",
+    "scrollHint": "Scroll horizontally to see all details.",
+    "loadFailed": "Records could not be loaded. Please retry.",
+    "uncertain": "The resend outcome could not be confirmed. Refresh the list before retrying; the previous link remains valid until a replacement is confirmed.",
+    "cooldown": "Available in {{seconds}} seconds",
+    "noInvitations": "No sent invitations",
+    "noInvitationsHint": "Invite a colleague to start building your team.",
+    "noMembers": "No active members yet",
+    "noMembersHint": "Colleagues will appear here after completing registration."
   }
 }
