@@ -241,6 +241,7 @@
     "expiry": "Expiry",
     "resend": "Resend",
     "pending": "Pending",
+    "failedState": "Failed to send",
     "notSent": "Not sent",
     "role": "Professional role",
     "loading": "Loading records…",

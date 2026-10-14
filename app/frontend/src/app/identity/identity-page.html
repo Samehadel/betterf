@@ -118,7 +118,7 @@
                 <a class="button" routerLink="/company/invitations">{{ t('invitations.formTitle') }}</a>
               }
               @if (account.accessRole === 'ADMIN') {
-                <a class="button secondary mt-4" routerLink="/company/team">{{ t('team.title') }}</a>
+                <a class="button workspace-team-button" routerLink="/company/team">{{ t('team.title') }}</a>
               } @else {
                 <div class="workspace-upcoming">
                   <span>{{ t('identity.home.comingSoon') }}</span>{{ t('identity.home.memberTools') }}

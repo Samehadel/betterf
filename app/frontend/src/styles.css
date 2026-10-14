@@ -1168,6 +1168,43 @@ button:disabled {
   max-width: 420px;
   margin-bottom: 26px;
 }
+.workspace-note .workspace-team-button {
+  display: flex;
+  width: fit-content;
+  margin: 16px 0 4px;
+  border-color: #a38acb;
+  background: #ded3ef;
+  color: #513968;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.workspace-note .workspace-team-button:hover {
+  border-color: #8463b4;
+  background: #d5c3ee;
+  color: #3c2657;
+  filter: none;
+}
+.invitation-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid rgb(179 161 255 / 30%);
+  border-radius: 999px;
+  background: rgb(179 161 255 / 10%);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.invitation-status-accepted {
+  border-color: rgb(134 239 172 / 30%);
+  background: rgb(134 239 172 / 10%);
+  color: #86efac;
+}
+.invitation-status-failed {
+  border-color: rgb(252 165 165 / 30%);
+  background: rgb(252 165 165 / 10%);
+  color: #fca5a5;
+}
 .workspace-upcoming {
   display: flex;
   flex-wrap: wrap;

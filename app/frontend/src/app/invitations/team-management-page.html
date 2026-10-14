@@ -196,22 +196,22 @@
                             </div>
                           }
                         </td>
-                        <td
-                          class="py-5 pr-5 font-medium"
-                          [class.text-red-300]="invitation.status === 'FAILED'"
-                          [class.text-green-300]="
-                            invitation.status === 'ACCEPTED'
-                          "
-                        >
-                          {{
-                            t(
-                              invitation.status === 'ACCEPTED'
-                                ? 'invitations.status.accepted'
-                                : invitation.status === 'FAILED'
-                                  ? 'invitations.status.failed'
-                                  : 'team.pending'
-                            )
-                          }}
+                        <td class="py-5 pr-5">
+                          <span
+                            class="invitation-status"
+                            [class.invitation-status-failed]="invitation.status === 'FAILED'"
+                            [class.invitation-status-accepted]="invitation.status === 'ACCEPTED'"
+                          >
+                            {{
+                              t(
+                                invitation.status === 'ACCEPTED'
+                                  ? 'invitations.status.accepted'
+                                  : invitation.status === 'FAILED'
+                                    ? 'team.failedState'
+                                    : 'team.pending'
+                              )
+                            }}
+                          </span>
                         </td>
                         <td class="py-5 pr-5">
                           @if (invitation.sentAt) {
