@@ -98,9 +98,11 @@ for (const viewport of [
           exact: true,
         })
         .click();
-      await expect(page.getByRole('status')).toContainText(
-        'Delivery failed. The previous link remains valid.',
-      );
+      await expect(
+        page.getByRole('status').filter({
+          hasText: 'Delivery failed. The previous link remains valid.',
+        }),
+      ).toBeVisible();
       await page.getByRole('tab', { name: 'Sent invitations' }).focus();
       await page.keyboard.press('ArrowRight');
       await expect(
