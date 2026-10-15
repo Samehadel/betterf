@@ -170,11 +170,11 @@ paths:
   /api/invitations/members:
     get:
       operationId: listActiveMembers
-      summary: All active ordinary members of the verified administrator's company.
+      summary: All active members, including administrators, of the verified administrator's company.
       description: |
         No truncation or pagination. Ordered by activation timestamp (ACCOUNT.UPDATED_AT)
-        descending, then UUID descending. Only ACTIVE accounts with MEMBER access role.
-        Administrator accounts remain included in capacity checks but are not listed here.
+        descending, then UUID descending. Only ACTIVE accounts with MEMBER or ADMIN access role.
+        Administrator accounts are included in both this list and capacity checks.
       security: [{ SessionCookie: [] }]
       responses:
         '200':

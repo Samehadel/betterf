@@ -435,7 +435,8 @@ class InvitationIntegrationTests {
         assertThat(invitations.members("admin@example.com"))
                 .containsExactly(
                         new ActiveMemberView(
-                                "Member Name", "accepted@example.com", "Software Engineer"));
+                                "Member Name", "accepted@example.com", "Software Engineer"),
+                        new ActiveMemberView("Ada", "admin@example.com", "Other"));
         assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
                 .isInstanceOf(IdentityException.class);
     }
@@ -455,7 +456,8 @@ class InvitationIntegrationTests {
                 "UPDATE TEAM_INVITATION SET EXPIRES_AT=? WHERE EMAIL='listed1@example.com'",
                 java.sql.Timestamp.from(now));
         assertThat(invitations.sent("admin@example.com")).hasSize(28);
-        assertThat(invitations.members("admin@example.com")).isEmpty();
+        assertThat(invitations.members("admin@example.com"))
+                .containsExactly(new ActiveMemberView("Ada", "admin@example.com", "Other"));
         admin("other@example.com", "other.com");
         assertThat(invitations.sent("other@example.com")).isEmpty();
         mvc.perform(get("/api/invitations/sent")).andExpect(status().isUnauthorized());
@@ -518,25 +520,30 @@ class InvitationIntegrationTests {
     }
 
     @Test
-    void memberListIsCompleteOrderedAndExcludesInactiveAdministratorsAndOtherCompanies() {
+    void memberListIncludesAdministratorsAndExcludesInactiveAccountsAndOtherCompanies() {
         var org = identity.current("admin@example.com").organizationId();
         for (int i = 0; i < 30; i++) {
             jdbc.update(
                     "INSERT INTO ACCOUNT(ID, EMAIL, FULL_NAME, PASSWORD_HASH, PROFESSIONAL_ROLE,"
-                        + " STATUS, ORGANIZATION_ID, ACCESS_ROLE, UPDATED_AT) VALUES (?, ?,"
-                        + " 'Member', 'unused', 'OTHER', 'ACTIVE', ?, 'MEMBER', ?)",
+                            + " STATUS, ORGANIZATION_ID, ACCESS_ROLE, UPDATED_AT) VALUES (?, ?,"
+                            + " 'Member', 'unused', 'OTHER', 'ACTIVE', ?, 'MEMBER', ?)",
                     UUID.randomUUID(),
                     "member" + i + "@example.com",
                     org,
                     java.sql.Timestamp.from(now.plusSeconds(i)));
         }
-        assertThat(invitations.members("admin@example.com")).hasSize(30);
+        assertThat(invitations.members("admin@example.com")).hasSize(31);
         assertThat(invitations.members("admin@example.com").getFirst().email())
                 .isEqualTo("member29@example.com");
         jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='member0@example.com'");
         admin("other@example.com", "other.com");
-        assertThat(invitations.members("admin@example.com")).hasSize(29);
-        assertThat(invitations.members("other@example.com")).isEmpty();
+        assertThat(invitations.members("admin@example.com")).hasSize(30);
+        assertThat(invitations.members("admin@example.com"))
+                .extracting(ActiveMemberView::email)
+                .contains("admin@example.com")
+                .doesNotContain("other@example.com", "member0@example.com");
+        assertThat(invitations.members("other@example.com"))
+                .containsExactly(new ActiveMemberView("Ada", "other@example.com", "Other"));
         jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='admin@example.com'");
         assertThatThrownBy(() -> invitations.members("admin@example.com"))
                 .isInstanceOf(IdentityException.class);
