@@ -14,6 +14,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { KnowledgeStore } from './knowledge.store';
 import {
   DetailBlock,
+  RefinementField,
   TicketContent,
   blockTypes,
   detailsLength,
@@ -107,13 +108,14 @@ export class CapturePage {
     this.dirty.set(true);
     this.store.discard();
   }
-  refine() {
-    if (this.valid() && !this.locked()) this.store.refine(this.content());
+  refine(field: RefinementField) {
+    if (this.valid() && !this.locked())
+      this.store.refine({ content: this.content(), field });
   }
   accept() {
     const suggestion = this.store.suggestion();
     if (!suggestion) return;
-    this.content.update((c) => ({ ...c, ...suggestion }));
+    this.content.update((c) => ({ ...c, [suggestion.field]: suggestion.text }));
     this.changed();
   }
   publish() {

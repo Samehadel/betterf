@@ -27,7 +27,9 @@
       <p class="knowledge-ticket-meta">
         {{ ticket.authorName }} · {{ ticket.createdAt | date:'medium' }}
       </p>
+      @if (ticket.content.capture?.trim()) {
       <p class="knowledge-ticket-capture">{{ ticket.content.capture }}</p>
+      }
       <app-details-view [blocks]="ticket.content.details" />
       <footer class="knowledge-classification">
         <h2>{{ t('knowledge.attributes') }}</h2>

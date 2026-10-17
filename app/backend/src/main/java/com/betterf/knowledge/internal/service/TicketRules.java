@@ -37,7 +37,8 @@ public final class TicketRules {
     public static void validate(TicketContent content) {
         if (content == null) invalid("Ticket content is required.");
         text(content.title(), 200, "Title");
-        text(content.capture(), 1000, "Capture");
+        if (content.capture() != null && content.capture().length() > 1000)
+            invalid("Capture must be at most 1000 characters.");
         if (content.template() == null || !TEMPLATES.contains(content.template()))
             invalid("Choose a writing template.");
         if (content.details() == null

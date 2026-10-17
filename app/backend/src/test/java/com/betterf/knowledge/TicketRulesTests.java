@@ -31,11 +31,7 @@ class TicketRulesTests {
                                                     "Knowledge",
                                                     text("Details"))))
                     .hasMessageContaining("Title");
-            assertThatThrownBy(
-                            () ->
-                                    TicketRules.validate(
-                                            content("Title", blank, "Knowledge", text("Details"))))
-                    .hasMessageContaining("Capture");
+            TicketRules.validate(content("Title", blank, "Knowledge", text("Details")));
             assertThatThrownBy(
                             () ->
                                     TicketRules.validate(
@@ -141,5 +137,20 @@ class TicketRulesTests {
                                                 new DetailBlock(
                                                         "code", "return key;", null, null))))
                 .hasMessageContaining("language");
+    }
+
+    @Test
+    void omittedCaptureIsOptionalAndStillBoundedWhenProvided() {
+        TicketRules.validate(content("Title", null, "Knowledge", text("Details")));
+        TicketRules.validate(content("Title", "", "Knowledge", text("Details")));
+        assertThatThrownBy(
+                        () ->
+                                TicketRules.validate(
+                                        content(
+                                                "Title",
+                                                "x".repeat(1001),
+                                                "Knowledge",
+                                                text("Details"))))
+                .hasMessageContaining("1000");
     }
 }

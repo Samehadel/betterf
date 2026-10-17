@@ -143,6 +143,11 @@ class KnowledgeIntegrationTests {
     @Test
     void classificationIsSeparateAndPersistsOnlyValidatedCatalogSelections() {
         var ticket = knowledge.create("member@example.com", request());
+        // Make the job due independently of host/container clock precision.
+        jdbc.update(
+                "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                    + " WHERE ID=?",
+                ticket.id());
         verifyNoInteractions(ai);
         when(ai.classify(content()))
                 .thenReturn(List.of("area:backend", "type:coding", "area:backend"));
@@ -155,6 +160,11 @@ class KnowledgeIntegrationTests {
     @Test
     void invalidOutputAndProviderFailureRetryThreeTimesWithoutUnpublishing() {
         var ticket = knowledge.create("member@example.com", request());
+        // Make the job due independently of host/container clock precision.
+        jdbc.update(
+                "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                    + " WHERE ID=?",
+                ticket.id());
         when(ai.classify(content())).thenReturn(List.of("invented:attribute"));
         worker.runOnce();
         assertThat(knowledge.get("member@example.com", ticket.id()).classificationStatus())
@@ -177,7 +187,13 @@ class KnowledgeIntegrationTests {
     @Test
     void leaseRecoveryFencesStaleWorkersAndEmptyResultsComplete() {
         var ticket = knowledge.create("member@example.com", request());
+        // Make the job due independently of host/container clock precision.
+        jdbc.update(
+                "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                    + " WHERE ID=?",
+                ticket.id());
         var oldWork = transactions.claim();
+        assertThat(oldWork).isNotNull();
         assertThat(transactions.claim()).isNull();
         jdbc.update(
                 "UPDATE KNOWLEDGE_TICKET SET LEASE_UNTIL=CURRENT_TIMESTAMP-INTERVAL '1 second'");
@@ -192,20 +208,75 @@ class KnowledgeIntegrationTests {
     }
 
     @Test
-    void refinementReceivesAllContentAndNeverMutatesPublication() {
-        when(ai.refine(content()))
-                .thenReturn(
-                        new RefinementView("Safe retries", "Reuse a stable key for every retry."));
-        assertThat(knowledge.refine("member@example.com", content()).title())
-                .isEqualTo("Safe retries");
-        verify(ai).refine(content());
+    void refinementTargetsOneFieldWithWholeTicketContextAndNeverMutatesPublication() {
+        when(ai.refine(content(), "title")).thenReturn("Safe retries");
+        var result =
+                knowledge.refine("member@example.com", new RefinementRequest("title", content()));
+        assertThat(result).isEqualTo(new RefinementView("title", "Safe retries"));
+        verify(ai).refine(content(), "title");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM KNOWLEDGE_TICKET", Integer.class))
                 .isZero();
-        when(ai.refine(content())).thenThrow(new IllegalStateException("offline"));
-        assertThatThrownBy(() -> knowledge.refine("member@example.com", content()))
+        var withoutCapture =
+                new TicketContent(content().title(), "", "Coding", content().details());
+        when(ai.refine(withoutCapture, "capture")).thenReturn("Reuse a stable key.");
+        assertThat(
+                        knowledge.refine(
+                                "member@example.com",
+                                new RefinementRequest("capture", withoutCapture)))
+                .isEqualTo(new RefinementView("capture", "Reuse a stable key."));
+        when(ai.refine(content(), "title")).thenThrow(new IllegalStateException("offline"));
+        assertThatThrownBy(
+                        () ->
+                                knowledge.refine(
+                                        "member@example.com",
+                                        new RefinementRequest("title", content())))
                 .isInstanceOfSatisfying(
                         KnowledgeException.class,
                         e -> assertThat(e.code()).isEqualTo("REFINEMENT_UNAVAILABLE"));
+        assertThatThrownBy(
+                        () ->
+                                knowledge.refine(
+                                        "member@example.com",
+                                        new RefinementRequest("details", content())))
+                .isInstanceOfSatisfying(
+                        KnowledgeException.class, e -> assertThat(e.status()).isEqualTo(400));
+    }
+
+    @Test
+    void publishesWithOmittedCapture() {
+        var withoutCapture =
+                new TicketContent(content().title(), null, "Coding", content().details());
+        var created =
+                knowledge.create(
+                        "member@example.com",
+                        new CreateTicketRequest(UUID.randomUUID(), withoutCapture));
+        assertThat(knowledge.get("member@example.com", created.id()).content().capture()).isNull();
+    }
+
+    @Test
+    void refinementTransportReturnsOnlySelectedFieldAndRejectsDetails() throws Exception {
+        when(ai.refine(content(), "capture")).thenReturn("Reuse a stable key.");
+        mvc.perform(
+                        post("/api/knowledge/tickets/refine")
+                                .with(user("member@example.com").roles("MEMBER"))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(
+                                        json.writeValueAsString(
+                                                new RefinementRequest("capture", content()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.field").value("capture"))
+                .andExpect(jsonPath("$.data.text").value("Reuse a stable key."))
+                .andExpect(jsonPath("$.data.title").doesNotExist());
+        mvc.perform(
+                        post("/api/knowledge/tickets/refine")
+                                .with(user("member@example.com").roles("MEMBER"))
+                                .with(csrf())
+                                .contentType("application/json")
+                                .content(
+                                        json.writeValueAsString(
+                                                new RefinementRequest("details", content()))))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

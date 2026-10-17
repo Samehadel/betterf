@@ -309,7 +309,9 @@ the proposed decision is in `architecture/decisions/0005-session-refresh.md`.
 ## Knowledge capture and monitoring
 
 Active members and administrators can open **Capture knowledge** from organization
-home. The Writing Studio publishes immediately, then classifies in the background.
+home. Title and Details are required; Capture is optional. Refine Title or Capture
+independently and accept each suggestion separately; Details are context only.
+The Writing Studio publishes immediately, then classifies in the background.
 Set the server-only `OPENAI_API_KEY` for Spring AI ChatClient with OpenAI
 `gpt-5.4-nano`. AI suggestions are optional; an unavailable provider does not prevent
 publication. Title, Capture, and Details are sent to the provider without author or

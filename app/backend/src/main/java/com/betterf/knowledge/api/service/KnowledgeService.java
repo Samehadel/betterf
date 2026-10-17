@@ -9,5 +9,5 @@ public interface KnowledgeService {
 
     TicketView get(String email, UUID id);
 
-    RefinementView refine(String email, TicketContent content);
+    RefinementView refine(String email, RefinementRequest request);
 }

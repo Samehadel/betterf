@@ -13,9 +13,11 @@ describe('knowledge content', () => {
     details: [{ ...emptyBlock('paragraph'), text: 'Details' }],
   });
   it('rejects formatting-only content and enforces all three limits', () => {
+    expect(validContent({ ...content(), capture: null })).toBe(true);
+    expect(validContent({ ...content(), capture: undefined })).toBe(true);
     for (const blank of ['', ' \n\t', '\u00a0\u200b']) {
       expect(validContent({ ...content(), title: blank })).toBe(false);
-      expect(validContent({ ...content(), capture: blank })).toBe(false);
+      expect(validContent({ ...content(), capture: blank })).toBe(true);
       expect(
         validContent({
           ...content(),

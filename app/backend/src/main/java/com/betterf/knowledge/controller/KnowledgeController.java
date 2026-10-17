@@ -29,7 +29,7 @@ public class KnowledgeController {
     }
 
     @PostMapping("/refine")
-    public RefinementView refine(Principal principal, @RequestBody TicketContent content) {
-        return knowledge.refine(principal.getName(), content);
+    public RefinementView refine(Principal principal, @RequestBody RefinementRequest request) {
+        return knowledge.refine(principal.getName(), request);
     }
 }

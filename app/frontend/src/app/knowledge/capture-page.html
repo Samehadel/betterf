@@ -29,7 +29,7 @@
                 class="knowledge-ai"
                 type="button"
                 [disabled]="!valid()"
-                (click)="refine()"
+                (click)="refine('title')"
                 [attr.aria-label]="t('knowledge.refineTitle')"
               >
                 ✧
@@ -53,12 +53,12 @@
             <div class="knowledge-label">
               <label for="ticket-capture"
                 >{{ t('knowledge.fields.capture') }}
-                <span>{{ t('knowledge.required') }}</span></label
+                <span>{{ t('knowledge.optional') }}</span></label
               ><button
                 class="knowledge-ai"
                 type="button"
                 [disabled]="!valid()"
-                (click)="refine()"
+                (click)="refine('capture')"
                 [attr.aria-label]="t('knowledge.refineCapture')"
               >
                 ✧
@@ -71,12 +71,11 @@
               [ngModel]="content().capture"
               (ngModelChange)="update('capture', $event)"
               maxlength="1000"
-              required
               aria-describedby="capture-hint"
             ></textarea>
             <p id="capture-hint" class="knowledge-hint">
               {{ t('knowledge.captureHint') }}
-              <span>{{ content().capture.length }}/1,000</span>
+              <span>{{ (content().capture?.length ?? 0) }}/1,000</span>
             </p>
           </div>
           <div class="knowledge-label">
@@ -100,15 +99,6 @@
                 {{ t('knowledge.fields.details') }}
                 <span>{{ t('knowledge.required') }}</span>
               </h2>
-              <button
-                class="knowledge-ai"
-                type="button"
-                [disabled]="!valid()"
-                (click)="refine()"
-                [attr.aria-label]="t('knowledge.refineDetails')"
-              >
-                ✧
-              </button>
             </div>
             <p id="details-hint" class="knowledge-hint">
               {{ t('knowledge.guidance.' + content().template) }}
@@ -172,15 +162,7 @@
                         (click)="remove(i)"
                         [attr.aria-label]="t('knowledge.remove') + ' ' + (i + 1)"
                       >
-                        ×</button
-                      ><button
-                        class="knowledge-ai"
-                        type="button"
-                        [disabled]="!valid()"
-                        (click)="refine()"
-                        [attr.aria-label]="t('knowledge.refineDetails') + ' ' + (i + 1)"
-                      >
-                        ✧
+                        ×
                       </button>
                     </div>
                   </div>
@@ -207,15 +189,7 @@
                       (ngModelChange)="block(i, {url: $event})"
                       placeholder="https://"
                       maxlength="30000"
-                    /><button
-                      class="knowledge-ai"
-                      type="button"
-                      [disabled]="!valid()"
-                      (click)="refine()"
-                      [attr.aria-label]="t('knowledge.refineDetails')"
-                    >
-                      ✧
-                    </button>
+                    />
                   </div>
                   }
                 </div>
@@ -268,24 +242,33 @@
       <p class="eyebrow">{{ t('knowledge.beforeShare') }}</p>
       <h2>{{ t('knowledge.polish') }}</h2>
       <p>{{ t('knowledge.polishIntro') }}</p>
-      <button
-        type="button"
-        class="button secondary"
-        [disabled]="!valid() || locked()"
-        (click)="refine()"
-      >
-        <span aria-hidden="true">✧</span> {{ t(store.refining() ?
-        'knowledge.refining' : 'knowledge.refine') }}
-      </button>
-      @if (store.refinementError()) {
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="!valid() || locked()"
+          (click)="refine('title')"
+        >
+          {{ t('knowledge.refineTitle') }}
+        </button>
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="!valid() || locked()"
+          (click)="refine('capture')"
+        >
+          {{ t('knowledge.refineCapture') }}
+        </button>
+      </div>
+      @if (store.refining()) {
+      <p role="status">{{ t('knowledge.refining') }}</p>
+      } @if (store.refinementError()) {
       <p role="alert" class="form-alert">{{ t(store.refinementError()) }}</p>
       } @if (store.suggestion(); as suggestion) {
       <section class="knowledge-suggestion" aria-live="polite">
         <h3>{{ t('knowledge.suggestion') }}</h3>
-        <h4>{{ t('knowledge.fields.title') }}</h4>
-        <p>{{ suggestion.title }}</p>
-        <h4>{{ t('knowledge.fields.capture') }}</h4>
-        <p>{{ suggestion.capture }}</p>
+        <h4>{{ t('knowledge.fields.' + suggestion.field) }}</h4>
+        <p>{{ suggestion.text }}</p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="button" (click)="accept()">
             {{ t('knowledge.accept') }}</button

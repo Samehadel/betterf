@@ -33,11 +33,7 @@ class SpringAiKnowledgeAiTests {
                                     StandardCharsets.UTF_8));
                     var answer =
                             requests.size() == 1
-                                    ? Map.of(
-                                            "title",
-                                            "Safe retries",
-                                            "capture",
-                                            "Reuse a stable key.")
+                                    ? Map.of("text", "Safe retries")
                                     : Map.of("attributes", List.of("area:backend"));
                     var body =
                             json.writeValueAsBytes(
@@ -95,7 +91,7 @@ class SpringAiKnowledgeAiTests {
                             List.of(
                                     new TicketContent.DetailBlock(
                                             "code", "return key;", "java", null)));
-            assertThat(ai.refine(content).title()).isEqualTo("Safe retries");
+            assertThat(ai.refine(content, "title")).isEqualTo("Safe retries");
             assertThat(ai.classify(content)).containsExactly("area:backend");
             for (var request : requests) {
                 var payload = json.readTree(request);

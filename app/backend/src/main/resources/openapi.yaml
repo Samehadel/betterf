@@ -57,7 +57,7 @@ paths:
   /api/knowledge/tickets/refine:
     post:
       operationId: refineKnowledgeTicket
-      summary: Suggest Title and Capture wording using complete valid content.
+      summary: Suggest wording for only the selected Title or Capture using complete Details.
       security: [{ SessionCookie: [] }]
       parameters:
         - $ref: '#/components/parameters/InvitationCsrf'
@@ -65,7 +65,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/TicketContent' }
+            schema: { $ref: '#/components/schemas/RefinementRequest' }
       responses:
         '200':
           description: Optional suggestions; no content has been persisted or changed.
@@ -78,10 +78,14 @@ paths:
                   error: { type: 'null' }
                   data:
                     type: object
-                    required: [title, capture]
+                    required: [field, text]
                     properties:
-                      title: { type: string, minLength: 1, maxLength: 200 }
-                      capture: { type: string, minLength: 1, maxLength: 1000 }
+                      field: { type: string, enum: [title, capture] }
+                      text:
+                        type: string
+                        minLength: 1
+                        maxLength: 1000
+                        description: Suggested wording for only the selected field; Title is limited to 200 characters.
         '400': { description: INVALID_TICKET; complete required Details first. }
         '401': { description: Authentication required. }
         '403': { description: Inactive membership or invalid CSRF. }
@@ -1084,11 +1088,11 @@ components:
           description: Required for links only; absolute HTTP(S), without credentials.
     TicketContent:
       type: object
-      required: [title, capture, template, details]
+      required: [title, template, details]
       description: Required content rejects Unicode whitespace/format-only values. Details count text plus URLs across all blocks in UTF-16 code units, excluding JSON markup, up to 30000. Coding requires a nonempty code block. Lists use one item per line.
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
-        capture: { type: string, minLength: 1, maxLength: 1000 }
+        capture: { type: [string, 'null'], maxLength: 1000, description: Optional; may be omitted or blank. }
         template: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
         details:
           type: array
@@ -1115,3 +1119,10 @@ components:
               uniqueItems: true
               description: Valid IDs from AttributeCatalog.ALL only. Empty on no-match or before successful classification.
               items: { type: string }
+    RefinementRequest:
+      type: object
+      required: [field, content]
+      properties:
+        field: { type: string, enum: [title, capture] }
+        content: { $ref: '#/components/schemas/TicketContent' }
+      description: Only the selected field is suggested. Details are context and cannot be a refinement target. Empty Capture may be drafted from provided knowledge; all required content must validate.

@@ -309,19 +309,17 @@
     "moveDown": "Move block down",
     "preview": "Preview Details",
     "hidePreview": "Hide preview",
-    "aiHint": "AI refinement uses the whole ticket and becomes available when all required content is complete. Details stay as written.",
+    "aiHint": "Refine Title or Capture independently using the whole ticket as context once required Details are complete. Capture is optional; Details stay as written.",
     "visibility": "Visible to your organization",
     "autoAttributes": "Attributes are added automatically after publishing.",
     "publish": "Publish ticket",
     "publishing": "Publishing…",
     "beforeShare": "Before you share",
     "polish": "A little polish.",
-    "polishIntro": "Use your complete knowledge to make the introduction clearer.",
-    "refine": "Refine Title & Capture",
+    "polishIntro": "Choose Title or Capture to refine. Preview and accept each suggestion separately.",
     "refining": "Refining…",
-    "refineTitle": "Suggest Title and Capture wording",
-    "refineCapture": "Suggest Title and Capture wording using Capture",
-    "refineDetails": "Use Details to suggest Title and Capture wording",
+    "refineTitle": "Refine Title",
+    "refineCapture": "Refine Capture",
     "suggestion": "Suggested wording",
     "accept": "Accept wording",
     "discard": "Discard",
@@ -346,6 +344,7 @@
     "noMatch": "No catalog attributes matched this knowledge.",
     "unavailable": "The request could not finish. Your writing is preserved. Please retry.",
     "retryHint": "Your content is preserved. If publication is uncertain, editing is paused; retry to safely retrieve the same published ticket.",
-    "TICKET_NOT_FOUND": "This ticket is unavailable in your organization."
+    "TICKET_NOT_FOUND": "This ticket is unavailable in your organization.",
+    "optional": "Optional"
   }
 }

@@ -3,7 +3,12 @@ import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, pipe, tap } from 'rxjs';
 import { KnowledgeApi } from './knowledge.api';
-import { Refinement, Ticket, TicketContent } from './knowledge.models';
+import {
+  Refinement,
+  RefinementField,
+  Ticket,
+  TicketContent,
+} from './knowledge.models';
 export const KnowledgeStore = signalStore(
   withState({
     ticket: null as Ticket | null,
@@ -39,15 +44,15 @@ export const KnowledgeStore = signalStore(
         }),
       ),
     );
-    const refine = rxMethod<TicketContent>(
+    const refine = rxMethod<{ content: TicketContent; field: RefinementField }>(
       pipe(
-        exhaustMap((content) => {
+        exhaustMap(({ content, field }) => {
           patchState(store, {
             refining: true,
             refinementError: '',
             suggestion: null,
           });
-          return api.refine(content).pipe(
+          return api.refine(content, field).pipe(
             tap((suggestion) =>
               patchState(store, { suggestion, refining: false }),
             ),

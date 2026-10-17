@@ -13,7 +13,7 @@ export interface DetailBlock {
 }
 export interface TicketContent {
   title: string;
-  capture: string;
+  capture?: string | null;
   template: string;
   details: DetailBlock[];
 }
@@ -26,9 +26,10 @@ export interface Ticket {
   classificationStatus: string;
   attributes: string[];
 }
+export type RefinementField = 'title' | 'capture';
 export interface Refinement {
-  title: string;
-  capture: string;
+  field: RefinementField;
+  text: string;
 }
 export const templates = [
   'Knowledge',
@@ -77,8 +78,7 @@ export function validContent(content: TicketContent): boolean {
   return (
     meaningful(content.title) &&
     content.title.length <= 200 &&
-    meaningful(content.capture) &&
-    content.capture.length <= 1000 &&
+    (content.capture?.length ?? 0) <= 1000 &&
     templates.includes(content.template) &&
     validDetails(content)
   );

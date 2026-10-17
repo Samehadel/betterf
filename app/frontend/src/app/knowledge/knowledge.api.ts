@@ -1,7 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { map, switchMap } from 'rxjs';
-import { Ticket, TicketContent, Refinement } from './knowledge.models';
+import {
+  Ticket,
+  TicketContent,
+  Refinement,
+  RefinementField,
+} from './knowledge.models';
 @Injectable({ providedIn: 'root' })
 export class KnowledgeApi {
   private readonly http = inject(HttpClient);
@@ -16,8 +21,11 @@ export class KnowledgeApi {
       content,
     });
   }
-  refine(content: TicketContent) {
-    return this.post<Refinement>('/api/knowledge/tickets/refine', content);
+  refine(content: TicketContent, field: RefinementField) {
+    return this.post<Refinement>('/api/knowledge/tickets/refine', {
+      content,
+      field,
+    });
   }
   private post<T>(url: string, body: unknown) {
     return this.http
