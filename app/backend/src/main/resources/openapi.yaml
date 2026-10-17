@@ -7,6 +7,137 @@ info:
     organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
     Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
 paths:
+  /api/knowledge/tickets:
+    post:
+      operationId: createKnowledgeTicket
+      summary: Publish a ticket immediately within the active member's organization.
+      description: Same submission ID and content safely return the original ticket. Changed content under the same ID returns 409. Classification runs after commit independently.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionId, content]
+              properties:
+                submissionId: { type: string, format: uuid }
+                content: { $ref: '#/components/schemas/TicketContent' }
+      responses:
+        '201':
+          description: Published ticket or an identical previous submission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketEnvelope' }
+        '400': { description: INVALID_TICKET or malformed request. }
+        '401': { description: Authentication required. }
+        '403': { description: Inactive membership or invalid CSRF. }
+        '409': { description: SUBMISSION_CONFLICT. }
+  /api/knowledge/tickets/{id}:
+    get:
+      operationId: getKnowledgeTicket
+      summary: Read a published ticket from the current organization.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Published content and current automatic classification.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketEnvelope' }
+        '401': { description: Authentication required. }
+        '403': { description: Inactive membership. }
+        '404': { description: TICKET_NOT_FOUND, including cross-organization access. }
+  /api/knowledge/tickets/refine:
+    post:
+      operationId: refineKnowledgeTicket
+      summary: Suggest Title and Capture wording using complete valid content.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/InvitationCsrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TicketContent' }
+      responses:
+        '200':
+          description: Optional suggestions; no content has been persisted or changed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, error]
+                properties:
+                  error: { type: 'null' }
+                  data:
+                    type: object
+                    required: [title, capture]
+                    properties:
+                      title: { type: string, minLength: 1, maxLength: 200 }
+                      capture: { type: string, minLength: 1, maxLength: 1000 }
+        '400': { description: INVALID_TICKET; complete required Details first. }
+        '401': { description: Authentication required. }
+        '403': { description: Inactive membership or invalid CSRF. }
+        '503': { description: REFINEMENT_UNAVAILABLE; original content remains unchanged. }
+  /actuator/health:
+    get:
+      operationId: aggregateHealth
+      summary: Unwrapped aggregate health status; details require administrator role.
+      responses:
+        '200': { description: UP. }
+        '503': { description: A configured health contributor is down. }
+  /actuator/health/{probe}:
+    get:
+      operationId: healthProbe
+      summary: Public unwrapped liveness or database readiness probe.
+      parameters:
+        - in: path
+          name: probe
+          required: true
+          schema: { type: string, enum: [liveness, readiness] }
+      responses:
+        '200': { description: UP. }
+        '503': { description: DOWN or out of service. }
+  /actuator/metrics:
+    get:
+      operationId: listMetrics
+      summary: Unwrapped metric names, active administrators only.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200': { description: Available Micrometer metric names. }
+        '401': { description: Authentication required. }
+        '403': { description: Active administrator required. }
+  /actuator/metrics/{name}:
+    get:
+      operationId: metricMeasurements
+      summary: Unwrapped measurements and tags, active administrators only.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Metric measurements. }
+        '401': { description: Authentication required. }
+        '403': { description: Active administrator required. }
+        '404': { description: Metric not found. }
+  /actuator/prometheus:
+    get:
+      operationId: prometheusScrape
+      summary: Prometheus text exposition, active administrators only.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200': { description: Prometheus metrics, not wrapped in an API envelope. }
+        '401': { description: Authentication required. }
+        '403': { description: Active administrator required. }
   /api/auth/invitation/preview:
     post:
       operationId: previewInvitationAcceptance
@@ -938,3 +1069,49 @@ components:
                 - UP
         error:
           type: 'null'
+    DetailBlock:
+      type: object
+      required: [type, text]
+      properties:
+        type: { type: string, enum: [paragraph, heading, bulletList, orderedList, link, code] }
+        text: { type: string, maxLength: 30000 }
+        language:
+          type: [string, 'null']
+          description: Required for code only; plaintext, java, typescript, javascript, python, sql, bash, json, yaml, html, css, csharp, cpp, go, rust, kotlin.
+        url:
+          type: [string, 'null']
+          maxLength: 30000
+          description: Required for links only; absolute HTTP(S), without credentials.
+    TicketContent:
+      type: object
+      required: [title, capture, template, details]
+      description: Required content rejects Unicode whitespace/format-only values. Details count text plus URLs across all blocks in UTF-16 code units, excluding JSON markup, up to 30000. Coding requires a nonempty code block. Lists use one item per line.
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        capture: { type: string, minLength: 1, maxLength: 1000 }
+        template: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
+        details:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/DetailBlock' }
+    TicketEnvelope:
+      type: object
+      required: [data, error]
+      properties:
+        error: { type: 'null' }
+        data:
+          type: object
+          required: [id, content, authorId, authorName, createdAt, classificationStatus, attributes]
+          properties:
+            id: { type: string, format: uuid }
+            content: { $ref: '#/components/schemas/TicketContent' }
+            authorId: { type: string, format: uuid }
+            authorName: { type: string }
+            createdAt: { type: string, format: date-time }
+            classificationStatus: { type: string, enum: [PENDING, PROCESSING, RETRYING, COMPLETE, FAILED] }
+            attributes:
+              type: array
+              uniqueItems: true
+              description: Valid IDs from AttributeCatalog.ALL only. Empty on no-match or before successful classification.
+              items: { type: string }

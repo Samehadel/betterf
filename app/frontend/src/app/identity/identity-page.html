@@ -111,6 +111,7 @@
           <div class="workspace-grid">
             <section class="workspace-note" aria-labelledby="workspace-note-title">
               <span class="workspace-icon" aria-hidden="true">↗</span>
+              <a class="button mb-5" routerLink="/knowledge/new">{{ t('knowledge.newCapture') }}</a>
               <p class="eyebrow">{{ t('identity.home.nextEyebrow') }}</p>
               <h2 id="workspace-note-title">{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextTitle' : 'identity.home.memberTitle') }}</h2>
               <p>{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextDescription' : 'identity.home.memberDescription') }}</p>

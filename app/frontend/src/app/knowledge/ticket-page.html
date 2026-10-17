@@ -1,0 +1,51 @@
+<ng-container *transloco="let t">
+  <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  <header class="top">
+    <nav class="wrap" aria-label="Main navigation">
+      <a class="brand" routerLink="/company"
+        >BetterF<span class="text-[var(--accent)]">.</span></a
+      ><a class="button secondary" routerLink="/knowledge/new"
+        >{{ t('knowledge.newCapture') }}</a
+      >
+    </nav>
+  </header>
+  <main id="main" class="wrap knowledge-ticket" tabindex="-1">
+    <a class="text-link" routerLink="/company">← {{ t('knowledge.back') }}</a>
+    @if (created) {
+    <p role="status" class="knowledge-success">
+      ✓ {{ t('knowledge.success') }}
+    </p>
+    } @if (store.error()) {
+    <p role="alert" class="form-alert">{{ t(store.error()) }}</p>
+    <button type="button" class="button secondary" (click)="store.load(id)">
+      {{ t('identity.retry') }}
+    </button>
+    } @if (store.ticket(); as ticket) {
+    <article class="knowledge-card">
+      <p class="eyebrow">{{ t('knowledge.published') }}</p>
+      <h1>{{ ticket.content.title }}</h1>
+      <p class="knowledge-ticket-meta">
+        {{ ticket.authorName }} · {{ ticket.createdAt | date:'medium' }}
+      </p>
+      <p class="knowledge-ticket-capture">{{ ticket.content.capture }}</p>
+      <app-details-view [blocks]="ticket.content.details" />
+      <footer class="knowledge-classification">
+        <h2>{{ t('knowledge.attributes') }}</h2>
+        <p role="status">
+          {{ t('knowledge.status.' + ticket.classificationStatus) }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          @for (attribute of ticket.attributes; track attribute) {
+          <span class="knowledge-attribute">{{ attribute }}</span> }
+        </div>
+        @if (ticket.classificationStatus === 'COMPLETE' &&
+        !ticket.attributes.length) {
+        <p>{{ t('knowledge.noMatch') }}</p>
+        }
+      </footer>
+    </article>
+    } @else if (store.loading()) {
+    <p role="status">{{ t('knowledge.loading') }}</p>
+    }
+  </main>
+</ng-container>

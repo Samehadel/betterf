@@ -12,6 +12,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 class ApiExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    @ExceptionHandler(com.betterf.knowledge.api.exception.KnowledgeException.class)
+    ResponseEntity<ApiEnvelope<Void>> knowledge(
+            com.betterf.knowledge.api.exception.KnowledgeException exception) {
+        return ResponseEntity.status(exception.status())
+                .body(ApiEnvelope.failure(exception.code(), exception.getMessage()));
+    }
+
     @ExceptionHandler(com.betterf.identity.api.exception.IdentityException.class)
     ResponseEntity<ApiEnvelope<Void>> identity(
             com.betterf.identity.api.exception.IdentityException exception) {

@@ -1,3 +1,8 @@
+import { KnowledgeStore } from './knowledge/knowledge.store';
+import {
+  knowledgeAccess,
+  unsavedCapture,
+} from './knowledge/knowledge-access.guard';
 import { TeamManagementStore } from './invitations/team-management.store';
 import { AcceptanceStore } from './invitations/acceptance.store';
 import { InvitationStore } from './invitations/invitation.store';
@@ -6,6 +11,21 @@ import { Routes } from '@angular/router';
 import { StatusStore } from './foundation/status.store';
 
 export const routes: Routes = [
+  {
+    path: 'knowledge/new',
+    canActivate: [knowledgeAccess],
+    canDeactivate: [unsavedCapture],
+    providers: [KnowledgeStore],
+    loadComponent: () =>
+      import('./knowledge/capture-page').then((m) => m.CapturePage),
+  },
+  {
+    path: 'knowledge/tickets/:id',
+    canActivate: [knowledgeAccess],
+    providers: [KnowledgeStore],
+    loadComponent: () =>
+      import('./knowledge/ticket-page').then((m) => m.TicketPage),
+  },
   {
     path: 'invitation/accept',
     providers: [AcceptanceStore],

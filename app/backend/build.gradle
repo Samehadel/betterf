@@ -8,8 +8,15 @@ group = 'com.betterf'
 version = file('../../VERSION').text.trim()
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 repositories { mavenCentral() }
-dependencyManagement { imports { mavenBom 'org.springframework.modulith:spring-modulith-bom:2.0.8' } }
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.modulith:spring-modulith-bom:2.0.8'
+        mavenBom 'org.springframework.ai:spring-ai-bom:2.0.1'
+    }
+}
 dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-liquibase'

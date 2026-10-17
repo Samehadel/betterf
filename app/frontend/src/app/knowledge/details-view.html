@@ -1,0 +1,31 @@
+<div class="knowledge-prose">
+  @for (block of rendered(); track $index) { @switch (block.type) { @case
+  ('heading') {
+  <h2>{{ block.text }}</h2>
+  } @case ('bulletList') {
+  <ul>
+    @for (line of lines(block.text); track $index) {
+    <li>{{ line }}</li>
+    }
+  </ul>
+  } @case ('orderedList') {
+  <ol>
+    @for (line of lines(block.text); track $index) {
+    <li>{{ line }}</li>
+    }
+  </ol>
+  } @case ('link') {
+  <p>
+    <a [href]="block.url" target="_blank" rel="noopener noreferrer"
+      >{{ block.text }} ↗</a
+    >
+  </p>
+  } @case ('code') {
+  <figure class="knowledge-code">
+    <figcaption>{{ block.language }}</figcaption>
+    <pre><code [innerHTML]="block.highlighted ?? ''" [hidden]="block.highlighted === null"></code>@if (block.highlighted === null) { <code>{{ block.text }}</code> }</pre>
+  </figure>
+  } @default {
+  <p>{{ block.text }}</p>
+  } } }
+</div>

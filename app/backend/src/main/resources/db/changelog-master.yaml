@@ -15,3 +15,5 @@ databaseChangeLog:
       file: db/identity/20261008-001-invitation-acceptance.sql
   - include:
       file: db/identity/20261015-001-invitation-resend.sql
+  - include:
+      file: db/knowledge/20261018-001-tickets.sql

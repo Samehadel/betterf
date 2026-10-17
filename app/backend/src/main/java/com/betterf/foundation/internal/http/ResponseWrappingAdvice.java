@@ -13,7 +13,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestControllerAdvice(
-        basePackages = {"com.betterf.foundation.controller", "com.betterf.identity.controller"})
+        basePackages = {
+            "com.betterf.foundation.controller",
+            "com.betterf.identity.controller",
+            "com.betterf.knowledge.controller"
+        })
 class ResponseWrappingAdvice implements ResponseBodyAdvice<Object> {
     @Override
     public boolean supports(

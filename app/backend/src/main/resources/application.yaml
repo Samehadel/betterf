@@ -1,4 +1,20 @@
 spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:unconfigured}
+      timeout: 30s
+      max-retries: 0
+      chat:
+        model: gpt-5.4-nano
+        temperature: null
+        max-completion-tokens: 2048
+        store: false
+      embedding:
+        enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 2
   application:
     name: betterf
   datasource:
@@ -47,10 +63,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: never
+      show-details: when-authorized
+      roles: ADMIN
       probes:
         enabled: true
       group:

@@ -304,3 +304,28 @@ share recovery; browsers supporting Web Locks also coordinate across tabs.
 Apply the additive refresh-session migration with the backend deployment and deploy
 the matching frontend. Architecture consulted: `16a2955` on architecture `origin/main`;
 the proposed decision is in `architecture/decisions/0005-session-refresh.md`.
+
+
+## Knowledge capture and monitoring
+
+Active members and administrators can open **Capture knowledge** from organization
+home. The Writing Studio publishes immediately, then classifies in the background.
+Set the server-only `OPENAI_API_KEY` for Spring AI ChatClient with OpenAI
+`gpt-5.4-nano`. AI suggestions are optional; an unavailable provider does not prevent
+publication. Title, Capture, and Details are sent to the provider without author or
+organization metadata. Content sanitization is deferred by the product owner's
+explicit decision, so embedded sensitive text is not redacted.
+
+Classification makes up to three attempts and preserves publication on failure.
+`betterf.knowledge.classification.enabled=false` disables the scheduler;
+`betterf.knowledge.classification.delay` changes its five-second default interval.
+The Details block format and catalog are documented in
+[the knowledge contract](../architecture/backend/knowledge-capture.md).
+
+Public Actuator probes are `/actuator/health/liveness` and
+`/actuator/health/readiness` (database readiness). Aggregate `/actuator/health`
+also checks configured SMTP. `/actuator/info`, `/actuator/metrics`, and
+`/actuator/prometheus` require an active administrator session. JVM and HTTP metrics
+are available; `betterf.knowledge.classification` records completed and failed
+classification attempts. The deployment proxy forwards these protected endpoints;
+no deployment has been performed as part of this story.

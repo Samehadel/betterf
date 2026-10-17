@@ -10,8 +10,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.authentication.*;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.password.*;
 import org.springframework.security.web.SecurityFilterChain;
@@ -83,7 +85,8 @@ class SecurityConfiguration {
             JsonMapper mapper,
             SecurityContextRepository contexts,
             CsrfTokenRepository csrf,
-            RefreshSessions refresh)
+            RefreshSessions refresh,
+            IdentityService identity)
             throws Exception {
         return http.sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
@@ -95,6 +98,7 @@ class SecurityConfiguration {
                                 auth.requestMatchers(
                                                 HttpMethod.GET,
                                                 "/api/status",
+                                                "/actuator/health",
                                                 "/actuator/health/liveness",
                                                 "/actuator/health/readiness",
                                                 "/api/auth/csrf",
@@ -111,6 +115,13 @@ class SecurityConfiguration {
                                                 "/api/auth/login",
                                                 "/api/auth/refresh")
                                         .permitAll()
+                                        .requestMatchers("/actuator/**")
+                                        .access(
+                                                (authentication, context) ->
+                                                        new AuthorizationDecision(
+                                                                activeAdministrator(
+                                                                        authentication.get(),
+                                                                        identity)))
                                         .requestMatchers(HttpMethod.GET, "/api/auth/me")
                                         .authenticated()
                                         .requestMatchers(
@@ -125,6 +136,13 @@ class SecurityConfiguration {
                                                 "/api/invitations/sent",
                                                 "/api/invitations/members")
                                         .hasRole("ADMIN")
+                                        .requestMatchers(HttpMethod.GET, "/api/knowledge/tickets/*")
+                                        .authenticated()
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/api/knowledge/tickets",
+                                                "/api/knowledge/tickets/refine")
+                                        .authenticated()
                                         .anyRequest()
                                         .denyAll())
                 .logout(
@@ -160,6 +178,18 @@ class SecurityConfiguration {
                                                                         : "ACCESS_DENIED",
                                                                 "Access is denied.")))
                 .build();
+    }
+
+    private boolean activeAdministrator(Authentication authentication, IdentityService identity) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getAuthorities().stream()
+                        .noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) return false;
+        try {
+            return "ADMIN".equals(identity.current(authentication.getName()).accessRole());
+        } catch (com.betterf.identity.api.exception.IdentityException exception) {
+            return false;
+        }
     }
 
     private void failure(
