@@ -56,7 +56,7 @@ for (const viewport of [
           const request = route.request().postDataJSON();
           ids.push(request.submissionId);
           published = {
-            id: 'ticket-1',
+            id: ids.length > 2 ? 'ticket-2' : 'ticket-1',
             content: request.content,
             authorId: 'author',
             authorName: 'Ada',
@@ -71,7 +71,7 @@ for (const viewport of [
             });
           return route.fulfill({ status: 201, json: { data: published } });
         }
-        if (path === '/api/knowledge/tickets/ticket-1')
+        if (path === '/api/knowledge/tickets/' + published?.id)
           return route.fulfill({ json: { data: published } });
         return route.fulfill({ status: 404 });
       });
@@ -173,6 +173,40 @@ for (const viewport of [
         page.getByText('area:backend', { exact: true }),
       ).toBeVisible();
       await expect(page.locator('pre')).toContainText('return key;');
+      await page
+        .getByRole('link', { name: 'Capture knowledge', exact: true })
+        .click();
+      await expect(page).toHaveURL(/knowledge\/new$/);
+      await expect(
+        page.getByLabel('Title Required', { exact: true }),
+      ).toHaveValue('');
+      await expect(
+        page.getByLabel('Capture Required', { exact: true }),
+      ).toHaveValue('');
+      await expect(page.getByLabel('Text 1', { exact: true })).toHaveValue('');
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Publish ticket', exact: true }),
+      ).toBeDisabled();
+      await page
+        .getByLabel('Title Required', { exact: true })
+        .fill('A second insight');
+      await page
+        .getByLabel('Capture Required', { exact: true })
+        .fill('Preserve the next lesson.');
+      await page
+        .getByLabel('Text 1', { exact: true })
+        .fill('A distinct piece of knowledge.');
+      await page
+        .getByRole('button', { name: 'Publish ticket', exact: true })
+        .click();
+      await expect(page).toHaveURL(/knowledge\/tickets\/ticket-2$/);
+      await expect(
+        page.getByRole('heading', { name: 'A second insight', exact: true }),
+      ).toBeVisible();
+      expect(ids).toHaveLength(3);
+      expect(ids[2]).not.toBe(ids[0]);
+
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,

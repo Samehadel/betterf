@@ -24,6 +24,7 @@ import {
 } from './knowledge.models';
 import { DetailsView } from './details-view';
 @Component({
+  providers: [KnowledgeStore],
   selector: 'app-capture-page',
   imports: [FormsModule, RouterLink, TranslocoDirective, DetailsView],
   templateUrl: './capture-page.html',

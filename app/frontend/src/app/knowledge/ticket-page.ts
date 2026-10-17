@@ -10,6 +10,7 @@ import { TranslocoDirective } from '@jsverse/transloco';
 import { KnowledgeStore } from './knowledge.store';
 import { DetailsView } from './details-view';
 @Component({
+  providers: [KnowledgeStore],
   selector: 'app-ticket-page',
   imports: [DatePipe, RouterLink, TranslocoDirective, DetailsView],
   templateUrl: './ticket-page.html',

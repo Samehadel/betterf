@@ -1,4 +1,3 @@
-import { KnowledgeStore } from './knowledge/knowledge.store';
 import {
   knowledgeAccess,
   unsavedCapture,
@@ -15,14 +14,12 @@ export const routes: Routes = [
     path: 'knowledge/new',
     canActivate: [knowledgeAccess],
     canDeactivate: [unsavedCapture],
-    providers: [KnowledgeStore],
     loadComponent: () =>
       import('./knowledge/capture-page').then((m) => m.CapturePage),
   },
   {
     path: 'knowledge/tickets/:id',
     canActivate: [knowledgeAccess],
-    providers: [KnowledgeStore],
     loadComponent: () =>
       import('./knowledge/ticket-page').then((m) => m.TicketPage),
   },
