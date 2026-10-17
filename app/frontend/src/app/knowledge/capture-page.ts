@@ -17,6 +17,7 @@ import {
   RefinementField,
   TicketContent,
   blockTypes,
+  canRefineField,
   detailsLength,
   emptyBlock,
   languages,
@@ -108,8 +109,11 @@ export class CapturePage {
     this.dirty.set(true);
     this.store.discard();
   }
+  canRefine(field: RefinementField) {
+    return !this.locked() && canRefineField(this.content(), field);
+  }
   refine(field: RefinementField) {
-    if (this.valid() && !this.locked())
+    if (this.canRefine(field))
       this.store.refine({ content: this.content(), field });
   }
   accept() {

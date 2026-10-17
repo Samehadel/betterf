@@ -1,4 +1,5 @@
 import {
+  canRefineField,
   detailsLength,
   emptyBlock,
   TicketContent,
@@ -79,5 +80,17 @@ describe('knowledge content', () => {
     };
     expect(validContent(linked)).toBe(true);
     expect(detailsLength(linked.details)).toBe(23);
+  });
+  it('refines only fields containing existing wording without making Capture required', () => {
+    const ticket = { ...content(), capture: '' };
+    expect(validContent(ticket)).toBe(true);
+    expect(canRefineField(ticket, 'title')).toBe(true);
+    expect(canRefineField(ticket, 'capture')).toBe(false);
+    expect(
+      canRefineField({ ...ticket, capture: ' \u00a0\u200b' }, 'capture'),
+    ).toBe(false);
+    expect(
+      canRefineField({ ...ticket, capture: 'Existing wording' }, 'capture'),
+    ).toBe(true);
   });
 });

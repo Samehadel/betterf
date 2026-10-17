@@ -310,7 +310,9 @@ the proposed decision is in `architecture/decisions/0005-session-refresh.md`.
 
 Active members and administrators can open **Capture knowledge** from organization
 home. Title and Details are required; Capture is optional. Refine Title or Capture
-independently and accept each suggestion separately; Details are context only.
+independently and accept each suggestion separately. Refinement rephrases only
+the selected field's existing text; blank Capture cannot be refined. Prompts live
+in backend `resources/prompts/knowledge/*.st`. Details are never refinement context.
 The Writing Studio publishes immediately, then classifies in the background.
 Set the server-only `OPENAI_API_KEY` for Spring AI ChatClient with OpenAI
 `gpt-5.4-nano`. AI suggestions are optional; an unavailable provider does not prevent

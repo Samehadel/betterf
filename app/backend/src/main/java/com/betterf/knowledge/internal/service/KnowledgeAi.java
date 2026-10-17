@@ -5,7 +5,7 @@ import com.betterf.knowledge.api.dto.*;
 import java.util.List;
 
 public interface KnowledgeAi {
-    String refine(TicketContent content, String field);
+    String refine(String original, String field);
 
     List<String> classify(TicketContent content);
 }

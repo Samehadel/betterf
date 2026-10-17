@@ -28,7 +28,7 @@
               ><button
                 class="knowledge-ai"
                 type="button"
-                [disabled]="!valid()"
+                [disabled]="!canRefine('title')"
                 (click)="refine('title')"
                 [attr.aria-label]="t('knowledge.refineTitle')"
               >
@@ -57,7 +57,7 @@
               ><button
                 class="knowledge-ai"
                 type="button"
-                [disabled]="!valid()"
+                [disabled]="!canRefine('capture')"
                 (click)="refine('capture')"
                 [attr.aria-label]="t('knowledge.refineCapture')"
               >
@@ -246,7 +246,7 @@
         <button
           type="button"
           class="button secondary"
-          [disabled]="!valid() || locked()"
+          [disabled]="!canRefine('title')"
           (click)="refine('title')"
         >
           {{ t('knowledge.refineTitle') }}
@@ -254,7 +254,7 @@
         <button
           type="button"
           class="button secondary"
-          [disabled]="!valid() || locked()"
+          [disabled]="!canRefine('capture')"
           (click)="refine('capture')"
         >
           {{ t('knowledge.refineCapture') }}

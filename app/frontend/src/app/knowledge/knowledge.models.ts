@@ -83,6 +83,12 @@ export function validContent(content: TicketContent): boolean {
     validDetails(content)
   );
 }
+export function canRefineField(
+  content: TicketContent,
+  field: RefinementField,
+): boolean {
+  return validContent(content) && meaningful(content[field] ?? '');
+}
 export function validDetails(content: TicketContent): boolean {
   return (
     content.details.length > 0 &&

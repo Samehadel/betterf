@@ -57,7 +57,7 @@ paths:
   /api/knowledge/tickets/refine:
     post:
       operationId: refineKnowledgeTicket
-      summary: Suggest wording for only the selected Title or Capture using complete Details.
+      summary: Concisely rephrase existing wording in the selected Title or Capture.
       security: [{ SessionCookie: [] }]
       parameters:
         - $ref: '#/components/parameters/InvitationCsrf'
@@ -1125,4 +1125,4 @@ components:
       properties:
         field: { type: string, enum: [title, capture] }
         content: { $ref: '#/components/schemas/TicketContent' }
-      description: Only the selected field is suggested. Details are context and cannot be a refinement target. Empty Capture may be drafted from provided knowledge; all required content must validate.
+      description: Only existing selected-field wording is sent to the provider. Blank fields cannot be refined. Details are not refinement context or targets. All required ticket content must validate. Suggestions retain meaning and are bounded to the original trimmed length plus 20 percent (rounded up), with a minimum four-character allowance, and the field limit.

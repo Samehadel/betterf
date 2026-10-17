@@ -146,7 +146,7 @@ class KnowledgeIntegrationTests {
         // Make the job due independently of host/container clock precision.
         jdbc.update(
                 "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
-                    + " WHERE ID=?",
+                        + " WHERE ID=?",
                 ticket.id());
         verifyNoInteractions(ai);
         when(ai.classify(content()))
@@ -163,7 +163,7 @@ class KnowledgeIntegrationTests {
         // Make the job due independently of host/container clock precision.
         jdbc.update(
                 "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
-                    + " WHERE ID=?",
+                        + " WHERE ID=?",
                 ticket.id());
         when(ai.classify(content())).thenReturn(List.of("invented:attribute"));
         worker.runOnce();
@@ -190,7 +190,7 @@ class KnowledgeIntegrationTests {
         // Make the job due independently of host/container clock precision.
         jdbc.update(
                 "UPDATE KNOWLEDGE_TICKET SET NEXT_ATTEMPT_AT=CURRENT_TIMESTAMP-INTERVAL '1 second'"
-                    + " WHERE ID=?",
+                        + " WHERE ID=?",
                 ticket.id());
         var oldWork = transactions.claim();
         assertThat(oldWork).isNotNull();
@@ -208,23 +208,25 @@ class KnowledgeIntegrationTests {
     }
 
     @Test
-    void refinementTargetsOneFieldWithWholeTicketContextAndNeverMutatesPublication() {
-        when(ai.refine(content(), "title")).thenReturn("Safe retries");
+    void refinementRephrasesOnlyExistingSelectedTextAndNeverMutatesPublication() {
+        when(ai.refine(content().title(), "title")).thenReturn("Safe retries");
         var result =
                 knowledge.refine("member@example.com", new RefinementRequest("title", content()));
         assertThat(result).isEqualTo(new RefinementView("title", "Safe retries"));
-        verify(ai).refine(content(), "title");
+        verify(ai).refine(content().title(), "title");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM KNOWLEDGE_TICKET", Integer.class))
                 .isZero();
         var withoutCapture =
                 new TicketContent(content().title(), "", "Coding", content().details());
-        when(ai.refine(withoutCapture, "capture")).thenReturn("Reuse a stable key.");
-        assertThat(
-                        knowledge.refine(
-                                "member@example.com",
-                                new RefinementRequest("capture", withoutCapture)))
-                .isEqualTo(new RefinementView("capture", "Reuse a stable key."));
-        when(ai.refine(content(), "title")).thenThrow(new IllegalStateException("offline"));
+        assertThatThrownBy(
+                        () ->
+                                knowledge.refine(
+                                        "member@example.com",
+                                        new RefinementRequest("capture", withoutCapture)))
+                .isInstanceOfSatisfying(
+                        KnowledgeException.class, e -> assertThat(e.status()).isEqualTo(400));
+        verify(ai, never()).refine(eq(""), anyString());
+        when(ai.refine(content().title(), "title")).thenThrow(new IllegalStateException("offline"));
         assertThatThrownBy(
                         () ->
                                 knowledge.refine(
@@ -243,6 +245,23 @@ class KnowledgeIntegrationTests {
     }
 
     @Test
+    void rejectsRefinementThatExpandsFarBeyondTheOriginalWording() {
+        when(ai.refine(content().capture(), "capture"))
+                .thenReturn(
+                        "A long new explanation with facts and suggestions that the user never entered. "
+                                .repeat(4));
+        assertThatThrownBy(
+                        () ->
+                                knowledge.refine(
+                                        "member@example.com",
+                                        new RefinementRequest("capture", content())))
+                .isInstanceOfSatisfying(
+                        KnowledgeException.class,
+                        e -> assertThat(e.code()).isEqualTo("REFINEMENT_UNAVAILABLE"));
+        assertThat(content().capture()).isEqualTo("Reuse the same idempotency key.");
+    }
+
+    @Test
     void publishesWithOmittedCapture() {
         var withoutCapture =
                 new TicketContent(content().title(), null, "Coding", content().details());
@@ -255,7 +274,7 @@ class KnowledgeIntegrationTests {
 
     @Test
     void refinementTransportReturnsOnlySelectedFieldAndRejectsDetails() throws Exception {
-        when(ai.refine(content(), "capture")).thenReturn("Reuse a stable key.");
+        when(ai.refine(content().capture(), "capture")).thenReturn("Reuse a stable key.");
         mvc.perform(
                         post("/api/knowledge/tickets/refine")
                                 .with(user("member@example.com").roles("MEMBER"))

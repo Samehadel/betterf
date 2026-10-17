@@ -89,17 +89,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             TicketRules.invalid("Choose Title or Capture for refinement.");
         }
         TicketRules.validate(request.content());
+        String original = RefinementRules.original(request.content(), request.field());
         try {
-            var text = ai.refine(request.content(), request.field());
+            var text = ai.refine(original, request.field());
             TicketRules.text(
-                    text, "title".equals(request.field()) ? 200 : 1000, "Suggested wording");
+                    text,
+                    RefinementRules.maxCharacters(original, request.field()),
+                    "Suggested wording");
             return new RefinementView(request.field(), text);
         } catch (RuntimeException exception) {
             throw new KnowledgeException(
                     503,
                     "REFINEMENT_UNAVAILABLE",
                     "Refinement is unavailable. Your writing is safe; retry or publish as"
-                        + " written.");
+                            + " written.");
         }
     }
 }

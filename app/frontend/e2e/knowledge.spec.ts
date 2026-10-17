@@ -49,10 +49,7 @@ for (const viewport of [
             json: {
               data: {
                 field,
-                text:
-                  field === 'title'
-                    ? 'Make retries safe'
-                    : 'Use one stable key for all retries.',
+                text: field === 'title' ? 'Retry safely' : 'One stable key.',
               },
             },
           });
@@ -142,7 +139,7 @@ for (const viewport of [
       await page.getByRole('button', { name: 'Accept wording' }).click();
       await expect(
         page.getByLabel('Title Required', { exact: true }),
-      ).toHaveValue('Make retries safe');
+      ).toHaveValue('Retry safely');
       await expect(page.getByLabel('Code 2', { exact: true })).toHaveValue(
         'return key;',
       );
@@ -162,10 +159,10 @@ for (const viewport of [
       await page.getByRole('button', { name: 'Accept wording' }).click();
       await expect(
         page.getByLabel('Capture Optional', { exact: true }),
-      ).toHaveValue('Use one stable key for all retries.');
+      ).toHaveValue('One stable key.');
       await expect(
         page.getByLabel('Title Required', { exact: true }),
-      ).toHaveValue('Make retries safe');
+      ).toHaveValue('Retry safely');
       await expect(page.getByLabel('Code 2', { exact: true })).toHaveValue(
         'return key;',
       );
@@ -184,7 +181,7 @@ for (const viewport of [
       await expect(page.getByRole('alert')).toContainText('Response lost');
       await expect(
         page.getByLabel('Title Required', { exact: true }),
-      ).toHaveValue('Make retries safe');
+      ).toHaveValue('Retry safely');
       await expect(
         page.getByLabel('Title Required', { exact: true }),
       ).toBeDisabled();
@@ -199,7 +196,7 @@ for (const viewport of [
         'Classification complete',
       ]);
       await expect(
-        page.getByRole('heading', { name: 'Make retries safe' }),
+        page.getByRole('heading', { name: 'Retry safely' }),
       ).toBeVisible();
       await expect(
         page.getByText('area:backend', { exact: true }),
@@ -226,6 +223,17 @@ for (const viewport of [
       await page
         .getByLabel('Text 1', { exact: true })
         .fill('A distinct piece of knowledge.');
+      await expect(
+        page
+          .getByRole('complementary')
+          .getByRole('button', { name: 'Refine Title', exact: true }),
+      ).toBeEnabled();
+      await expect(
+        page
+          .getByRole('complementary')
+          .getByRole('button', { name: 'Refine Capture', exact: true }),
+      ).toBeDisabled();
+
       await page
         .getByRole('button', { name: 'Publish ticket', exact: true })
         .click();
@@ -234,6 +242,7 @@ for (const viewport of [
         page.getByRole('heading', { name: 'A second insight', exact: true }),
       ).toBeVisible();
       expect(published.content.capture).toBe('');
+      await expect(page.locator('.knowledge-ticket-capture')).toHaveCount(0);
       expect(ids).toHaveLength(3);
       expect(ids[2]).not.toBe(ids[0]);
 

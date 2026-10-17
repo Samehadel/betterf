@@ -1,4 +1,4 @@
 package com.betterf.knowledge.api.dto;
 
-/** Only Title or Capture may be refined; complete Details remain context. */
+/** Only existing Title or Capture wording may be rephrased; Details are not sent for refinement. */
 public record RefinementRequest(String field, TicketContent content) {}
