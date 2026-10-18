@@ -2,10 +2,11 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:unconfigured}
-      timeout: 30s
+      timeout: 45s
       max-retries: 0
       chat:
         model: gpt-5.4-nano
+        reasoning-effort: none
         temperature: null
         max-completion-tokens: 2048
         store: false

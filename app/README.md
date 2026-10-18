@@ -315,7 +315,8 @@ the selected field's existing text; blank Capture cannot be refined. Prompts liv
 in backend `resources/prompts/knowledge/*.st`. Details are never refinement context.
 The Writing Studio publishes immediately, then classifies in the background.
 Set the server-only `OPENAI_API_KEY` for Spring AI ChatClient with OpenAI
-`gpt-5.4-nano`. AI suggestions are optional; an unavailable provider does not prevent
+`gpt-5.4-nano`. Startup requires a nonblank API key. After startup, AI suggestions
+are optional; an unavailable provider does not prevent
 publication. Title, Capture, and Details are sent to the provider without author or
 organization metadata. Content sanitization is deferred by the product owner's
 explicit decision, so embedded sensitive text is not redacted.
@@ -333,3 +334,12 @@ also checks configured SMTP. `/actuator/info`, `/actuator/metrics`, and
 are available; `betterf.knowledge.classification` records completed and failed
 classification attempts. The deployment proxy forwards these protected endpoints;
 no deployment has been performed as part of this story.
+
+
+The knowledge ChatClient and model initialize lazily and share the application's
+observation and meter registries. OpenAI calls use `reasoning-effort: none`,
+`store: false`, 2,048 completion tokens, a 45-second timeout, and zero retries.
+The browser and proxy allow 50 and 55 seconds respectively for refinement.
+`SimpleLoggerAdvisor` is installed with advisor parameter `provider=openai`.
+Its request/response logging is available at DEBUG via
+`logging.level.org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor=DEBUG`.

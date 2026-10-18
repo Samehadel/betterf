@@ -84,7 +84,7 @@ class SpringAiKnowledgeAiTests {
                                             .store(false)
                                             .build())
                             .build();
-            var ai = new SpringAiKnowledgeAi(ChatClient.create(model), json, "local-test-key");
+            var ai = new SpringAiKnowledgeAi(ChatClient.create(model), json);
             var content =
                     new TicketContent(
                             "retry safely",

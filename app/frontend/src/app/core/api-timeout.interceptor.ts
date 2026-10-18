@@ -7,7 +7,7 @@ export const apiTimeoutInterceptor: HttpInterceptorFn = (request, next) => {
   // Registration may wait for bounded SMTP connection, write, and response timeouts.
   const deadline =
     request.url === '/api/knowledge/tickets/refine'
-      ? 35000
+      ? 50000
       : request.url.startsWith('/api/registration') ||
           request.url.startsWith('/api/invitations')
         ? 15000

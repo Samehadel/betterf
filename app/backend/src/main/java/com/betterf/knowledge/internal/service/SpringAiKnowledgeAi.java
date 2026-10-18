@@ -22,7 +22,6 @@ public class SpringAiKnowledgeAi implements KnowledgeAi {
             new ClassPathResource("prompts/knowledge/refine-capture-system.st");
     private final ChatClient knowledgeChatClient;
     private final JsonMapper json;
-    private final String apiKey;
 
     public record Classification(List<String> attributes) {}
 
@@ -30,7 +29,6 @@ public class SpringAiKnowledgeAi implements KnowledgeAi {
 
     @Override
     public String refine(String original, String field) {
-        requireConfigured();
         Resource prompt = "title".equals(field) ? TITLE_PROMPT : CAPTURE_PROMPT;
         var result =
                 knowledgeChatClient
@@ -52,7 +50,6 @@ public class SpringAiKnowledgeAi implements KnowledgeAi {
 
     @Override
     public List<String> classify(TicketContent content) {
-        requireConfigured();
         var result =
                 knowledgeChatClient
                         .prompt()
@@ -68,11 +65,5 @@ public class SpringAiKnowledgeAi implements KnowledgeAi {
                         .entity(Classification.class, spec -> spec.useProviderStructuredOutput());
         if (result == null) throw new IllegalArgumentException("Missing classification");
         return AttributeCatalog.validate(result.attributes());
-    }
-
-    private void requireConfigured() {
-        if (apiKey == null || apiKey.isBlank() || "unconfigured".equals(apiKey)) {
-            throw new IllegalStateException("OpenAI is not configured");
-        }
     }
 }
