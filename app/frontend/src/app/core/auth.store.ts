@@ -9,6 +9,7 @@ export const AuthStore = signalStore(
   withState({
     account: null as Account | null,
     initialized: false,
+    sessionVersion: 0,
     loading: false,
     error: '',
     errorCode: '',
@@ -21,6 +22,12 @@ export const AuthStore = signalStore(
       revision++;
       patchState(store, {
         account,
+        sessionVersion:
+          store.sessionVersion() +
+          (store.account()?.id !== account?.id ||
+          store.account()?.organizationId !== account?.organizationId
+            ? 1
+            : 0),
         initialized: true,
         loading: false,
         error: '',

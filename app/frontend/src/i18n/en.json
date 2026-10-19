@@ -335,16 +335,30 @@
     "published": "Published knowledge",
     "loading": "Loading ticket…",
     "status": {
-      "PENDING": "Classification is queued. Your ticket is published.",
-      "PROCESSING": "Finding relevant attributes…",
-      "RETRYING": "Classification is delayed. We will retry automatically.",
-      "COMPLETE": "Classification complete.",
-      "FAILED": "Classification could not finish after three attempts. Your ticket remains published."
+      "PENDING": "Classifying",
+      "PROCESSING": "Classifying",
+      "RETRYING": "Classifying",
+      "FAILED": "Classification unavailable",
+      "COMPLETE": "Classification complete"
     },
-    "noMatch": "No catalog attributes matched this knowledge.",
+    "noMatch": "No matching attributes",
     "unavailable": "The request could not finish. Your writing is preserved. Please retry.",
     "retryHint": "Your content is preserved. If publication is uncertain, editing is paused; retry to safely retrieve the same published ticket.",
     "TICKET_NOT_FOUND": "This ticket is unavailable in your organization.",
-    "optional": "Optional"
+    "optional": "Optional",
+    "browseTitle": "Knowledge",
+    "browseIntro": "Useful context, shared by your organization.",
+    "backToKnowledge": "Back to knowledge",
+    "detailsType": "Details type",
+    "allTypes": "All types",
+    "clearFilter": "Clear filter",
+    "refresh": "Refresh",
+    "loadMore": "Load more",
+    "moreAttributes": "+{{count}} more",
+    "empty": "No knowledge captured yet",
+    "filteredEmpty": "No tickets of this type yet",
+    "browseLoading": "Loading knowledge…",
+    "browseError": "Knowledge could not be loaded. Please retry.",
+    "detailRefreshError": "This ticket could not be refreshed. The loaded content is still available. Please retry."
   }
 }

@@ -119,6 +119,111 @@ class KnowledgeIntegrationTests {
     }
 
     @Test
+    void browseUsesStableKeysetsAcrossInsertsAndClassificationChanges() {
+        var published = new ArrayList<TicketView>();
+        for (int i = 0; i < 25; i++)
+            published.add(knowledge.create("member@example.com", request()));
+        knowledge.create("outsider@example.com", request());
+        jdbc.update("UPDATE KNOWLEDGE_TICKET SET CREATED_AT='2026-10-01T12:00:00Z'");
+        var first = knowledge.browse("admin@example.com", null, null, null);
+        assertThat(first.items()).hasSize(20);
+        var expected =
+                published.stream()
+                        .map(t -> t.id().toString())
+                        .sorted(Comparator.reverseOrder())
+                        .toList();
+        assertThat(first.items().stream().map(t -> t.id().toString()))
+                .containsExactlyElementsOf(expected.subList(0, 20));
+        var newest = knowledge.create("member@example.com", request());
+        jdbc.update(
+                "UPDATE KNOWLEDGE_TICKET SET CLASSIFICATION_STATUS='FAILED' WHERE ID=?",
+                first.items().getFirst().id());
+        var next = knowledge.browse("member@example.com", null, 20, first.nextCursor());
+        assertThat(next.items()).hasSize(5);
+        assertThat(next.nextCursor()).isNull();
+        assertThat(next.items().stream().map(t -> t.id().toString()))
+                .containsExactlyElementsOf(expected.subList(20, 25));
+        assertThat(knowledge.browse("member@example.com", null, 20, null).items().getFirst().id())
+                .isEqualTo(newest.id());
+        assertThat(knowledge.browse("member@example.com", null, 500, null).items()).hasSize(26);
+    }
+
+    @Test
+    void filtersFullCollectionByWritingTypeAndValidatesCursorContext() {
+        for (int i = 0; i < 22; i++) knowledge.create("member@example.com", request());
+        var decision = new TicketContent("Decision", null, "Decision", content().details());
+        knowledge.create(
+                "member@example.com", new CreateTicketRequest(UUID.randomUUID(), decision));
+        jdbc.update("UPDATE KNOWLEDGE_TICKET SET CLASSIFICATION_STATUS='FAILED'");
+        var coding = knowledge.browse("member@example.com", "Coding", 20, null);
+        assertThat(coding.items())
+                .hasSize(20)
+                .allSatisfy(
+                        t -> {
+                            assertThat(t.detailsType()).isEqualTo("Coding");
+                            assertThat(t.classificationStatus()).isEqualTo("FAILED");
+                        });
+        assertThat(
+                        knowledge
+                                .browse("member@example.com", "Coding", 20, coding.nextCursor())
+                                .items())
+                .hasSize(2);
+        assertThat(knowledge.browse("member@example.com", "Decision", 20, null).items()).hasSize(1);
+        assertThat(knowledge.browse("member@example.com", "Learning", 20, null).items()).isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                knowledge.browse(
+                                        "member@example.com", "Decision", 20, coding.nextCursor()))
+                .isInstanceOf(KnowledgeException.class);
+        assertThatThrownBy(
+                        () -> knowledge.browse("member@example.com", null, 20, coding.nextCursor()))
+                .isInstanceOf(KnowledgeException.class);
+        for (String invalid : List.of("", "unknown", "coding"))
+            assertThatThrownBy(() -> knowledge.browse("member@example.com", invalid, 20, null))
+                    .isInstanceOf(KnowledgeException.class);
+        for (String invalid : List.of("", "invalid", "e30", "x".repeat(1025)))
+            assertThatThrownBy(() -> knowledge.browse("member@example.com", null, 20, invalid))
+                    .isInstanceOf(KnowledgeException.class);
+        assertThatThrownBy(() -> knowledge.browse("member@example.com", null, 0, null))
+                .isInstanceOf(KnowledgeException.class);
+    }
+
+    @Test
+    void collectionTransportIsLightweightBoundedAndEnforcesMembership() throws Exception {
+        knowledge.create("member@example.com", request());
+        mvc.perform(get("/api/knowledge/tickets")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/knowledge/tickets").with(user("member@example.com").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].title").value("Retry safely"))
+                .andExpect(jsonPath("$.data.items[0].detailsType").value("Coding"))
+                .andExpect(jsonPath("$.data.items[0].content").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].details").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].leaseToken").doesNotExist());
+        mvc.perform(
+                        get("/api/knowledge/tickets")
+                                .with(user("outsider@example.com").roles("MEMBER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isEmpty());
+        mvc.perform(
+                        get("/api/knowledge/tickets")
+                                .param("detailsType", "wrong")
+                                .with(user("member@example.com").roles("MEMBER")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        get("/api/knowledge/tickets")
+                                .param("limit", "no")
+                                .with(user("member@example.com").roles("MEMBER")))
+                .andExpect(status().isBadRequest());
+        jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE ID=?", author);
+        mvc.perform(get("/api/knowledge/tickets").with(user("member@example.com").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+        jdbc.update("UPDATE ACCOUNT SET STATUS='ACTIVE' WHERE ID=?", author);
+        jdbc.update("UPDATE ORGANIZATION SET STATUS='PENDING' WHERE ID=?", organization);
+        mvc.perform(get("/api/knowledge/tickets").with(user("member@example.com").roles("MEMBER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void concurrentRetriesPublishOnlyOnceAndChangedPayloadIsRejected() throws Exception {
         var request = request();
         try (var pool = Executors.newFixedThreadPool(2)) {

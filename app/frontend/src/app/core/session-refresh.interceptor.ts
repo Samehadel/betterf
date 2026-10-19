@@ -123,6 +123,7 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
   const generation = sessions.generation;
   const protectedRequest =
     request.url === '/api/auth/me' ||
+    /^\/api\/knowledge(?:[/?]|$)/.test(request.url) ||
     /^\/api\/invitations(?:[/?]|$)/.test(request.url);
   const withCsrf = (csrf: Csrf) =>
     request.clone({ setHeaders: { [csrf.headerName]: csrf.token } });

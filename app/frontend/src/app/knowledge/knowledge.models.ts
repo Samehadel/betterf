@@ -114,3 +114,55 @@ function safeUrl(value: string | null): boolean {
     return false;
   }
 }
+
+export interface TicketSummary {
+  id: string;
+  title: string;
+  capturePreview: string | null;
+  detailsType: string;
+  authorName: string;
+  createdAt: string;
+  classificationStatus: string;
+  attributes: string[];
+}
+export interface TicketPageResult {
+  items: TicketSummary[];
+  nextCursor: string | null;
+}
+const attributeCatalog: [string, string][] = [
+  ['type:knowledge', 'Knowledge'],
+  ['type:coding', 'Coding'],
+  ['type:problem', 'Problem'],
+  ['type:decision', 'Decision'],
+  ['type:accomplishment', 'Accomplishment'],
+  ['type:learning', 'Learning'],
+  ['area:backend', 'Backend'],
+  ['area:frontend', 'Frontend'],
+  ['area:database', 'Database'],
+  ['area:infrastructure', 'Infrastructure'],
+  ['area:security', 'Security'],
+  ['area:testing', 'Testing'],
+  ['area:product', 'Product'],
+  ['area:process', 'Process'],
+  ['technology:java', 'Java'],
+  ['technology:spring', 'Spring'],
+  ['technology:angular', 'Angular'],
+  ['technology:typescript', 'TypeScript'],
+  ['technology:javascript', 'JavaScript'],
+  ['technology:python', 'Python'],
+  ['technology:sql', 'SQL'],
+  ['technology:postgresql', 'PostgreSQL'],
+  ['technology:docker', 'Docker'],
+  ['technology:other', 'Other'],
+];
+export function attributeLabels(ids: string[]): string[] {
+  return attributeCatalog
+    .filter(([id]) => ids.includes(id))
+    .map(([, label]) => label);
+}
+export function fullDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'full',
+    timeStyle: 'long',
+  }).format(new Date(value));
+}
