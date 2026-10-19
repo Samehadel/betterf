@@ -1,6 +1,19 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
 const mailpit = process.env['MAILPIT_URL'] ?? 'http://127.0.0.1:8025';
 const password = 'Validpass!';
+async function openAccount(page: Page) {
+  const navigation = page.getByRole('button', { name: 'Open navigation' });
+  if (
+    (await navigation.isVisible()) &&
+    (await navigation.getAttribute('aria-expanded')) !== 'true'
+  ) {
+    await navigation.click();
+  }
+  const logout = page.getByRole('button', { name: 'Log out' });
+  if (!(await logout.isVisible())) {
+    await page.getByLabel('Your account', { exact: true }).click();
+  }
+}
 async function latestLink(
   request: APIRequestContext,
   email: string,
@@ -72,7 +85,7 @@ test('landing registration, local email verification, password login and logout'
   await page.getByLabel('Company website', { exact: true }).fill(`https://browser-${unique}.com`);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Verification email status' })).toBeVisible({
     timeout: 15000,
   });
   await expect(
@@ -101,16 +114,19 @@ test('landing registration, local email verification, password login and logout'
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  await openAccount(page);
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.reload();
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  await openAccount(page);
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto(link);
   await expect(page).toHaveURL(/\/company$/);
+  await openAccount(page);
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto(link);
@@ -122,6 +138,7 @@ test('landing registration, local email verification, password login and logout'
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/company$/);
+  await openAccount(page);
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/company');
@@ -141,7 +158,7 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Register your organization', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Verification email status' })).toBeVisible({
     timeout: 15000,
   });
   const old = await latestLink(request, email);
@@ -165,6 +182,7 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   await expect(page.getByText('Welcome, Ada Browser.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browser Acme', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('navigation').getByRole('button', { name: 'Log out' })).toBeVisible();
+  await openAccount(page);
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
