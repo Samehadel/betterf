@@ -37,6 +37,9 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Start local stack and verify browser communication
         working-directory: app
+        env:
+          # Browser checks do not call AI; satisfy startup validation without a provider secret.
+          OPENAI_API_KEY: ci-placeholder-not-a-real-key
         run: |
           cp .env.example .env
           printf '\nDB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
