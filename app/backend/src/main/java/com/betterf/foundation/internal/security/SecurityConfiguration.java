@@ -136,7 +136,10 @@ class SecurityConfiguration {
                                                 "/api/invitations/sent",
                                                 "/api/invitations/members")
                                         .hasRole("ADMIN")
-                                        .requestMatchers(HttpMethod.GET, "/api/knowledge/tickets/*")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/knowledge/tickets",
+                                                "/api/knowledge/tickets/*")
                                         .authenticated()
                                         .requestMatchers(
                                                 HttpMethod.POST,

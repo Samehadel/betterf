@@ -199,7 +199,7 @@ for (const viewport of [
         page.getByRole('heading', { name: 'Retry safely' }),
       ).toBeVisible();
       await expect(
-        page.getByText('area:backend', { exact: true }),
+        page.getByText('Backend', { exact: true }),
       ).toBeVisible();
       await expect(page.locator('pre')).toContainText('return key;');
       await page

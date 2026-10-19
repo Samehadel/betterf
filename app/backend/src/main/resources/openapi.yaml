@@ -8,6 +8,46 @@ info:
     Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
 paths:
   /api/knowledge/tickets:
+    get:
+      operationId: browseKnowledgeTickets
+      summary: Browse summaries within the active member's organization.
+      description: Ordered by createdAt DESC then id DESC. Details type is applied before keyset pagination. Classification state never affects inclusion or ordering. No full Details or internal job fields are returned.
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - in: query
+          name: detailsType
+          schema: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
+          description: Omit for all Details writing types; independent of extracted attributes.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, default: 20 }
+          description: Requested size, capped at 50.
+        - in: query
+          name: cursor
+          schema: { type: string, maxLength: 1024 }
+          description: Opaque continuation from the same Details type selection.
+      responses:
+        '200':
+          description: Bounded summaries and an optional continuation cursor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, error]
+                properties:
+                  error: { type: 'null' }
+                  data:
+                    type: object
+                    required: [items, nextCursor]
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items: { $ref: '#/components/schemas/TicketSummary' }
+                      nextCursor: { type: [string, 'null'] }
+        '400': { description: Invalid Details type, page size, malformed cursor, or cursor/type mismatch. }
+        '401': { description: Authentication required. }
+        '403': { description: Inactive account or organization. }
     post:
       operationId: createKnowledgeTicket
       summary: Publish a ticket immediately within the active member's organization.
@@ -816,6 +856,21 @@ components:
       in: cookie
       name: JSESSIONID
   schemas:
+    TicketSummary:
+      type: object
+      required: [id, title, capturePreview, detailsType, authorName, createdAt, classificationStatus, attributes]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, maxLength: 200 }
+        capturePreview: { type: [string, 'null'], maxLength: 280 }
+        detailsType: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
+        authorName: { type: string }
+        createdAt: { type: string, format: date-time }
+        classificationStatus: { type: string, enum: [PENDING, PROCESSING, RETRYING, COMPLETE, FAILED] }
+        attributes:
+          type: array
+          items: { type: string }
+          description: Extracted stable catalog IDs; clients display catalog labels in type, area, technology order.
     InvitationLink:
       type: object
       required: [id, token]

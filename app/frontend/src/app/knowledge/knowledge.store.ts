@@ -74,7 +74,13 @@ export const KnowledgeStore = signalStore(
           return api.get(id).pipe(
             tap((ticket) => patchState(store, { ticket, loading: false })),
             catchError((e) => {
-              patchState(store, { loading: false, error: message(e) });
+              patchState(store, {
+                loading: false,
+                error: message(e),
+                ...([401, 403, 404].includes(e?.status)
+                  ? { ticket: null }
+                  : {}),
+              });
               return EMPTY;
             }),
           );

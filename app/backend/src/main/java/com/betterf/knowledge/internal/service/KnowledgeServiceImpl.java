@@ -7,6 +7,7 @@ import com.betterf.knowledge.api.service.KnowledgeService;
 import com.betterf.knowledge.internal.entity.TicketEntity;
 import com.betterf.knowledge.internal.mapper.TicketMapper;
 import com.betterf.knowledge.internal.repository.TicketRepository;
+import com.betterf.knowledge.internal.repository.TicketSummaryRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +26,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final IdentityService identity;
     private final TicketRepository tickets;
     private final TicketMapper mapper;
+    private final TicketSummaryRepository summaries;
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
     private final Clock clock;
@@ -79,6 +81,27 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                                         404,
                                         "TICKET_NOT_FOUND",
                                         "This ticket is unavailable in your organization."));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TicketPage browse(
+            String email, String detailsType, Integer limit, String encodedCursor) {
+        var account = identity.current(email);
+        var type = detailsType == null ? "" : detailsType;
+        if (detailsType != null && !TicketRules.TEMPLATES.contains(type))
+            TicketRules.invalid("Choose a supported Details type.");
+        if (limit != null && limit < 1) TicketRules.invalid("Page size must be positive.");
+        int size = limit == null ? 20 : Math.min(limit, 50);
+        var cursor = TicketCursor.decode(encodedCursor, type);
+        var rows = summaries.browse(account.organizationId(), type, cursor, size + 1);
+        var items = rows.stream().limit(size).toList();
+        String next = null;
+        if (rows.size() > size) {
+            var last = items.getLast();
+            next = new TicketCursor(1, last.createdAt(), last.id(), type).encode();
+        }
+        return new TicketPage(items, next);
     }
 
     @Override

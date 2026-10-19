@@ -23,6 +23,15 @@ public class KnowledgeController {
         return knowledge.create(principal.getName(), request);
     }
 
+    @GetMapping
+    public TicketPage browse(
+            Principal principal,
+            @RequestParam(required = false) String detailsType,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String cursor) {
+        return knowledge.browse(principal.getName(), detailsType, limit, cursor);
+    }
+
     @GetMapping("/{id}")
     public TicketView get(Principal principal, @PathVariable UUID id) {
         return knowledge.get(principal.getName(), id);

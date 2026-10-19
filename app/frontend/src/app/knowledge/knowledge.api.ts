@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { map, switchMap } from 'rxjs';
 import {
   Ticket,
+  TicketPageResult,
   TicketContent,
   Refinement,
   RefinementField,
@@ -10,6 +11,14 @@ import {
 @Injectable({ providedIn: 'root' })
 export class KnowledgeApi {
   private readonly http = inject(HttpClient);
+  browse(detailsType: string, cursor: string | null) {
+    const params: Record<string, string> = {};
+    if (detailsType) params['detailsType'] = detailsType;
+    if (cursor) params['cursor'] = cursor;
+    return this.http
+      .get<{ data: TicketPageResult }>('/api/knowledge/tickets', { params })
+      .pipe(map((response) => response.data));
+  }
   get(id: string) {
     return this.http
       .get<{ data: Ticket }>(`/api/knowledge/tickets/${id}`)

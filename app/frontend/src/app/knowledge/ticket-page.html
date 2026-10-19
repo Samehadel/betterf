@@ -10,13 +10,18 @@
     </nav>
   </header>
   <main id="main" class="wrap knowledge-ticket" tabindex="-1">
-    <a class="text-link" routerLink="/company">← {{ t('knowledge.back') }}</a>
+    <a class="text-link" routerLink="/knowledge"
+      >← {{ t('knowledge.backToKnowledge') }}</a
+    >
     @if (created) {
     <p role="status" class="knowledge-success">
       ✓ {{ t('knowledge.success') }}
     </p>
     } @if (store.error()) {
-    <p role="alert" class="form-alert">{{ t(store.error()) }}</p>
+    <p role="alert" class="form-alert">
+      {{ store.ticket() ? t('knowledge.detailRefreshError') : t(store.error())
+      }}
+    </p>
     <button type="button" class="button secondary" (click)="store.load(id)">
       {{ t('identity.retry') }}
     </button>
@@ -25,7 +30,10 @@
       <p class="eyebrow">{{ t('knowledge.published') }}</p>
       <h1>{{ ticket.content.title }}</h1>
       <p class="knowledge-ticket-meta">
-        {{ ticket.authorName }} · {{ ticket.createdAt | date:'medium' }}
+        {{ ticket.authorName }} ·
+        <time [attr.datetime]="ticket.createdAt"
+          >{{ fullDate(ticket.createdAt) }}</time
+        >
       </p>
       @if (ticket.content.capture?.trim()) {
       <p class="knowledge-ticket-capture">{{ ticket.content.capture }}</p>
@@ -37,7 +45,7 @@
           {{ t('knowledge.status.' + ticket.classificationStatus) }}
         </p>
         <div class="flex flex-wrap gap-2">
-          @for (attribute of ticket.attributes; track attribute) {
+          @for (attribute of labels(ticket.attributes); track $index) {
           <span class="knowledge-attribute">{{ attribute }}</span> }
         </div>
         @if (ticket.classificationStatus === 'COMPLETE' &&

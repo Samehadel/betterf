@@ -1,0 +1,144 @@
+<ng-container *transloco="let t">
+  <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  <header class="top">
+    <nav class="wrap" aria-label="Main navigation">
+      <a class="brand" routerLink="/company"
+        >BetterF<span class="text-[var(--accent)]">.</span></a
+      >
+      <a class="button" routerLink="/knowledge/new"
+        >{{ t('knowledge.newCapture') }}</a
+      >
+    </nav>
+  </header>
+  <main id="main" class="wrap knowledge-browse" tabindex="-1">
+    <a class="text-link" routerLink="/company">← {{ t('knowledge.back') }}</a>
+    <div class="knowledge-browse-heading">
+      <div>
+        <p class="eyebrow">{{ t('knowledge.visibility') }}</p>
+        <h1>{{ t('knowledge.browseTitle') }}</h1>
+        <p class="text-[var(--muted)]">{{ t('knowledge.browseIntro') }}</p>
+      </div>
+      <button
+        class="button secondary"
+        type="button"
+        (click)="refresh()"
+        [disabled]="store.loading()"
+      >
+        {{ t('knowledge.refresh') }}
+      </button>
+    </div>
+    <div class="knowledge-filter">
+      <label for="details-type">{{ t('knowledge.detailsType') }}</label>
+      <select
+        id="details-type"
+        [ngModel]="store.detailsType()"
+        (ngModelChange)="selectType($event)"
+      >
+        <option value="">{{ t('knowledge.allTypes') }}</option>
+        @for (type of templates; track type) {
+        <option [value]="type">{{ t('knowledge.templates.' + type) }}</option>
+        }
+      </select>
+      @if (store.detailsType()) {
+      <button class="text-link" type="button" (click)="selectType('')">
+        {{ t('knowledge.clearFilter') }}
+      </button>
+      }
+    </div>
+    @if (store.error()) {
+    <div class="form-alert" role="alert">
+      <p>{{ t('knowledge.browseError') }}</p>
+      <button
+        class="button secondary"
+        type="button"
+        (click)="store.retry()"
+        [disabled]="store.loading()"
+      >
+        {{ t('identity.retry') }}
+      </button>
+    </div>
+    }
+    <ul
+      class="knowledge-list"
+      [attr.aria-label]="t('knowledge.browseTitle')"
+      [attr.aria-busy]="store.loading()"
+    >
+      @for (ticket of store.items(); track ticket.id) {
+      <li class="knowledge-list-row">
+        <span class="knowledge-details-type"
+          >{{ t('knowledge.templates.' + ticket.detailsType) }}</span
+        >
+        <h2>
+          <a [routerLink]="['/knowledge/tickets', ticket.id]"
+            >{{ ticket.title }}</a
+          >
+        </h2>
+        @if (ticket.capturePreview) {
+        <p class="knowledge-capture-preview">{{ ticket.capturePreview }}</p>
+        }
+        <p class="knowledge-ticket-meta">
+          {{ ticket.authorName }} <span aria-hidden="true">·</span>
+          <time
+            [attr.datetime]="ticket.createdAt"
+            [attr.aria-label]="fullDate(ticket.createdAt)"
+            [title]="fullDate(ticket.createdAt)"
+            >{{ ticket.createdAt | date:'mediumDate' }}</time
+          >
+        </p>
+        <div class="knowledge-summary-attributes">
+          @for (label of labels(ticket.attributes).slice(0, 3); track $index) {
+          <span class="knowledge-attribute">{{ label }}</span> } @if
+          (labels(ticket.attributes).length > 3) {
+          <span class="knowledge-more"
+            >{{ t('knowledge.moreAttributes', { count:
+            labels(ticket.attributes).length - 3 }) }}</span
+          >
+          } @if (ticket.classificationStatus !== 'COMPLETE') {
+          <span class="knowledge-state"
+            >{{ t('knowledge.status.' + ticket.classificationStatus) }}</span
+          >
+          } @else if (!ticket.attributes.length) {
+          <span class="knowledge-state">{{ t('knowledge.noMatch') }}</span> }
+        </div>
+      </li>
+      }
+    </ul>
+    @if (store.loading()) {
+    <p role="status">{{ t('knowledge.browseLoading') }}</p>
+    @if (!store.items().length) {
+    <div aria-hidden="true" class="knowledge-placeholders">
+      @for (row of [1,2,3]; track row) {
+      <div class="knowledge-placeholder"></div>
+      }
+    </div>
+    } } @else if (store.initialized() && !store.items().length &&
+    !store.error()) {
+    <div class="knowledge-empty">
+      <p class="eyebrow">{{ t('knowledge.browseTitle') }}</p>
+      <h2>
+        {{ t(store.detailsType() ? 'knowledge.filteredEmpty' :
+        'knowledge.empty') }}
+      </h2>
+      @if (store.detailsType()) {
+      <button class="button secondary" type="button" (click)="selectType('')">
+        {{ t('knowledge.clearFilter') }}
+      </button>
+      }
+      <a class="button" routerLink="/knowledge/new"
+        >{{ t('knowledge.newCapture') }}</a
+      >
+    </div>
+    } @if (store.nextCursor()) {
+    <div class="knowledge-pagination">
+      <button
+        class="button secondary"
+        type="button"
+        [disabled]="store.loading()"
+        (click)="store.more()"
+      >
+        {{ t('knowledge.loadMore') }}
+      </button>
+    </div>
+    }
+  </main>
+</ng-container>

@@ -11,6 +11,13 @@ import { StatusStore } from './foundation/status.store';
 
 export const routes: Routes = [
   {
+    path: 'knowledge',
+    pathMatch: 'full',
+    canActivate: [knowledgeAccess],
+    loadComponent: () =>
+      import('./knowledge/browse-page').then((m) => m.BrowsePage),
+  },
+  {
     path: 'knowledge/new',
     canActivate: [knowledgeAccess],
     canDeactivate: [unsavedCapture],

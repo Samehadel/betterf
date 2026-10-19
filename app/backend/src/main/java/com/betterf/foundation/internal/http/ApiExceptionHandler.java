@@ -38,6 +38,15 @@ class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(ApiEnvelope.failure("INVALID_REQUEST", message));
     }
 
+    @ExceptionHandler(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiEnvelope<Void>> invalidParameter(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+                    exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiEnvelope.failure("INVALID_REQUEST", "Invalid request parameter."));
+    }
+
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<ApiEnvelope<Void>> unavailable(DataAccessException exception) {
         LOG.warn("Database readiness check failed", exception);

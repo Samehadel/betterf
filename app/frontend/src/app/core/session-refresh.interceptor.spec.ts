@@ -64,6 +64,19 @@ describe('Session recovery', () => {
     retry.flush({ data: 'sent' });
     expect(result).toHaveBeenCalledWith({ data: 'sent' });
   });
+  it.each(['/api/knowledge/tickets', '/api/knowledge/tickets/example'])(
+    'recovers expired sessions for knowledge reads at %s',
+    (url) => {
+      const result = jest.fn();
+      client.get(url).subscribe(result);
+      http
+        .expectOne(url)
+        .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
+      refresh();
+      http.expectOne(url).flush({ data: 'knowledge' });
+      expect(result).toHaveBeenCalledWith({ data: 'knowledge' });
+    },
+  );
   it('renews stale CSRF before recovering an expired session', () => {
     client.post('/api/invitations', {}).subscribe();
     http.expectOne('/api/invitations').flush(rejected('CSRF_INVALID'), {
