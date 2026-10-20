@@ -1,0 +1,221 @@
+<ng-container *transloco="let t">
+  <div
+    [class.workspace-app]="active()"
+    [class.sidebar-collapsed]="collapsed()"
+    [class.mobile-nav-open]="mobileOpen()"
+    (keydown)="navigationKey($event)"
+  >
+    @if (active()) {
+      <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+    }
+    @if (active()) {
+      @if (auth.account(); as account) {
+        <aside
+          #sidebar
+          class="app-sidebar"
+          id="workspace-navigation"
+          [attr.aria-label]="t('workspace.navigation')"
+        >
+          <a class="sidebar-brand" routerLink="/company" aria-label="BetterF"
+            ><span class="sidebar-logo" aria-hidden="true">b</span
+            ><span class="sidebar-label"
+              >betterf<span class="sidebar-brand-dot">.</span></span
+            ></a
+          >
+          <div class="sidebar-organization">
+            <span class="organization-avatar" aria-hidden="true">{{
+              account.organizationName.slice(0, 1).toUpperCase()
+            }}</span>
+            <div class="sidebar-label">
+              <strong>{{ account.organizationName }}</strong
+              ><small>{{ t('workspace.organization') }}</small>
+            </div>
+          </div>
+          <div class="sidebar-nav-group">
+            <p class="sidebar-caption sidebar-label">
+              {{ t('workspace.label') }}
+            </p>
+            <nav
+              class="sidebar-nav"
+              [attr.aria-label]="t('workspace.navigation')"
+            >
+              <a
+                routerLink="/company"
+                routerLinkActive="selected"
+                [routerLinkActiveOptions]="{ exact: true }"
+                ariaCurrentWhenActive="page"
+                [attr.aria-label]="t('workspace.home')"
+                [attr.title]="collapsed() ? t('workspace.home') : null"
+                (click)="closeMobile()"
+                ><svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"
+                  /></svg
+                ><span class="sidebar-label">{{ t('workspace.home') }}</span></a
+              >
+              <a
+                routerLink="/knowledge"
+                [class.selected]="
+                  url() === '/knowledge' || url().startsWith('/knowledge/')
+                "
+                [attr.aria-current]="
+                  url() === '/knowledge' || url().startsWith('/knowledge/')
+                    ? 'page'
+                    : null
+                "
+                [attr.aria-label]="t('workspace.knowledge')"
+                [attr.title]="collapsed() ? t('workspace.knowledge') : null"
+                (click)="closeMobile()"
+                ><svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 4h6v16H4zM14 4l5-1 3 16-5 1z" /></svg
+                ><span class="sidebar-label">{{
+                  t('workspace.knowledge')
+                }}</span></a
+              >
+              @if (account.accessRole === 'ADMIN') {
+                <a
+                  routerLink="/company/team"
+                  [class.selected]="
+                    url().startsWith('/company/team') ||
+                    url() === '/company/invitations'
+                  "
+                  [attr.aria-current]="
+                    url().startsWith('/company/team') ||
+                    url() === '/company/invitations'
+                      ? 'page'
+                      : null
+                  "
+                  [attr.aria-label]="t('workspace.team')"
+                  [attr.title]="collapsed() ? t('workspace.team') : null"
+                  (click)="closeMobile()"
+                  ><svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3" />
+                    <path
+                      d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"
+                    /></svg
+                  ><span class="sidebar-label">{{
+                    t('workspace.team')
+                  }}</span></a
+                >
+              }
+            </nav>
+          </div>
+          <div class="sidebar-bottom">
+            <button
+              class="sidebar-toggle"
+              type="button"
+              [attr.aria-label]="
+                t(collapsed() ? 'workspace.expand' : 'workspace.collapse')
+              "
+              [attr.aria-expanded]="!collapsed()"
+              aria-controls="workspace-navigation"
+              (click)="collapsed.set(!collapsed())"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M9 4v16m7-11-3 3 3 3" /></svg
+              ><span class="sidebar-label">{{ t('workspace.collapse') }}</span>
+            </button>
+            <details class="sidebar-account">
+              <summary [attr.aria-label]="t('workspace.account')">
+                <span class="account-avatar" aria-hidden="true">{{
+                  initials()
+                }}</span
+                ><span class="sidebar-label"
+                  ><strong>{{ account.fullName }}</strong
+                  ><small>{{
+                    t(
+                      account.accessRole === 'ADMIN'
+                        ? 'identity.home.administrator'
+                        : 'identity.home.member'
+                    )
+                  }}</small></span
+                >
+              </summary>
+              <div class="account-menu">
+                <strong>{{ account.fullName }}</strong
+                ><span>{{ account.email }}</span
+                ><small>{{
+                  t(
+                    account.accessRole === 'ADMIN'
+                      ? 'identity.home.administrator'
+                      : 'identity.home.member'
+                  )
+                }}</small
+                ><button
+                  class="button secondary"
+                  [disabled]="session.busy()"
+                  (click)="session.run({ kind: 'logout' })"
+                >
+                  {{ t('identity.logout') }}
+                </button>
+                @if (session.errorCode()) {
+                  <p role="alert">
+                    {{ session.error() || t('identity.unavailable') }}
+                  </p>
+                }
+              </div>
+            </details>
+          </div>
+          <button
+            type="button"
+            class="mobile-close sidebar-toggle"
+            (click)="closeMobile()"
+            [attr.aria-label]="t('workspace.close')"
+          >
+            {{ t('workspace.close') }} <span aria-hidden="true">×</span>
+          </button>
+        </aside>
+        @if (mobileOpen()) {
+          <button
+            class="sidebar-backdrop"
+            type="button"
+            (click)="closeMobile()"
+            [attr.aria-label]="t('workspace.close')"
+          ></button>
+        }
+      }
+    }
+    <div
+      class="workspace-page"
+      [attr.inert]="mobileOpen() && active() ? '' : null"
+    >
+      @if (active()) {
+        <header class="workspace-topbar">
+          <div>
+            <button
+              class="mobile-menu sidebar-toggle"
+              #menuButton
+              type="button"
+              [attr.aria-label]="t('workspace.open')"
+              [attr.aria-expanded]="mobileOpen()"
+              aria-controls="workspace-navigation"
+              (click)="openMobile()"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg></button
+            ><span>{{ auth.account()?.organizationName }}</span
+            ><span aria-hidden="true">/</span
+            ><strong>{{ t(section()) }}</strong>
+          </div>
+          @if (
+            section() === 'workspace.knowledge' && url() !== '/knowledge/new'
+          ) {
+            <a
+              class="button workspace-capture-shortcut"
+              routerLink="/knowledge/new"
+              >{{ t('knowledge.newCapture') }}</a
+            >
+          } @else {
+            <span class="workspace-topbar-status"
+              ><span aria-hidden="true">●</span
+              >{{ t('identity.home.active') }}</span
+            >
+          }
+        </header>
+      }
+      <ng-content />
+    </div>
+  </div>
+</ng-container>

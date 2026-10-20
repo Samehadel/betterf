@@ -83,73 +83,74 @@
           </div>
         }
         @if (store.account(); as account) {
-          <div class="workspace-breadcrumb">
-            <span aria-hidden="true">◇</span>{{ t('identity.home.label') }}
-          </div>
-          <section class="workspace-hero">
+          <section class="workspace-hero workspace-home-hero">
             <div class="workspace-hero-copy">
               <p class="eyebrow">{{ t('identity.home.eyebrow') }}</p>
               <h1 id="workspace-title">{{ account.organizationName }}</h1>
               <p class="workspace-welcome">
                 {{ t('identity.welcome', { name: account.fullName }) }}
               </p>
-              <p class="workspace-intro">{{ t('identity.home.intro') }}</p>
-              <span class="workspace-status"
-                ><span aria-hidden="true">✓</span>{{ t('identity.home.active') }}</span
+              <p class="workspace-intro">{{ t('workspace.intro') }}</p>
+              <a class="button" routerLink="/knowledge/new"
+                ><span aria-hidden="true">＋</span>{{ t('knowledge.newCapture') }}</a
               >
             </div>
             <div class="workspace-art" aria-hidden="true">
-              <div class="workspace-orbit"></div>
-              <div class="workspace-orbit second"></div>
-              <span class="workspace-spark">✦</span>
               <div class="workspace-monogram">
                 {{ account.organizationName.slice(0, 1).toUpperCase() }}
               </div>
-              <span class="workspace-art-caption">{{ t('identity.home.artCaption') }}</span>
             </div>
           </section>
-          <div class="workspace-grid">
+          <div class="home-section-heading">
+            <h2>{{ t('workspace.atAGlance') }}</h2>
+            <span>{{ account.organizationName }}</span>
+          </div>
+          <div class="workspace-grid workspace-home-grid">
             <section class="workspace-note" aria-labelledby="workspace-note-title">
               <span class="workspace-icon" aria-hidden="true">↗</span>
-              <a class="button secondary mb-5" routerLink="/knowledge">{{ t('knowledge.browseTitle') }}</a>
-              <a class="button mb-5" routerLink="/knowledge/new">{{ t('knowledge.newCapture') }}</a>
-              <p class="eyebrow">{{ t('identity.home.nextEyebrow') }}</p>
-              <h2 id="workspace-note-title">{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextTitle' : 'identity.home.memberTitle') }}</h2>
-              <p>{{ t(account.accessRole === 'ADMIN' ? 'identity.home.nextDescription' : 'identity.home.memberDescription') }}</p>
+              <h2 id="workspace-note-title">
+                {{
+                  t(
+                    account.accessRole === 'ADMIN'
+                      ? 'identity.home.nextTitle'
+                      : 'identity.home.memberTitle'
+                  )
+                }}
+              </h2>
+              <p>
+                {{
+                  t(
+                    account.accessRole === 'ADMIN'
+                      ? 'identity.home.nextDescription'
+                      : 'identity.home.memberDescription'
+                  )
+                }}
+              </p>
               @if (account.accessRole === 'ADMIN') {
-                <a class="button" routerLink="/company/invitations">{{ t('invitations.formTitle') }}</a>
-              }
-              @if (account.accessRole === 'ADMIN') {
-                <a class="button workspace-team-button" routerLink="/company/team">{{ t('team.title') }}</a>
+                <div class="home-card-actions">
+                  <a class="button secondary" routerLink="/company/invitations">{{
+                    t('invitations.formTitle')
+                  }}</a
+                  ><a class="home-text-link" routerLink="/company/team"
+                    >{{ t('team.title') }} <span aria-hidden="true">→</span></a
+                  >
+                </div>
               } @else {
-                <div class="workspace-upcoming">
-                  <span>{{ t('identity.home.comingSoon') }}</span>{{ t('identity.home.memberTools') }}
-                </div>
+                <a class="home-text-link" routerLink="/knowledge/new"
+                  >{{ t('workspace.createCapture') }} <span aria-hidden="true">→</span></a
+                >
               }
-
             </section>
-            <section class="workspace-profile" aria-labelledby="workspace-profile-title">
-              <h2 id="workspace-profile-title">{{ t('identity.home.profileTitle') }}</h2>
-              <dl>
-                <div>
-                  <dt>{{ t('identity.fullName') }}</dt>
-                  <dd>{{ account.fullName }}</dd>
-                </div>
-                <div>
-                  <dt>{{ t('identity.email') }}</dt>
-                  <dd>{{ account.email }}</dd>
-                </div>
-                <div>
-                  <dt>{{ t('identity.home.access') }}</dt>
-                  <dd>
-                    {{
-                      account.accessRole === 'ADMIN'
-                        ? t('identity.home.administrator')
-                        : t('identity.home.member')
-                    }}
-                  </dd>
-                </div>
-              </dl>
+            <section
+              class="workspace-profile workspace-knowledge-card"
+              aria-labelledby="workspace-knowledge-title"
+            >
+              <span class="workspace-icon" aria-hidden="true">✧</span>
+              <h2 id="workspace-knowledge-title">{{ t('workspace.knowledgeTitle') }}</h2>
+              <p>{{ t('workspace.knowledgeDescription') }}</p>
+              <a class="home-text-link" routerLink="/knowledge"
+                >{{ t('workspace.preserveLesson') }} <span aria-hidden="true">→</span></a
+              >
             </section>
           </div>
           <p class="workspace-footer">{{ t('identity.home.footer') }}</p>

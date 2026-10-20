@@ -360,5 +360,24 @@
     "browseLoading": "Loading knowledge…",
     "browseError": "Knowledge could not be loaded. Please retry.",
     "detailRefreshError": "This ticket could not be refreshed. The loaded content is still available. Please retry."
+  },
+  "workspace": {
+    "navigation": "Workspace navigation",
+    "label": "Workspace",
+    "organization": "Organization workspace",
+    "home": "Home",
+    "knowledge": "Knowledge",
+    "team": "Team",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "open": "Open navigation",
+    "close": "Close navigation",
+    "account": "Your account",
+    "intro": "A shared home for what your team learns. Make every lesson count.",
+    "atAGlance": "Your workspace, at a glance",
+    "knowledgeTitle": "Make knowledge reusable.",
+    "knowledgeDescription": "Find the context, solutions, and lessons your organization captures.",
+    "createCapture": "Create a capture",
+    "preserveLesson": "Browse knowledge"
   }
 }

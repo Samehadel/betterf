@@ -42,7 +42,11 @@ for (const viewport of [
         await expect(
           page.getByRole('heading', { name: 'Invite a colleague' }),
         ).toBeVisible();
-        await page.getByRole('link', { name: 'Back to company' }).click();
+        const navigation = page.getByRole('button', { name: 'Open navigation' });
+        if (await navigation.isVisible()) {
+          await navigation.click();
+        }
+        await page.getByRole('link', { name: 'Home', exact: true }).click();
         await expect(
           page.getByRole('heading', { name: account.organizationName }),
         ).toBeVisible();
@@ -103,6 +107,11 @@ for (const viewport of [
         page.getByRole('heading', { name: account.organizationName }),
       ).toBeVisible();
       expect(meCalls).toBe(startupCalls);
+      const navigation = page.getByRole('button', { name: 'Open navigation' });
+      if (await navigation.isVisible()) {
+        await navigation.click();
+      }
+      await page.getByLabel('Your account', { exact: true }).click();
       await page.getByRole('button', { name: 'Log out' }).click();
       await expect(page).toHaveURL(/\/login$/);
       await page.goBack();
