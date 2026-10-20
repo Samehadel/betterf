@@ -23,13 +23,25 @@
   </header>
   <main
     class="identity-shell"
-    [class.registration-shell]="mode === 'register' || mode === 'login'"
+    [class.registration-shell]="isRegistration || mode === 'login'"
     [class.login-shell]="mode === 'login'"
     [class.company-shell]="mode === 'company'"
     id="main"
     tabindex="-1"
   >
-    @if (mode === 'register' || mode === 'login') {
+    @if (mode === 'signup') {
+      <aside class="registration-story">
+        <div class="story-content">
+          <p class="eyebrow">{{ t('individual.eyebrow') }}</p>
+          <h2>{{ t('individual.title') }}</h2>
+          <p class="story-intro">{{ t('individual.intro') }}</p>
+          <p class="personal-boundary">{{ t('individual.boundary') }}</p>
+          <a class="mt-5 inline-block text-[#beadff] underline" routerLink="/register"
+            >{{ t('identity.register') }} →</a
+          >
+        </div>
+      </aside>
+    } @else if (isRegistration || mode === 'login') {
       <aside class="registration-story" aria-labelledby="registration-story-title">
         <div class="story-content">
           <p class="eyebrow">
@@ -97,7 +109,7 @@
             </div>
             <div class="workspace-art" aria-hidden="true">
               <div class="workspace-monogram">
-                {{ account.organizationName.slice(0, 1).toUpperCase() }}
+                {{ (account.organizationName ?? account.fullName).slice(0, 1).toUpperCase() }}
               </div>
             </div>
           </section>
@@ -146,7 +158,9 @@
               aria-labelledby="workspace-knowledge-title"
             >
               <span class="workspace-icon" aria-hidden="true">✧</span>
-              <h2 id="workspace-knowledge-title">{{ t('workspace.knowledgeTitle') }}</h2>
+              <h2 id="workspace-knowledge-title">
+                {{ t('workspace.knowledgeTitle') }}
+              </h2>
               <p>{{ t('workspace.knowledgeDescription') }}</p>
               <a class="home-text-link" routerLink="/knowledge"
                 >{{ t('workspace.preserveLesson') }} <span aria-hidden="true">→</span></a
@@ -175,9 +189,22 @@
       <section class="identity-content" aria-labelledby="identity-title">
         <div class="identity-form-wrap">
           <p class="eyebrow">
-            {{ t(mode === 'login' ? 'identity.loginEyebrow' : 'identity.eyebrow') }}
+            {{
+              t(
+                mode === 'signup'
+                  ? 'individual.eyebrow'
+                  : mode === 'login'
+                    ? 'identity.loginEyebrow'
+                    : 'identity.eyebrow'
+              )
+            }}
           </p>
-          <h1 id="identity-title">{{ t('identity.title.' + mode) }}</h1>
+          <h1 id="identity-title">
+            {{ t(mode === 'signup' ? 'individual.signup' : 'identity.title.' + mode) }}
+          </h1>
+          @if (socialMessage) {
+            <p class="form-alert" role="status">{{ t(socialMessage) }}</p>
+          }
           @if (store.errorCode()) {
             <div role="alert" class="form-alert">
               {{ store.error() || t('identity.unavailable') }}
@@ -186,89 +213,102 @@
           @if (store.busy() && mode !== 'verify') {
             <p role="status" class="form-hint">{{ t('identity.working') }}</p>
           }
-          @if (mode === 'register' && !store.pending()) {
-            <p class="form-intro">{{ t('identity.intro') }}</p>
+          @if (isRegistration && !store.pending()) {
+            <p class="form-intro">
+              {{ t(mode === 'signup' ? 'individual.formIntro' : 'identity.intro') }}
+            </p>
+            @if (mode === 'signup') {
+              <app-social-buttons />
+              <p class="form-hint my-5">{{ t('individual.orEmail') }}</p>
+            }
             <form
               [formGroup]="registration"
               (ngSubmit)="register()"
               novalidate
               class="registration-form"
             >
+              @if (mode === 'register') {
+                <fieldset [disabled]="store.busy()">
+                  <legend>
+                    <span class="section-number" aria-hidden="true">01</span
+                    >{{ t('identity.company') }}
+                  </legend>
+                  <div class="form-grid">
+                    <div class="form-field">
+                      <label for="companyName">{{ t('identity.companyName') }}</label>
+                      <input
+                        class="identity-input"
+                        id="companyName"
+                        formControlName="companyName"
+                        autocomplete="organization"
+                        required
+                        maxlength="200"
+                        [attr.aria-invalid]="invalid('companyName')"
+                        [attr.aria-describedby]="invalid('companyName') ? 'companyNameError' : null"
+                      />
+                      @if (invalid('companyName')) {
+                        <p id="companyNameError" class="field-error">
+                          {{ t(fieldError('companyName')) }}
+                        </p>
+                      }
+                    </div>
+                    <div class="form-field">
+                      <label for="specialization">{{ t('identity.specialization') }}</label>
+                      <input
+                        class="identity-input"
+                        id="specialization"
+                        formControlName="specialization"
+                        required
+                        maxlength="200"
+                        [attr.aria-invalid]="invalid('specialization')"
+                        [attr.aria-describedby]="
+                          invalid('specialization') ? 'specializationError' : null
+                        "
+                      />
+                      @if (invalid('specialization')) {
+                        <p id="specializationError" class="field-error">
+                          {{ t(fieldError('specialization')) }}
+                        </p>
+                      }
+                    </div>
+                    <div class="form-field field-full">
+                      <label for="website">{{ t('identity.website') }}</label>
+                      <input
+                        class="identity-input"
+                        id="website"
+                        formControlName="website"
+                        type="url"
+                        placeholder="https://company.com"
+                        required
+                        maxlength="253"
+                        [attr.aria-invalid]="
+                          invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
+                        "
+                        [attr.aria-describedby]="
+                          invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
+                            ? 'websiteHint websiteError'
+                            : 'websiteHint'
+                        "
+                      />
+                      <p id="websiteHint" class="form-hint">
+                        {{ t('identity.websiteHint') }}
+                      </p>
+                      @if (invalid('website')) {
+                        <p id="websiteError" class="field-error">
+                          {{ t(fieldError('website')) }}
+                        </p>
+                      } @else if (store.errorCode() === 'INVALID_WEBSITE') {
+                        <p id="websiteError" class="field-error">{{ store.error() }}</p>
+                      }
+                    </div>
+                  </div>
+                </fieldset>
+              }
               <fieldset [disabled]="store.busy()">
                 <legend>
-                  <span class="section-number" aria-hidden="true">01</span
-                  >{{ t('identity.company') }}
-                </legend>
-                <div class="form-grid">
-                  <div class="form-field">
-                    <label for="companyName">{{ t('identity.companyName') }}</label>
-                    <input
-                      class="identity-input"
-                      id="companyName"
-                      formControlName="companyName"
-                      autocomplete="organization"
-                      required
-                      maxlength="200"
-                      [attr.aria-invalid]="invalid('companyName')"
-                      [attr.aria-describedby]="invalid('companyName') ? 'companyNameError' : null"
-                    />
-                    @if (invalid('companyName')) {
-                      <p id="companyNameError" class="field-error">
-                        {{ t(fieldError('companyName')) }}
-                      </p>
-                    }
-                  </div>
-                  <div class="form-field">
-                    <label for="specialization">{{ t('identity.specialization') }}</label>
-                    <input
-                      class="identity-input"
-                      id="specialization"
-                      formControlName="specialization"
-                      required
-                      maxlength="200"
-                      [attr.aria-invalid]="invalid('specialization')"
-                      [attr.aria-describedby]="
-                        invalid('specialization') ? 'specializationError' : null
-                      "
-                    />
-                    @if (invalid('specialization')) {
-                      <p id="specializationError" class="field-error">
-                        {{ t(fieldError('specialization')) }}
-                      </p>
-                    }
-                  </div>
-                  <div class="form-field field-full">
-                    <label for="website">{{ t('identity.website') }}</label>
-                    <input
-                      class="identity-input"
-                      id="website"
-                      formControlName="website"
-                      type="url"
-                      placeholder="https://company.com"
-                      required
-                      maxlength="253"
-                      [attr.aria-invalid]="
-                        invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
-                      "
-                      [attr.aria-describedby]="
-                        invalid('website') || store.errorCode() === 'INVALID_WEBSITE'
-                          ? 'websiteHint websiteError'
-                          : 'websiteHint'
-                      "
-                    />
-                    <p id="websiteHint" class="form-hint">{{ t('identity.websiteHint') }}</p>
-                    @if (invalid('website')) {
-                      <p id="websiteError" class="field-error">{{ t(fieldError('website')) }}</p>
-                    } @else if (store.errorCode() === 'INVALID_WEBSITE') {
-                      <p id="websiteError" class="field-error">{{ store.error() }}</p>
-                    }
-                  </div>
-                </div>
-              </fieldset>
-              <fieldset [disabled]="store.busy()">
-                <legend>
-                  <span class="section-number" aria-hidden="true">02</span
-                  >{{ t('identity.administrator') }}
+                  <span class="section-number" aria-hidden="true">
+                    {{ mode === 'signup' ? '01' : '02' }}</span
+                  >{{ t(mode === 'signup' ? 'individual.profile' : 'identity.administrator') }}
                 </legend>
                 <div class="form-grid">
                   <div class="form-field">
@@ -284,30 +324,36 @@
                       [attr.aria-describedby]="invalid('fullName') ? 'fullNameError' : null"
                     />
                     @if (invalid('fullName')) {
-                      <p id="fullNameError" class="field-error">{{ t(fieldError('fullName')) }}</p>
+                      <p id="fullNameError" class="field-error">
+                        {{ t(fieldError('fullName')) }}
+                      </p>
                     }
                   </div>
-                  <div class="form-field">
-                    <label for="role">{{ t('identity.role') }}</label>
-                    <select
-                      class="identity-input"
-                      id="role"
-                      formControlName="professionalRole"
-                      required
-                      [attr.aria-invalid]="invalid('professionalRole')"
-                      [attr.aria-describedby]="invalid('professionalRole') ? 'roleError' : null"
-                    >
-                      <option value="">{{ t('identity.chooseRole') }}</option>
-                      @for (role of store.roles(); track role.id) {
-                        <option [value]="role.id">{{ role.label }}</option>
+                  @if (mode === 'register') {
+                    <div class="form-field">
+                      <label for="role">{{ t('identity.role') }}</label>
+                      <select
+                        class="identity-input"
+                        id="role"
+                        formControlName="professionalRole"
+                        required
+                        [attr.aria-invalid]="invalid('professionalRole')"
+                        [attr.aria-describedby]="invalid('professionalRole') ? 'roleError' : null"
+                      >
+                        <option value="">{{ t('identity.chooseRole') }}</option>
+                        @for (role of store.roles(); track role.id) {
+                          <option [value]="role.id">{{ role.label }}</option>
+                        }
+                      </select>
+                      @if (invalid('professionalRole')) {
+                        <p id="roleError" class="field-error">
+                          {{ t('identity.chooseRole') }}
+                        </p>
                       }
-                    </select>
-                    @if (invalid('professionalRole')) {
-                      <p id="roleError" class="field-error">{{ t('identity.chooseRole') }}</p>
-                    }
-                  </div>
+                    </div>
+                  }
                   <div class="form-field field-full">
-                    <label for="email">{{ t('identity.email') }}</label>
+                    <label for="email">{{ t('individual.email') }}</label>
                     <input
                       class="identity-input"
                       id="email"
@@ -320,7 +366,9 @@
                       [attr.aria-describedby]="invalid('email') ? 'emailError' : null"
                     />
                     @if (invalid('email')) {
-                      <p id="emailError" class="field-error">{{ t(fieldError('email')) }}</p>
+                      <p id="emailError" class="field-error">
+                        {{ t(fieldError('email')) }}
+                      </p>
                     }
                   </div>
                   <div class="form-field field-full">
@@ -339,9 +387,13 @@
                       "
                       [attr.aria-invalid]="invalid('password')"
                     />
-                    <p id="passwordHint" class="form-hint">{{ t('identity.passwordHint') }}</p>
+                    <p id="passwordHint" class="form-hint">
+                      {{ t('identity.passwordHint') }}
+                    </p>
                     @if (invalid('password')) {
-                      <p id="passwordError" class="field-error">{{ t(fieldError('password')) }}</p>
+                      <p id="passwordError" class="field-error">
+                        {{ t(fieldError('password')) }}
+                      </p>
                     }
                   </div>
                 </div>
@@ -355,13 +407,16 @@
                 </p>
               }
               @if (submitted() && registration.invalid) {
-                <p role="alert" class="field-error">{{ t('identity.correctFields') }}</p>
+                <p role="alert" class="field-error">
+                  {{ t('identity.correctFields') }}
+                </p>
               }
               <button
                 class="button register-submit"
-                [disabled]="store.busy() || !store.roles().length"
+                [disabled]="store.busy() || (mode === 'register' && !store.roles().length)"
               >
-                {{ t('identity.register') }}<span aria-hidden="true">→</span>
+                {{ t(mode === 'signup' ? 'individual.signup' : 'identity.register')
+                }}<span aria-hidden="true">→</span>
               </button>
               <p class="form-signin">
                 {{ t('identity.alreadyRegistered') }}
@@ -369,7 +424,7 @@
               </p>
             </form>
           }
-          @if (mode === 'register' && store.pending()) {
+          @if (isRegistration && store.pending()) {
             <div class="delivery-card" aria-live="polite">
               <span class="delivery-icon" aria-hidden="true">✉</span>
               <h2>
@@ -400,11 +455,13 @@
           }
           @if (mode === 'login') {
             <p class="form-intro">{{ t('identity.loginIntro') }}</p>
+            <app-social-buttons />
+            <p class="form-hint my-5">{{ t('individual.orEmail') }}</p>
             <form [formGroup]="loginForm" (ngSubmit)="login()" class="login-form" novalidate>
               <fieldset [disabled]="store.busy()">
                 <legend class="sr-only">{{ t('identity.login') }}</legend>
                 <div class="form-field">
-                  <label for="loginEmail">{{ t('identity.email') }}</label>
+                  <label for="loginEmail">{{ t('individual.email') }}</label>
                   <input
                     class="identity-input"
                     id="loginEmail"
@@ -416,7 +473,9 @@
                     [attr.aria-describedby]="loginInvalid('email') ? 'loginEmailError' : null"
                   />
                   @if (loginInvalid('email')) {
-                    <p id="loginEmailError" class="field-error">{{ t('identity.emailError') }}</p>
+                    <p id="loginEmailError" class="field-error">
+                      {{ t('identity.emailError') }}
+                    </p>
                   }
                 </div>
                 <div class="form-field">
@@ -445,19 +504,20 @@
             </form>
             <p class="form-signin">
               {{ t('identity.noAccount') }}
+              <a routerLink="/signup" class="text-link">{{ t('individual.signup') }}</a>
+              ·
               <a routerLink="/register" class="text-link">{{ t('identity.register') }}</a>
             </p>
           }
           @if (
-            (mode === 'register' &&
-              (store.pending() || store.errorCode() === 'EMAIL_UNAVAILABLE')) ||
+            (isRegistration && (store.pending() || store.errorCode() === 'EMAIL_UNAVAILABLE')) ||
             (mode === 'verify' && !store.verified() && (invalidFragment() || store.errorCode())) ||
             mode === 'login'
           ) {
             <details class="verification-recovery" [open]="mode !== 'login'">
               <summary>{{ t('identity.resendTitle') }}</summary>
               <form [formGroup]="resendForm" (ngSubmit)="resend()" class="mt-4 space-y-3">
-                <label for="resendEmail">{{ t('identity.email') }}</label>
+                <label for="resendEmail">{{ t('individual.email') }}</label>
                 @if (store.pending(); as pending) {
                   <input
                     class="identity-input locked-email"
@@ -467,7 +527,9 @@
                     disabled
                     aria-describedby="emailLockedHint"
                   />
-                  <p id="emailLockedHint" class="form-hint">{{ t('identity.emailLocked') }}</p>
+                  <p id="emailLockedHint" class="form-hint">
+                    {{ t('identity.emailLocked') }}
+                  </p>
                 } @else {
                   <input
                     class="identity-input"
@@ -486,7 +548,9 @@
                     "
                   />
                   @if (resendForm.controls.email.invalid && resendForm.controls.email.touched) {
-                    <p id="resendEmailError" class="field-error">{{ t('identity.emailError') }}</p>
+                    <p id="resendEmailError" class="field-error">
+                      {{ t('identity.emailError') }}
+                    </p>
                   }
                 }
                 <button
@@ -496,9 +560,11 @@
                   {{ t('identity.resend') }}
                 </button>
                 @if (remaining() > 0) {
-                  <p role="status">{{ t('identity.cooldown', { seconds: remaining() }) }}</p>
+                  <p role="status">
+                    {{ t('identity.cooldown', { seconds: remaining() }) }}
+                  </p>
                 }
-                @if (store.pending() && mode !== 'register') {
+                @if (store.pending() && !isRegistration) {
                   <p role="status">{{ t(deliveryMessage()) }}</p>
                 }
               </form>

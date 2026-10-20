@@ -10,6 +10,11 @@ export interface Registration {
   password: string;
   professionalRole: string;
 }
+export type IndividualRegistration = Pick<Registration, 'fullName' | 'email' | 'password'>;
+export interface Provider {
+  id: 'linkedin' | 'facebook';
+  available: boolean;
+}
 export interface Pending {
   email: string;
   resendAvailableAt: string;
@@ -24,8 +29,8 @@ export interface Account {
   fullName: string;
   email: string;
   professionalRole: string;
-  organizationId: string;
-  organizationName: string;
+  organizationId: string | null;
+  organizationName: string | null;
   accessRole: string;
 }
 interface Envelope<T> {
@@ -53,6 +58,22 @@ export class IdentityApi {
       map((result) => result?.data),
     );
   }
+  providers() {
+    return this.http
+      .get<Envelope<Provider[]>>('/api/auth/social/providers')
+      .pipe(map((result) => result.data));
+  }
+  pendingLink() {
+    return this.http
+      .get<Envelope<{ provider: string | null }>>('/api/auth/social/pending')
+      .pipe(map((result) => result.data));
+  }
+  linkProvider() {
+    return this.post<Account>('/api/auth/social/link', {});
+  }
+  registerIndividual(body: IndividualRegistration) {
+    return this.post<Pending>('/api/registration/individual', body);
+  }
   register(body: Registration) {
     return this.post<Pending>('/api/registration', body);
   }
@@ -63,10 +84,10 @@ export class IdentityApi {
     return this.post<Pending>('/api/registration/resend', { email });
   }
   verify(id: string, token: string) {
-    return this.post<{ status: 'VERIFIED' | 'ALREADY_VERIFIED'; account: Account | null }>(
-      '/api/registration/verify',
-      { id, token },
-    );
+    return this.post<{
+      status: 'VERIFIED' | 'ALREADY_VERIFIED';
+      account: Account | null;
+    }>('/api/registration/verify', { id, token });
   }
   login(email: string, password: string) {
     return this.post<Account>('/api/auth/login', { email, password });

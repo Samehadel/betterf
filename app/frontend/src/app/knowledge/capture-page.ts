@@ -1,3 +1,4 @@
+import { AuthStore } from '../core/auth.store';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,6 +34,7 @@ import { DetailsView } from './details-view';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CapturePage {
+  readonly auth = inject(AuthStore);
   readonly store = inject(KnowledgeStore);
   readonly content = signal<TicketContent>({
     title: '',

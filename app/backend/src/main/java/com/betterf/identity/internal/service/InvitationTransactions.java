@@ -38,6 +38,7 @@ public class InvitationTransactions {
                 .filter(
                         a ->
                                 a.getStatus() == AccountStatus.ACTIVE
+                                        && !a.isIndividual()
                                         && a.getOrganization().getStatus()
                                                 == OrganizationStatus.ACTIVE
                                         && "ADMIN".equals(a.getAccessRole()))
@@ -129,6 +130,12 @@ public class InvitationTransactions {
     }
 
     private void requireEligibleRecipient(AccountEntity admin, String email) {
+        if (accounts.findByEmail(email).filter(AccountEntity::isIndividual).isPresent()) {
+            throw new IdentityException(
+                    409,
+                    "ACCOUNT_INELIGIBLE",
+                    "This email cannot be invited. Use a different email address.");
+        }
         var member =
                 accounts.findByEmail(email)
                         .filter(

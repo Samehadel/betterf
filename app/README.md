@@ -343,3 +343,32 @@ The browser and proxy allow 50 and 55 seconds respectively for refinement.
 `SimpleLoggerAdvisor` is installed with advisor parameter `provider=openai`.
 Its request/response logging is available at DEBUG via
 `logging.level.org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor=DEBUG`.
+
+## Personal accounts and social sign-in
+
+`/signup` creates an individual account with a private knowledge workspace and no
+organization. `/register` continues organization onboarding. Individuals cannot join
+organizations or transfer personal content. Email/password signup requires the existing
+verification email; search is deferred to BTF-17.
+
+To enable social sign-in, set `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`,
+`FACEBOOK_CLIENT_ID`, and `FACEBOOK_CLIENT_SECRET` in the backend secret environment.
+Each provider is enabled only when both its ID and secret are configured. Register
+`PUBLIC_ORIGIN/api/auth/oauth/callback/linkedin` and
+`PUBLIC_ORIGIN/api/auth/oauth/callback/facebook` as exact redirect URIs. LinkedIn
+requires the Sign In with LinkedIn using OpenID Connect product and
+`openid profile email` scopes; Facebook requires `public_profile email` permissions.
+`FACEBOOK_API_VERSION` defaults to `v23.0`. Production PUBLIC_ORIGIN must use HTTPS.
+No provider credentials belong in the frontend or repository.
+
+If provider email matches an existing account, sign in with its existing method and
+confirm linking within five minutes. A signed-in session restored by refresh is not
+sufficient reauthentication. Providers that report email as unverified are rejected;
+missing verification metadata is accepted only after successful provider authentication
+and retrieval of a usable email.
+
+Apply the individual-account and personal-ticket migrations before enabling the new
+frontend, with old backend instances stopped: old code assumes every account has an
+organization. The migration preserves existing organization accounts. Individual
+classification and personal ticket ownership are immutable. See
+[identity and migration design](../architecture/backend/individual-identity.md).

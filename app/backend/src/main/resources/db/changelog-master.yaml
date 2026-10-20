@@ -19,3 +19,7 @@ databaseChangeLog:
       file: db/knowledge/20261018-001-tickets.sql
   - include:
       file: db/knowledge/20261019-001-browsing.sql
+  - include:
+      file: db/identity/20261021-001-individuals.sql
+  - include:
+      file: db/knowledge/20261021-001-personal-tickets.sql

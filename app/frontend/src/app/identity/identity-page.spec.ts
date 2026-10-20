@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { Pending } from './identity.api';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { IdentityPage } from './identity-page';
 import { IdentityStore } from './identity.store';
@@ -12,7 +12,12 @@ describe('Verification link navigation', () => {
     const oldToken = 'a'.repeat(43);
     const newToken = 'b'.repeat(43);
     const fragments = new BehaviorSubject<string | null>(`${id}.${oldToken}`);
-    const store = { clear: jest.fn(), run: jest.fn(), verified: signal(false) };
+    const store = {
+      clear: jest.fn(),
+      run: jest.fn(),
+      verified: signal(false),
+      account: signal({ organizationId: 'company-id' }),
+    };
     const router = {
       navigate: jest.fn().mockResolvedValue(true),
       navigateByUrl: jest.fn().mockResolvedValue(true),
@@ -21,21 +26,35 @@ describe('Verification link navigation', () => {
       providers: [
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { data: { mode: 'verify' } }, fragment: fragments },
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({}),
+              data: { mode: 'verify' },
+            },
+            fragment: fragments,
+          },
         },
         { provide: Router, useValue: router },
         { provide: IdentityStore, useValue: store },
       ],
     });
     const page = TestBed.runInInjectionContext(() => new IdentityPage());
-    expect(store.run).toHaveBeenLastCalledWith({ kind: 'verify', id, token: oldToken });
+    expect(store.run).toHaveBeenLastCalledWith({
+      kind: 'verify',
+      id,
+      token: oldToken,
+    });
     fragments.next(null);
     expect(store.run).toHaveBeenCalledTimes(1);
 
     fragments.next(`${id}.${newToken}`);
     fragments.next(null);
     expect(store.run).toHaveBeenCalledTimes(2);
-    expect(store.run).toHaveBeenLastCalledWith({ kind: 'verify', id, token: newToken });
+    expect(store.run).toHaveBeenLastCalledWith({
+      kind: 'verify',
+      id,
+      token: newToken,
+    });
     expect(page.invalidFragment()).toBe(false);
     expect(router.navigate).toHaveBeenCalledTimes(2);
 
@@ -45,7 +64,9 @@ describe('Verification link navigation', () => {
     expect(page.invalidFragment()).toBe(true);
     store.verified.set(true);
     TestBed.tick();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/company', { replaceUrl: true });
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/company', {
+      replaceUrl: true,
+    });
   });
 });
 
@@ -61,12 +82,23 @@ describe('Registration email recovery', () => {
     };
     TestBed.configureTestingModule({
       providers: [
-        { provide: ActivatedRoute, useValue: { snapshot: { data: { mode: 'register' } } } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({}),
+              data: { mode: 'register' },
+            },
+          },
+        },
         { provide: Router, useValue: {} },
         { provide: IdentityStore, useValue: store },
       ],
     });
-    return { page: TestBed.runInInjectionContext(() => new IdentityPage()), store };
+    return {
+      page: TestBed.runInInjectionContext(() => new IdentityPage()),
+      store,
+    };
   }
 
   const saved: Pending = {
@@ -79,14 +111,20 @@ describe('Registration email recovery', () => {
     const { page, store } = createPage(saved);
     page.resendForm.controls.email.setValue('different@example.com');
     page.resend();
-    expect(store.run).toHaveBeenCalledWith({ kind: 'resend', email: saved.email });
+    expect(store.run).toHaveBeenCalledWith({
+      kind: 'resend',
+      email: saved.email,
+    });
   });
 
   it('allows entering an address for recovery before a registration is loaded', () => {
     const { page, store } = createPage();
     page.resendForm.controls.email.setValue('existing@example.com');
     page.resend();
-    expect(store.run).toHaveBeenCalledWith({ kind: 'resend', email: 'existing@example.com' });
+    expect(store.run).toHaveBeenCalledWith({
+      kind: 'resend',
+      email: 'existing@example.com',
+    });
   });
 
   it('does not issue another request while delivery is queued or during cooldown', () => {
@@ -124,5 +162,84 @@ describe('Registration email recovery', () => {
     const { page } = createPage();
     page.registration.controls.password.setValue(value);
     expect(page.registration.controls.password.valid).toBe(valid);
+  });
+});
+
+describe('Individual signup', () => {
+  it('submits only personal fields without loading organization roles', () => {
+    const store = {
+      clear: jest.fn(),
+      run: jest.fn(),
+      loadRoles: jest.fn(),
+      busy: signal(false),
+      pending: signal(null),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              data: { mode: 'signup' },
+              queryParamMap: convertToParamMap({}),
+            },
+          },
+        },
+        { provide: Router, useValue: {} },
+        { provide: IdentityStore, useValue: store },
+      ],
+    });
+    const page = TestBed.runInInjectionContext(() => new IdentityPage());
+    page.registration.patchValue({
+      fullName: 'Personal User',
+      email: 'person@example.com',
+      password: 'Validpass!',
+    });
+    expect(page.registration.valid).toBe(true);
+    page.register();
+    expect(store.loadRoles).not.toHaveBeenCalled();
+    expect(store.run).toHaveBeenCalledWith({
+      kind: 'individual',
+      body: {
+        fullName: 'Personal User',
+        email: 'person@example.com',
+        password: 'Validpass!',
+      },
+    });
+    expect(page.registration.controls.password.value).toBe('');
+  });
+});
+
+describe('Trusted reauthentication for linking', () => {
+  it('keeps the login form open for an existing session until password authentication succeeds', () => {
+    const store = {
+      clear: jest.fn(),
+      account: signal({ organizationId: null }),
+      loginSucceeded: signal(false),
+      pending: signal(null),
+      busy: signal(false),
+    };
+    const router = { navigateByUrl: jest.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              data: { mode: 'login' },
+              queryParamMap: convertToParamMap({ social: 'LINK_REQUIRED' }),
+            },
+          },
+        },
+        { provide: Router, useValue: router },
+        { provide: IdentityStore, useValue: store },
+      ],
+    });
+    TestBed.runInInjectionContext(() => new IdentityPage());
+    TestBed.tick();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    store.loginSucceeded.set(true);
+    TestBed.tick();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/link-account');
   });
 });

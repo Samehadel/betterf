@@ -15,13 +15,13 @@ import java.util.UUID;
 @Getter
 @Setter
 public class TicketEntity {
-    @Id private UUID id;
+    @Id
+    private UUID id;
 
     @Column(nullable = false)
     private UUID authorId;
 
-    @Column(nullable = false)
-    private UUID organizationId;
+    @Column private UUID organizationId;
 
     @Column(nullable = false, length = 200)
     private String authorName;

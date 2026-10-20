@@ -98,7 +98,7 @@ for (const viewport of [
       const startupCalls = meCalls;
       await page.getByRole('link', { name: 'Log in', exact: true }).click();
       await page
-        .getByLabel('Organization email', { exact: true })
+        .getByLabel('Email address', { exact: true })
         .first()
         .fill(account.email);
       await page.getByLabel('Password', { exact: true }).fill('Validpass!');

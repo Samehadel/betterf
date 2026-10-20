@@ -1,0 +1,38 @@
+<main *transloco="let t" id="main" class="mx-auto max-w-xl px-6 py-16">
+  <a class="brand" routerLink="/">betterf.</a>
+  <p class="eyebrow mt-12">{{ t("individual.secureLink") }}</p>
+  <h1 class="text-3xl mb-5">
+    {{ t(store.linked() ? "individual.linked" : "individual.linkTitle") }}
+  </h1>
+  @if (store.failed()) {
+    <p class="form-alert" role="alert">{{ store.error() || t('individual.linkUnavailable') }}</p>
+  }
+  @if (store.linked()) {
+    <p role="status">{{ t("individual.linkSuccess") }}</p>
+    <a class="button mt-6" routerLink="/knowledge">{{ t("workspace.knowledge") }}</a>
+  } @else if (!store.loaded()) {
+    <p role="status">{{ t("identity.working") }}</p>
+  } @else if (store.provider()) {
+    <p>{{ t("individual.linkIntro", { provider: store.provider() }) }}</p>
+    <div class="flex flex-wrap gap-3 mt-6">
+      <button class="button" [disabled]="store.busy()" (click)="store.confirm()">
+        {{ t(store.busy() ? "identity.working" : "individual.confirmLink") }}
+      </button>
+      <a class="button secondary" routerLink="/knowledge">{{ t("individual.later") }}</a>
+    </div>
+    <a
+      class="text-link block mt-6"
+      routerLink="/login"
+      [queryParams]="{ social: 'LINK_REQUIRED' }"
+      >{{ t("individual.reauthenticate") }}</a
+    >
+  } @else {
+    <p>{{ t("individual.linkExpired") }}</p>
+    <a class="button mt-6" routerLink="/login" [queryParams]="{ social: 'LINK_REQUIRED' }">{{ t("identity.login") }}</a>
+    @if (store.failed()) {
+      <button class="text-link" (click)="store.load()">
+        {{ t("identity.retry") }}
+      </button>
+    }
+  }
+</main>

@@ -76,6 +76,14 @@ management:
           include: readinessState,db
 
 betterf:
+  oauth:
+    linkedin:
+      client-id: ${LINKEDIN_CLIENT_ID:}
+      client-secret: ${LINKEDIN_CLIENT_SECRET:}
+    facebook:
+      client-id: ${FACEBOOK_CLIENT_ID:}
+      client-secret: ${FACEBOOK_CLIENT_SECRET:}
+      api-version: ${FACEBOOK_API_VERSION:v23.0}
   auth:
     refresh-lifetime: ${REFRESH_TOKEN_LIFETIME:14d}
   registration:

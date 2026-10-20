@@ -86,6 +86,7 @@ public class IdentityServiceImpl implements IdentityService {
         var existing = accounts.findByEmail(email);
         if (existing.isPresent()) {
             var account = existing.get();
+            if (account.isIndividual()) throw emailInUse();
             if (account.getStatus() == AccountStatus.ACTIVE
                     || account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
                 throw duplicate();
@@ -121,6 +122,49 @@ public class IdentityServiceImpl implements IdentityService {
 
     @Override
     @Transactional
+    public PendingView registerIndividual(IndividualRegistrationRequest request) {
+        if (request == null || !validator.validate(request).isEmpty()) {
+            throw new IdentityException(
+                    400,
+                    "INVALID_REQUEST",
+                    "Enter your name, a valid email and a password of 10–128 characters with an"
+                            + " uppercase letter and a special character.");
+        }
+        String email = normalizeEmail(request.email());
+        locks.lock("email:" + email);
+        var existing = accounts.findByEmail(email);
+        if (existing.isPresent()) {
+            throw emailInUse();
+        }
+        var account = new AccountEntity();
+        account.setId(UUID.randomUUID());
+        account.setAccountType("INDIVIDUAL");
+        account.setEmail(email);
+        account.setFullName(request.fullName().trim());
+        account.setPasswordHash(passwords.encode(request.password()));
+        account.setProfessionalRole("OTHER");
+        account.setStatus(AccountStatus.PENDING);
+        account.setUpdatedAt(clock.instant());
+        accounts.save(account);
+        var delivery = new VerificationEmailEntity();
+        delivery.setAccountId(account.getId());
+        delivery.setRecipient(email);
+        delivery.setStatus(EmailDeliveryStatus.PENDING);
+        delivery.setNextAttemptAt(clock.instant());
+        emails.save(delivery);
+        return pending(account);
+    }
+
+    static IdentityException emailInUse() {
+        return new IdentityException(
+                409,
+                "EMAIL_IN_USE",
+                "This email is already registered. Log in with your existing method, or request"
+                        + " another verification email if registration is pending.");
+    }
+
+    @Override
+    @Transactional
     public PendingView resend(String rawEmail) {
         String email = normalizeEmail(rawEmail);
         locks.lock("email:" + email);
@@ -131,11 +175,13 @@ public class IdentityServiceImpl implements IdentityService {
                                         new IdentityException(
                                                 400,
                                                 "REGISTRATION_NOT_FOUND",
-                                                "No pending registration was found. Register your"
-                                                        + " organization or log in if already"
-                                                        + " verified."));
+                                                "No pending registration was found. Sign up or log"
+                                                        + " in if already verified."));
+        if (account.isIndividual() && account.getStatus() == AccountStatus.ACTIVE)
+            throw emailInUse();
         if (account.getStatus() == AccountStatus.ACTIVE
-                || account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
+                || (!account.isIndividual()
+                        && account.getOrganization().getStatus() == OrganizationStatus.ACTIVE))
             throw duplicate();
         var delivery =
                 emails.findById(account.getId()).orElseThrow(IdentityServiceImpl::invalidLink);
@@ -145,8 +191,9 @@ public class IdentityServiceImpl implements IdentityService {
                     429,
                     "RESEND_COOLDOWN",
                     "Wait 60 seconds after the previous email before requesting another.");
-        if (organizations.existsByDomainAndStatus(
-                account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
+        if (!account.isIndividual()
+                && organizations.existsByDomainAndStatus(
+                        account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
             throw duplicate();
         if (delivery.getStatus() == EmailDeliveryStatus.SMTP_ACCEPTED) {
             delivery.setStatus(EmailDeliveryStatus.PENDING);
@@ -194,15 +241,21 @@ public class IdentityServiceImpl implements IdentityService {
                     400,
                     "EXPIRED_VERIFICATION",
                     "This link has expired. Request a new verification email.");
-        if (account.getStatus() == AccountStatus.ACTIVE
-                && account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
-            return new VerificationView("ALREADY_VERIFIED", null);
+        if (account.isActive()) return new VerificationView("ALREADY_VERIFIED", null);
+        if (account.isIndividual()) {
+            if (account.getStatus() != AccountStatus.PENDING) throw invalidLink();
+            account.setAccessRole("INDIVIDUAL");
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setUpdatedAt(clock.instant());
+            return new VerificationView("VERIFIED", mapper.view(account));
+        }
         if (account.getStatus() != AccountStatus.PENDING
                 || account.getOrganization().getStatus() != OrganizationStatus.PENDING)
             throw duplicate();
         locks.lock("domain:" + account.getOrganization().getDomain());
-        if (organizations.existsByDomainAndStatus(
-                account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
+        if (!account.isIndividual()
+                && organizations.existsByDomainAndStatus(
+                        account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
             throw duplicate();
         account.getOrganization().setStatus(OrganizationStatus.ACTIVE);
         account.setAccessRole("ADMIN");
@@ -221,9 +274,7 @@ public class IdentityServiceImpl implements IdentityService {
                                         a.getEmail(),
                                         a.getPasswordHash(),
                                         a.getAccessRole(),
-                                        a.getStatus() == AccountStatus.ACTIVE
-                                                && a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE))
+                                        a.isActive()))
                 .orElse(null);
     }
 
@@ -232,11 +283,7 @@ public class IdentityServiceImpl implements IdentityService {
     public AccountView current(String email) {
         var account =
                 accounts.findByEmail(normalizeEmail(email))
-                        .filter(
-                                a ->
-                                        a.getStatus() == AccountStatus.ACTIVE
-                                                && a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE)
+                        .filter(a -> a.isActive())
                         .orElseThrow(
                                 () ->
                                         new IdentityException(

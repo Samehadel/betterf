@@ -59,9 +59,11 @@ public class VerificationEmailTransactions {
         }
         var account = accounts.findById(id).orElseThrow();
         if (account.getStatus() != AccountStatus.PENDING
-                || account.getOrganization().getStatus() != OrganizationStatus.PENDING
-                || organizations.existsByDomainAndStatus(
-                        account.getOrganization().getDomain(), OrganizationStatus.ACTIVE)) {
+                || (!account.isIndividual()
+                        && (account.getOrganization().getStatus() != OrganizationStatus.PENDING
+                                || organizations.existsByDomainAndStatus(
+                                        account.getOrganization().getDomain(),
+                                        OrganizationStatus.ACTIVE)))) {
             delivery.setStatus(EmailDeliveryStatus.CANCELLED);
             delivery.setNextAttemptAt(null);
             return null;

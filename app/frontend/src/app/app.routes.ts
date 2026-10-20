@@ -67,12 +67,19 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./invitations/invitation-page').then((m) => m.InvitationPage),
   },
-  ...(['register', 'verify', 'login', 'company'] as const).map((mode) => ({
-    path: mode,
-    data: { mode },
-    providers: [IdentityStore],
+  ...(['register', 'signup', 'verify', 'login', 'company'] as const).map(
+    (mode) => ({
+      path: mode,
+      data: { mode },
+      providers: [IdentityStore],
+      loadComponent: () =>
+        import('./identity/identity-page').then((m) => m.IdentityPage),
+    }),
+  ),
+  {
+    path: 'link-account',
     loadComponent: () =>
-      import('./identity/identity-page').then((m) => m.IdentityPage),
-  })),
+      import('./identity/link-account-page').then((m) => m.LinkAccountPage),
+  },
   { path: '**', redirectTo: '' },
 ];

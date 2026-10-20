@@ -73,14 +73,16 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Transactional(readOnly = true)
     public TicketView get(String email, UUID id) {
         var account = identity.current(email);
-        return tickets.findByIdAndOrganizationId(id, account.organizationId())
+        return (account.organizationId() == null
+                        ? tickets.findByIdAndAuthorIdAndOrganizationIdIsNull(id, account.id())
+                        : tickets.findByIdAndOrganizationId(id, account.organizationId()))
                 .map(mapper::view)
                 .orElseThrow(
                         () ->
                                 new KnowledgeException(
                                         404,
                                         "TICKET_NOT_FOUND",
-                                        "This ticket is unavailable in your organization."));
+                                        "This ticket is unavailable in your workspace."));
     }
 
     @Override
@@ -94,7 +96,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (limit != null && limit < 1) TicketRules.invalid("Page size must be positive.");
         int size = limit == null ? 20 : Math.min(limit, 50);
         var cursor = TicketCursor.decode(encodedCursor, type);
-        var rows = summaries.browse(account.organizationId(), type, cursor, size + 1);
+        var rows = summaries.browse(account.organizationId(), account.id(), type, cursor, size + 1);
         var items = rows.stream().limit(size).toList();
         String next = null;
         if (rows.size() > size) {

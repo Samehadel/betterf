@@ -13,7 +13,8 @@ import java.util.UUID;
 @Getter
 @Setter
 public class AccountEntity {
-    @Id private UUID id;
+    @Id
+    private UUID id;
 
     @Column(nullable = false, unique = true, length = 254)
     private String email;
@@ -31,8 +32,11 @@ public class AccountEntity {
     @Column(nullable = false, length = 20)
     private AccountStatus status;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ORGANIZATION_ID", nullable = false)
+    @Column(nullable = false, length = 20)
+    private String accountType = "ORGANIZATION";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ORGANIZATION_ID")
     private OrganizationEntity organization;
 
     @Column(length = 20)
@@ -40,4 +44,13 @@ public class AccountEntity {
 
     @Column(nullable = false)
     private Instant updatedAt;
+
+    public boolean isIndividual() {
+        return "INDIVIDUAL".equals(accountType);
+    }
+
+    public boolean isActive() {
+        return status == AccountStatus.ACTIVE
+                && (isIndividual() || organization.getStatus() == OrganizationStatus.ACTIVE);
+    }
 }

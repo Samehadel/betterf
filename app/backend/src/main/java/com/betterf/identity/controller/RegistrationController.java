@@ -32,6 +32,12 @@ public class RegistrationController {
         return identity.register(request);
     }
 
+    @PostMapping("/individual")
+    public PendingView registerIndividual(
+            @Valid @RequestBody IndividualRegistrationRequest request) {
+        return identity.registerIndividual(request);
+    }
+
     @PostMapping("/resend")
     public PendingView resend(@Valid @RequestBody ResendRequest request) {
         return identity.resend(request.email());

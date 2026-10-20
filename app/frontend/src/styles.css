@@ -2313,3 +2313,11 @@ figure.knowledge-code {
     min-width: 0;
   }
 }
+
+/* Keep the personal account boundary readable on the dark onboarding panel. */
+.registration-story .personal-boundary {
+  color: #c5bfd5;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-top: 24px;
+}

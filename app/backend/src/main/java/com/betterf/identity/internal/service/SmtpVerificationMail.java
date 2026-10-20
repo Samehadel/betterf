@@ -43,7 +43,7 @@ public class SmtpVerificationMail implements VerificationMail {
             helper.setSubject("Verify your BetterF email");
             // The fragment keeps the credential out of HTTP access logs and Referer headers.
             helper.setText(
-                    "Complete your BetterF organization registration:\n"
+                    "Complete your BetterF registration:\n"
                             + origin
                             + "/verify#"
                             + id

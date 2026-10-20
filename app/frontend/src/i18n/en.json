@@ -379,5 +379,41 @@
     "knowledgeDescription": "Find the context, solutions, and lessons your organization captures.",
     "createCapture": "Create a capture",
     "preserveLesson": "Browse knowledge"
+  },
+  "individual": {
+    "eyebrow": "A space for your knowledge",
+    "title": "Keep what you learn. Find it when it matters.",
+    "intro": "Capture ideas, save solutions, and build a personal library that grows with you.",
+    "boundary": "Your personal workspace is yours alone. Individual accounts cannot join an organization or transfer personal content into one.",
+    "signup": "Create personal account",
+    "formIntro": "Start your own workspace. No organization or invitation needed.",
+    "profile": "Your account",
+    "email": "Email address",
+    "orEmail": "Or continue with email and password",
+    "linkedin": "Continue with LinkedIn",
+    "facebook": "Continue with Facebook",
+    "providerUnavailable": "Some social sign-in options are currently unavailable. You can continue with email and password.",
+    "workspace": "Personal workspace",
+    "private": "Private to you",
+    "account": "Individual account",
+    "visibility": "Only you can view these tickets. Your knowledge stays in your personal workspace.",
+    "secureLink": "Account security",
+    "linkTitle": "Connect your sign-in methods",
+    "linked": "Your accounts are connected",
+    "linkIntro": "Confirm that you want to use {{provider}} to sign in to the account you just authenticated.",
+    "confirmLink": "Confirm provider link",
+    "linkSuccess": "You can now sign in using either linked method. Both open the same account.",
+    "later": "Not now",
+    "reauthenticate": "Sign in again with an existing method",
+    "linkExpired": "There is no active linking request. Start again with the provider you want to connect.",
+    "errors": {
+      "LINK_REQUIRED": "This email already has an account. Sign in using your existing password or linked provider, then confirm the new provider link.",
+      "PROVIDER_EMAIL_UNVERIFIED": "Your provider reports an unverified email. Verify it with the provider and try again.",
+      "PROVIDER_EMAIL_MISSING": "The provider did not share a usable email. Allow email access or use email and password.",
+      "ACCOUNT_INACTIVE": "Verify your email before signing in. You can request another verification email below.",
+      "PROVIDER_AUTHENTICATION_FAILED": "Provider sign-in was cancelled or could not be validated. Try again or use another sign-in method.",
+      "PROVIDER_UNAVAILABLE": "Provider sign-in is temporarily unavailable. Please try again."
+    },
+    "linkUnavailable": "Linking is temporarily unavailable. Please retry."
   }
 }

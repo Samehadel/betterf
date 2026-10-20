@@ -7,10 +7,93 @@ info:
     organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
     Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
 paths:
+  /api/registration/individual:
+    post:
+      operationId: registerIndividual
+      summary: Create a pending individual account without an organization and queue email verification.
+      description: Requires session-bound CSRF. Canonical email is globally unique. Existing emails return EMAIL_IN_USE without overwriting credentials. Verification, resend and 30-day pending retention reuse the existing registration lifecycle.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password]
+              properties:
+                fullName: { type: string, minLength: 1, maxLength: 200 }
+                email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, minLength: 10, maxLength: 128, description: Requires uppercase and special characters. }
+      responses:
+        '200':
+          description: Pending registration queued for verification.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingEnvelope' }
+        '400': { description: Invalid name, email, or password. }
+        '403': { description: Missing or invalid CSRF. }
+        '409': { description: EMAIL_IN_USE. Log in or request verification. }
+        '503': { description: Retryable service failure. }
+  /api/auth/social/providers:
+    get:
+      operationId: socialProviders
+      security: []
+      responses:
+        '200':
+          description: Envelope data contains provider IDs linkedin/facebook and availability booleans. No credentials are returned.
+  /api/auth/oauth/authorize/{provider}:
+    get:
+      operationId: startSocialAuthentication
+      security: []
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [linkedin, facebook] }
+      responses:
+        '302': { description: Redirect to configured provider with session-bound OAuth state and OIDC nonce where applicable. }
+  /api/auth/oauth/callback/{provider}:
+    get:
+      operationId: completeSocialAuthentication
+      security: []
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [linkedin, facebook] }
+        - in: query
+          name: state
+          schema: { type: string }
+        - in: query
+          name: code
+          schema: { type: string }
+        - in: query
+          name: error
+          schema: { type: string }
+      responses:
+        '302': { description: Validated authentication redirects to knowledge or explicit linking. Failures redirect to login with a safe error code. No raw provider principal grants product access. }
+  /api/auth/social/pending:
+    get:
+      operationId: pendingSocialLink
+      security: []
+      responses:
+        '200': { description: Envelope data contains provider name or null for this session's live five-minute linking challenge. }
+  /api/auth/social/link:
+    post:
+      operationId: confirmSocialLink
+      summary: Link the session-bound provider identity after fresh trusted authentication.
+      description: Requires CSRF, a live server-side challenge, fresh password or already-linked provider authentication after challenge creation, and matching canonical email. Refresh and email verification do not qualify. Provider identity cannot be reassigned.
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200': { description: Account envelope for the existing user. Challenge is cleared. }
+        '401': { description: Fresh trusted authentication or a live linking challenge is required. }
+        '403': { description: Invalid CSRF, inactive account, or account email mismatch. }
+        '409': { description: Provider already linked to another account. }
+        '503': { description: Retryable database failure; no partial link. }
   /api/knowledge/tickets:
     get:
       operationId: browseKnowledgeTickets
-      summary: Browse summaries within the active member's organization.
+      summary: Browse summaries in the active account's personal or organization workspace.
       description: Ordered by createdAt DESC then id DESC. Details type is applied before keyset pagination. Classification state never affects inclusion or ordering. No full Details or internal job fields are returned.
       security: [{ SessionCookie: [] }]
       parameters:
@@ -1007,15 +1090,17 @@ components:
         professionalRole:
           type: string
         organizationId:
-          type: string
+          type: [string, 'null']
           format: uuid
+          description: Null for an individual account.
         organizationName:
-          type: string
+          type: [string, 'null']
         accessRole:
           type: string
           enum:
             - ADMIN
             - MEMBER
+            - INDIVIDUAL
     Registration:
       type: object
       required:

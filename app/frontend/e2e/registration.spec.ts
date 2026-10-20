@@ -44,7 +44,7 @@ async function fillRegistration(page: Page, email: string, website: string) {
   await page.getByLabel('Company website', { exact: true }).fill(website);
   await page.getByLabel('Specialization', { exact: true }).fill('Software engineering');
   await page.getByLabel('Full name', { exact: true }).fill('Ada Browser');
-  await page.getByLabel('Organization email', { exact: true }).first().fill(email);
+  await page.getByLabel('Email address', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByLabel('Professional role', { exact: true }).selectOption('OTHER');
 }
@@ -91,8 +91,8 @@ test('landing registration, local email verification, password login and logout'
   await expect(
     page.getByRole('button', { name: 'Send another verification email' }),
   ).toBeDisabled();
-  await expect(page.getByLabel('Organization email', { exact: true })).toBeDisabled();
-  await expect(page.getByLabel('Organization email', { exact: true })).toHaveValue(email);
+  await expect(page.getByLabel('Email address', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Email address', { exact: true })).toHaveValue(email);
   const link = await latestLink(request, email);
   await page.goto('/login');
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
@@ -101,12 +101,12 @@ test('landing registration, local email verification, password login and logout'
     'rgb(180, 35, 54)',
   );
   await expect(page.getByText('Enter your password.', { exact: true })).toBeVisible();
-  await page.getByLabel('Organization email', { exact: true }).first().fill(email);
+  await page.getByLabel('Email address', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('verify your email');
   await page.route('**/api/registration/verify', async (route) => {
-    await expect(page.getByLabel('Organization email', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Email address', { exact: true })).toHaveCount(0);
     await route.continue();
   });
   await page.goto(link);
@@ -134,7 +134,7 @@ test('landing registration, local email verification, password login and logout'
     page.getByText('Your email is already verified. Log in to open your organization.'),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Log in', exact: true }).last().click();
-  await page.getByLabel('Organization email', { exact: true }).first().fill(email);
+  await page.getByLabel('Email address', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/company$/);
@@ -170,7 +170,7 @@ test('resend rotates link and invalid link exposes recovery; narrow keyboard-acc
   ]);
   expect(response.status()).toBe(200);
   expect(response.request().postDataJSON()).toEqual({ email });
-  await expect(page.getByLabel('Organization email', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Email address', { exact: true })).toBeDisabled();
   await expect(resend).toBeDisabled();
   const replacement = await latestLink(request, email, old);
   expect(replacement).not.toBe(old);

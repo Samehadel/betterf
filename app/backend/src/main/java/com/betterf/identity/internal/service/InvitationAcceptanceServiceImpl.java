@@ -155,6 +155,12 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
 
     private InvitationAcceptanceView membershipFailure(InvitationEntity invitation) {
         var member = accounts.findByEmail(invitation.getEmail()).orElse(null);
+        if (member != null && member.isIndividual()) {
+            return view(
+                    invitation,
+                    "ACCOUNT_INELIGIBLE",
+                    "This account cannot join an organization. Use a different email address.");
+        }
         if (member != null
                 && (member.getStatus() != AccountStatus.PENDING
                         || member.getAccessRole() != null
