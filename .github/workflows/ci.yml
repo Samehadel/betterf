@@ -1,7 +1,7 @@
 name: BetterF checks and deployment
 on:
-  push:
   pull_request:
+    types: [opened]
   workflow_dispatch:
 permissions:
   contents: read
