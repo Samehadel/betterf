@@ -103,7 +103,12 @@ export class WorkspaceShell {
     this.switchError.set('');
     try {
       // Leaving the current route destroys its caches and runs unsaved-change guards.
-      if (!(await this.router.navigateByUrl('/workspace'))) return;
+      // Same-URL navigation resolves false even though there is nothing to leave.
+      if (
+        this.router.url.split(/[?#]/)[0] !== '/workspace' &&
+        !(await this.router.navigateByUrl('/workspace'))
+      )
+        return;
       const account = await firstValueFrom(this.api.selectWorkspace(id));
       this.auth.setAccount(account);
       await this.router.navigateByUrl('/knowledge');
