@@ -347,7 +347,8 @@
     "filteredEmpty": "No tickets of this type yet",
     "browseLoading": "Loading knowledge…",
     "browseError": "Knowledge could not be loaded. Please retry.",
-    "detailRefreshError": "This ticket could not be refreshed. The loaded content is still available. Please retry."
+    "detailRefreshError": "This ticket could not be refreshed. The loaded content is still available. Please retry.",
+    "workspaceChanged": "Workspace access changed. This draft stays in its original workspace and cannot be published here. Copy any writing you need before leaving."
   },
   "workspace": {
     "navigation": "Workspace navigation",
@@ -366,7 +367,8 @@
     "knowledgeTitle": "Make knowledge reusable.",
     "knowledgeDescription": "Find the context, solutions, and lessons your workspace captures.",
     "createCapture": "Create a capture",
-    "preserveLesson": "Browse knowledge"
+    "preserveLesson": "Browse knowledge",
+    "selectRequired": "Select a workspace"
   },
   "individual": {
     "eyebrow": "Your knowledge, connected",

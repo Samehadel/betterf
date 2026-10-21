@@ -70,7 +70,45 @@ export const AuthStore = signalStore(
         return request;
       }
 
-      return { load, setAccount, clear: () => setAccount(null) };
+      function requireWorkspaceSelection(account = store.account()) {
+        if (account)
+          setAccount({
+            ...account,
+            workspaceId: null,
+            workspaceName: null,
+            accessRole: '',
+          });
+      }
+
+      function restoreAccount(account: Account) {
+        const current = store.account();
+        if (!current) {
+          setAccount(account);
+          return;
+        }
+        const workspace =
+          current.id === account.id
+            ? account.workspaces?.find((w) => w.id === current.workspaceId)
+            : undefined;
+        if (workspace) {
+          setAccount({
+            ...account,
+            workspaceId: workspace.id,
+            workspaceName: workspace.name,
+            accessRole: workspace.role,
+          });
+        } else {
+          requireWorkspaceSelection(account);
+        }
+      }
+
+      return {
+        load,
+        setAccount,
+        restoreAccount,
+        requireWorkspaceSelection,
+        clear: () => setAccount(null),
+      };
     },
   ),
 );

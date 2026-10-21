@@ -74,22 +74,7 @@ export class SessionRefresh {
           },
         ),
       ),
-      tap((result) => {
-        const selected = this.auth.account()?.workspaceId;
-        const workspace = result.data.workspaces?.find(
-          (w) => w.id === selected,
-        );
-        this.auth.setAccount(
-          workspace
-            ? {
-                ...result.data,
-                workspaceId: workspace.id,
-                workspaceName: workspace.name,
-                accessRole: workspace.role,
-              }
-            : result.data,
-        );
-      }),
+      tap((result) => this.auth.restoreAccount(result.data)),
       switchMap(() => this.csrf()),
     );
   }
@@ -112,22 +97,7 @@ export class SessionRefresh {
         context: new HttpContext().set(INTERNAL, true),
       })
       .pipe(
-        tap((result) => {
-          const selected = this.auth.account()?.workspaceId;
-          const workspace = result.data.workspaces?.find(
-            (w) => w.id === selected,
-          );
-          this.auth.setAccount(
-            workspace
-              ? {
-                  ...result.data,
-                  workspaceId: workspace.id,
-                  workspaceName: workspace.name,
-                  accessRole: workspace.role,
-                }
-              : result.data,
-          );
-        }),
+        tap((result) => this.auth.restoreAccount(result.data)),
         map(() => true),
         catchError((error) =>
           error instanceof HttpErrorResponse && error.status === 401
@@ -180,9 +150,27 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
           error.status === 401 &&
           error.error?.error?.code === 'AUTHENTICATION_REQUIRED'
         ) {
-          return sessions
-            .refresh(generation)
-            .pipe(switchMap((csrf) => next(withCsrf(csrf))));
+          return sessions.refresh(generation).pipe(
+            switchMap((csrf) => {
+              const workspace = request.headers.get('X-Workspace-Id');
+              if (workspace && workspace !== auth.account()?.workspaceId) {
+                return throwError(
+                  () =>
+                    new HttpErrorResponse({
+                      status: 409,
+                      error: {
+                        error: {
+                          code: 'WORKSPACE_SELECTION_REQUIRED',
+                          message:
+                            'Workspace access changed. Select a workspace explicitly before continuing.',
+                        },
+                      },
+                    }),
+                );
+              }
+              return next(withCsrf(csrf));
+            }),
+          );
         }
         return throwError(() => error);
       }),
@@ -205,8 +193,7 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
           error.error?.error?.code === 'WORKSPACE_ACCESS_DENIED' &&
           request.headers.get('X-Workspace-Id') === auth.account()?.workspaceId
         ) {
-          auth.clear();
-          void router.navigateByUrl('/login');
+          auth.requireWorkspaceSelection();
         }
         return throwError(() => error);
       }),

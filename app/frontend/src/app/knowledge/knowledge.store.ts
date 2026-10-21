@@ -23,11 +23,15 @@ export const KnowledgeStore = signalStore(
   withMethods((store, api = inject(KnowledgeApi)) => {
     const message = (e: any) =>
       e?.error?.error?.message ?? 'knowledge.unavailable';
-    const publish = rxMethod<{ id: string; content: TicketContent }>(
+    const publish = rxMethod<{
+      id: string;
+      content: TicketContent;
+      workspaceId: string;
+    }>(
       pipe(
-        exhaustMap(({ id, content }) => {
+        exhaustMap(({ id, content, workspaceId }) => {
           patchState(store, { busy: true, error: '' });
-          return api.create(id, content).pipe(
+          return api.create(id, content, workspaceId).pipe(
             tap((ticket) =>
               patchState(store, { ticket, busy: false, uncertain: false }),
             ),
@@ -44,15 +48,19 @@ export const KnowledgeStore = signalStore(
         }),
       ),
     );
-    const refine = rxMethod<{ content: TicketContent; field: RefinementField }>(
+    const refine = rxMethod<{
+      content: TicketContent;
+      field: RefinementField;
+      workspaceId: string;
+    }>(
       pipe(
-        exhaustMap(({ content, field }) => {
+        exhaustMap(({ content, field, workspaceId }) => {
           patchState(store, {
             refining: true,
             refinementError: '',
             suggestion: null,
           });
-          return api.refine(content, field).pipe(
+          return api.refine(content, field, workspaceId).pipe(
             tap((suggestion) =>
               patchState(store, { suggestion, refining: false }),
             ),

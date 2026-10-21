@@ -3,7 +3,11 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { WorkspaceContext } from './workspace-context';
 export const workspaceInterceptor: HttpInterceptorFn = (request, next) => {
   const id = inject(WorkspaceContext).id();
-  if (id && /^\/api\/(knowledge|invitations)(\/|$)/.test(request.url)) {
+  if (
+    !request.headers.has('X-Workspace-Id') &&
+    id &&
+    /^\/api\/(knowledge|invitations)(\/|$)/.test(request.url)
+  ) {
     request = request.clone({ setHeaders: { 'X-Workspace-Id': id } });
   }
   return next(request);

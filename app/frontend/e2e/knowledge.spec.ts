@@ -23,6 +23,8 @@ for (const viewport of [
                 fullName: 'Ada',
                 accessRole: 'MEMBER',
                 workspaceName: 'Acme',
+                workspaceId: 'workspace',
+                workspaces: [{ id: 'workspace', name: 'Acme', role: 'MEMBER' }],
               },
             },
           });

@@ -43,10 +43,15 @@
             <select
               id="workspace-picker"
               class="identity-input sidebar-label"
-              [value]="account.workspaceId"
+              [value]="account.workspaceId ?? ''"
               [disabled]="switching()"
               (change)="switchWorkspace($event)"
             >
+              @if (!account.workspaceId) {
+                <option value="" disabled>
+                  {{ t("workspace.selectRequired") }}
+                </option>
+              }
               @for (workspace of account.workspaces; track workspace.id) {
                 <option
                   [value]="workspace.id"

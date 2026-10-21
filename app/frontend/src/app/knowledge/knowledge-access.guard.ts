@@ -10,10 +10,12 @@ export const knowledgeAccess: CanActivateFn = () => {
   // Revalidate membership before displaying any restored workspace content.
   const api = inject(IdentityApi);
   const workspaceId = auth.account()?.workspaceId;
+  if (auth.account() && !workspaceId)
+    return router.createUrlTree(['/workspace']);
   return (workspaceId ? api.selectWorkspace(workspaceId) : api.current()).pipe(
     map((account) => {
       auth.setAccount(account);
-      return true;
+      return account.workspaceId ? true : router.createUrlTree(['/workspace']);
     }),
     catchError(() => {
       auth.clear();

@@ -17,6 +17,12 @@
       </div>
       <h1>{{ t("knowledge.title") }}</h1>
       <p class="knowledge-intro">{{ t("knowledge.intro") }}</p>
+      @if (workspaceChanged()) {
+        <p role="alert" class="form-alert">
+          {{ t("knowledge.workspaceChanged") }}
+          <a routerLink="/workspace">{{ t("workspace.selectRequired") }}</a>
+        </p>
+      }
       <form class="knowledge-card" (ngSubmit)="publish()">
         <fieldset [disabled]="locked()" class="knowledge-fields">
           <legend class="sr-only">{{ t("knowledge.title") }}</legend>
@@ -248,7 +254,9 @@
           </p>
           <button
             class="button"
-            [disabled]="!valid() || store.busy() || store.refining()"
+            [disabled]="
+              workspaceChanged() || !valid() || store.busy() || store.refining()
+            "
           >
             {{ t(store.busy() ? "knowledge.publishing" : "knowledge.publish") }}
           </button>
