@@ -45,24 +45,33 @@ export class IdentityPage {
     ? 'individual.errors.' + this.socialStatus
     : '';
   private readonly fb = inject(FormBuilder).nonNullable;
-  readonly registration = this.fb.group({
-    fullName: ['', [Validators.required, Validators.maxLength(200)]],
-    email: [
-      '',
-      [Validators.required, Validators.email, Validators.maxLength(254)],
-    ],
-    password: [
-      '',
-      [
-        Validators.required,
-        Validators.minLength(10),
-        Validators.maxLength(128),
-        Validators.pattern(
-          /^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u,
-        ),
+  readonly registration = this.fb.group(
+    {
+      fullName: ['', [Validators.required, Validators.maxLength(200)]],
+      email: [
+        '',
+        [Validators.required, Validators.email, Validators.maxLength(254)],
       ],
-    ],
-  });
+      password: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(10),
+          Validators.maxLength(128),
+          Validators.pattern(
+            /^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u,
+          ),
+        ],
+      ],
+      confirmPassword: ['', Validators.required],
+    },
+    {
+      validators: (form) =>
+        form.get('password')?.value === form.get('confirmPassword')?.value
+          ? null
+          : { passwordMismatch: true },
+    },
+  );
   readonly workspaceForm = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],
   });
@@ -197,10 +206,12 @@ export class IdentityPage {
     this.submitted.set(true);
     this.registration.markAllAsTouched();
     if (this.registration.invalid) return;
-    const body = this.registration.getRawValue();
+    const { fullName, email, password } = this.registration.getRawValue();
+    const body = { fullName, email, password };
     this.resendForm.controls.email.setValue(body.email);
     this.store.run({ kind: 'register', body });
     this.registration.controls.password.reset();
+    this.registration.controls.confirmPassword.reset();
   }
   login() {
     this.submitted.set(true);
@@ -231,7 +242,12 @@ export class IdentityPage {
   }
   invalid(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
-    return control.invalid && control.touched;
+    return (
+      control.touched &&
+      (control.invalid ||
+        (field === 'confirmPassword' &&
+          this.registration.hasError('passwordMismatch')))
+    );
   }
   loginInvalid(field: keyof typeof this.loginForm.controls) {
     const control = this.loginForm.controls[field];
@@ -240,6 +256,7 @@ export class IdentityPage {
   fieldError(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
     if (control.hasError('required')) return 'identity.errors.' + field;
+    if (field === 'confirmPassword') return 'identity.passwordMismatch';
     if (field === 'email') return 'identity.emailError';
     if (field === 'password') return 'identity.passwordHint';
     return 'identity.tooLong';

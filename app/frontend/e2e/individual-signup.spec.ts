@@ -59,6 +59,9 @@ for (const viewport of [
       await page.getByLabel('Email address', { exact: true }).fill(email);
       await page.getByLabel('Password', { exact: true }).fill('Validpass!');
       await page
+        .getByLabel('Confirm password', { exact: true })
+        .fill('Validpass!');
+      await page
         .getByRole('button', { name: 'Create account', exact: true })
         .click();
       await expect(

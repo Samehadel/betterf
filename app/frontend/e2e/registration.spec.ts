@@ -43,6 +43,7 @@ async function fillRegistration(page: Page, email: string, website: string) {
   await page.getByLabel('Full name', { exact: true }).fill('Ada Browser');
   await page.getByLabel('Email address', { exact: true }).first().fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Confirm password', { exact: true }).fill(password);
 }
 test('landing registration, local email verification, password login and logout', async ({
   page,

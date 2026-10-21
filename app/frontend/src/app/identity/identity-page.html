@@ -431,6 +431,30 @@
                       </p>
                     }
                   </div>
+                  <div class="form-field field-full">
+                    <label for="confirmPassword">{{
+                      t("identity.confirmPassword")
+                    }}</label>
+                    <input
+                      class="identity-input"
+                      id="confirmPassword"
+                      type="password"
+                      formControlName="confirmPassword"
+                      autocomplete="new-password"
+                      required
+                      [attr.aria-invalid]="invalid('confirmPassword')"
+                      [attr.aria-describedby]="
+                        invalid('confirmPassword')
+                          ? 'confirmPasswordError'
+                          : null
+                      "
+                    />
+                    @if (invalid("confirmPassword")) {
+                      <p id="confirmPasswordError" class="field-error">
+                        {{ t(fieldError("confirmPassword")) }}
+                      </p>
+                    }
+                  </div>
                 </div>
               </fieldset>
               @if (submitted() && registration.invalid) {

@@ -110,7 +110,8 @@
     "errors": {
       "fullName": "Enter your full name.",
       "email": "Enter your email address.",
-      "password": "Create a password with at least 10 characters, one uppercase letter, and one special character."
+      "password": "Create a password with at least 10 characters, one uppercase letter, and one special character.",
+      "confirmPassword": "Confirm your password."
     },
     "story": {
       "eyebrow": "A better starting point",
@@ -157,7 +158,9 @@
       "memberTitle": "You’re in good workspace.",
       "memberDescription": "You have joined your team’s shared space. More ways to learn and grow together are coming soon.",
       "memberTools": "Team knowledge tools"
-    }
+    },
+    "confirmPassword": "Confirm password",
+    "passwordMismatch": "Passwords do not match."
   },
   "invitations": {
     "back": "Back to workspace",

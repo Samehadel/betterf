@@ -142,6 +142,40 @@ describe('Registration email recovery', () => {
     expect(store.run).not.toHaveBeenCalled();
   });
 
+  it.each(['', 'Differentpass!'])(
+    'blocks signup with missing or mismatched confirmation (%s)',
+    (confirmation) => {
+      const { page, store } = createPage();
+      page.registration.patchValue({
+        fullName: 'Ada',
+        email: 'ada@example.com',
+        password: 'Validpass!',
+        confirmPassword: confirmation,
+      });
+      page.register();
+      expect(store.run).not.toHaveBeenCalled();
+      expect(page.invalid('confirmPassword')).toBe(true);
+      expect(page.fieldError('confirmPassword')).toBe(
+        confirmation
+          ? 'identity.passwordMismatch'
+          : 'identity.errors.confirmPassword',
+      );
+    },
+  );
+  it('revalidates confirmation when the original password changes', () => {
+    const { page } = createPage();
+    page.registration.patchValue({
+      fullName: 'Ada',
+      email: 'ada@example.com',
+      password: 'Validpass!',
+      confirmPassword: 'Validpass!',
+    });
+    expect(page.registration.valid).toBe(true);
+    page.registration.controls.password.setValue('Changedpass!');
+    expect(page.registration.hasError('passwordMismatch')).toBe(true);
+    page.registration.controls.confirmPassword.setValue('Changedpass!');
+    expect(page.registration.valid).toBe(true);
+  });
   it('shows actionable errors for missing name and invalid email/password', () => {
     const { page, store } = createPage();
     page.registration.controls.email.setValue('invalid');
@@ -205,6 +239,7 @@ describe('Individual signup', () => {
       fullName: 'Personal User',
       email: 'person@example.com',
       password: 'Validpass!',
+      confirmPassword: 'Validpass!',
     });
     expect(page.registration.valid).toBe(true);
     page.register();
@@ -218,6 +253,7 @@ describe('Individual signup', () => {
       },
     });
     expect(page.registration.controls.password.value).toBe('');
+    expect(page.registration.controls.confirmPassword.value).toBe('');
   });
 });
 
