@@ -42,13 +42,9 @@ public class PendingRegistrationCleanup {
                     .filter(
                             a ->
                                     a.getStatus() == AccountStatus.PENDING
-                                            && (a.isIndividual()
-                                                    || a.getOrganization().getStatus()
-                                                            == OrganizationStatus.PENDING)
                                             && a.getUpdatedAt().isBefore(cutoff))
                     .ifPresent(
                             account -> {
-                                var organization = account.getOrganization();
                                 if (emails.findById(account.getId())
                                         .filter(e -> e.getStatus() == EmailDeliveryStatus.SENDING)
                                         .isPresent()) {
@@ -60,11 +56,6 @@ public class PendingRegistrationCleanup {
                                         "DELETE FROM VERIFICATION_EMAIL WHERE ACCOUNT_ID = ?",
                                         account.getId());
                                 jdbc.update("DELETE FROM ACCOUNT WHERE ID = ?", account.getId());
-                                if (organization != null) {
-                                    jdbc.update(
-                                            "DELETE FROM ORGANIZATION WHERE ID = ?",
-                                            organization.getId());
-                                }
                             });
         }
     }

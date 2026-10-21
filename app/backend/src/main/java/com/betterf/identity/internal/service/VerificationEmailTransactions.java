@@ -15,19 +15,16 @@ import java.util.*;
 public class VerificationEmailTransactions {
     private final VerificationEmailRepository emails;
     private final AccountRepository accounts;
-    private final OrganizationRepository organizations;
     private final RegistrationLocks locks;
     private final Clock clock;
 
     public VerificationEmailTransactions(
             VerificationEmailRepository emails,
             AccountRepository accounts,
-            OrganizationRepository organizations,
             RegistrationLocks locks,
             Clock clock) {
         this.emails = emails;
         this.accounts = accounts;
-        this.organizations = organizations;
         this.locks = locks;
         this.clock = clock;
     }
@@ -58,12 +55,7 @@ public class VerificationEmailTransactions {
             return null;
         }
         var account = accounts.findById(id).orElseThrow();
-        if (account.getStatus() != AccountStatus.PENDING
-                || (!account.isIndividual()
-                        && (account.getOrganization().getStatus() != OrganizationStatus.PENDING
-                                || organizations.existsByDomainAndStatus(
-                                        account.getOrganization().getDomain(),
-                                        OrganizationStatus.ACTIVE)))) {
+        if (account.getStatus() != AccountStatus.PENDING) {
             delivery.setStatus(EmailDeliveryStatus.CANCELLED);
             delivery.setNextAttemptAt(null);
             return null;

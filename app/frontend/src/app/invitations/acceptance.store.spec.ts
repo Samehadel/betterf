@@ -9,12 +9,11 @@ describe('Invitation acceptance state', () => {
   const body = {
     invitation: link,
     fullName: 'Alice',
-    professionalRole: 'OTHER',
     password: 'Memberpass!',
   };
   const ready = {
     status: 'READY',
-    companyName: 'Acme',
+    workspaceName: 'Acme',
     email: 'alice@example.com',
     message: '',
   };
@@ -54,7 +53,7 @@ describe('Invitation acceptance state', () => {
     api.accept.mockReturnValue(
       throwError(() => ({
         status: 400,
-        error: { error: { code: 'INVALID_ROLE', message: 'Choose a role.' } },
+        error: { error: { code: 'INVALID_REQUEST', message: 'Enter your full name.' } },
       })),
     );
     store.accept(body);

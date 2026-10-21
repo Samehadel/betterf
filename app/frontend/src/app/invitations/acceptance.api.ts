@@ -10,28 +10,29 @@ export interface InvitationLink {
 export interface AcceptancePreview {
   status: string;
   message: string;
-  companyName: string | null;
+  workspaceName: string | null;
   email: string | null;
 }
 export interface MemberRegistration {
   invitation: InvitationLink;
-  fullName: string;
-  professionalRole: string;
-  password: string;
+  fullName?: string;
+  password?: string;
 }
 @Injectable({ providedIn: 'root' })
 export class AcceptanceApi {
   private readonly http = inject(HttpClient);
 
   private post<T>(action: string, body: unknown) {
-    return this.http.get<{ data: { token: string; headerName: string } }>('/api/auth/csrf').pipe(
-      switchMap(({ data }) =>
-        this.http.post<{ data: T }>(`/api/auth/invitation/${action}`, body, {
-          headers: { [data.headerName]: data.token },
-        }),
-      ),
-      map(({ data }) => data),
-    );
+    return this.http
+      .get<{ data: { token: string; headerName: string } }>('/api/auth/csrf')
+      .pipe(
+        switchMap(({ data }) =>
+          this.http.post<{ data: T }>(`/api/auth/invitation/${action}`, body, {
+            headers: { [data.headerName]: data.token },
+          }),
+        ),
+        map(({ data }) => data),
+      );
   }
 
   preview(link: InvitationLink) {

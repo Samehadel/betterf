@@ -18,28 +18,60 @@
         >
           <a
             class="sidebar-brand"
-            [routerLink]="account.organizationId ? '/company' : '/knowledge'"
-            aria-label="BetterF"
-            ><span class="sidebar-logo" aria-hidden="true">b</span
-            ><span class="sidebar-label">betterf<span class="sidebar-brand-dot">.</span></span></a
+            [routerLink]="account.workspaceId ? '/workspace' : '/knowledge'"
+            aria-label="theeverthread"
+            ><span class="sidebar-logo" aria-hidden="true">e</span
+            ><span class="sidebar-label"
+              >theeverthread<span class="sidebar-brand-dot">.</span></span
+            ></a
           >
-          <div class="sidebar-organization">
-            <span class="organization-avatar" aria-hidden="true">{{
-              (account.organizationName ?? account.fullName).slice(0, 1).toUpperCase()
+          <div class="sidebar-workspace">
+            <span class="workspace-avatar" aria-hidden="true">{{
+              (account.workspaceName ?? account.fullName)
+                .slice(0, 1)
+                .toUpperCase()
             }}</span>
             <div class="sidebar-label">
-              <strong>{{ account.organizationName ?? t("individual.workspace") }}</strong
-              ><small>{{
-                t(account.organizationId ? "workspace.organization" : "individual.private")
-              }}</small>
+              <strong>{{ account.workspaceName }}</strong
+              ><small>{{ t("workspace.label") }}</small>
             </div>
           </div>
           <div class="sidebar-nav-group">
-            <p class="sidebar-caption sidebar-label">{{ t("workspace.label") }}</p>
-            <nav class="sidebar-nav" [attr.aria-label]="t('workspace.navigation')">
-              @if (account.organizationId) {
+            <label for="workspace-picker" class="sidebar-label"
+              >Workspace</label
+            >
+            <select
+              id="workspace-picker"
+              class="identity-input sidebar-label"
+              [value]="account.workspaceId"
+              [disabled]="switching()"
+              (change)="switchWorkspace($event)"
+            >
+              @for (workspace of account.workspaces; track workspace.id) {
+                <option
+                  [value]="workspace.id"
+                  [selected]="workspace.id === account.workspaceId"
+                >
+                  {{ workspace.name }} ·
+                  {{ workspace.role === "OWNER" ? "Owner" : "Member" }}
+                </option>
+              }
+            </select>
+            @if (switchError()) {
+              <p role="alert">{{ switchError() }}</p>
+            }
+            <p class="sidebar-caption sidebar-label">
+              {{ t("workspace.label") }}
+            </p>
+            <nav
+              class="sidebar-nav"
+              [attr.aria-label]="t('workspace.navigation')"
+            >
+              @if (account.workspaceId) {
                 <a
-                  [routerLink]="account.organizationId ? '/company' : '/knowledge'"
+                  [routerLink]="
+                    account.workspaceId ? '/workspace' : '/knowledge'
+                  "
                   routerLinkActive="selected"
                   [routerLinkActiveOptions]="{ exact: true }"
                   ariaCurrentWhenActive="page"
@@ -47,31 +79,43 @@
                   [attr.title]="collapsed() ? t('workspace.home') : null"
                   (click)="closeMobile()"
                   ><svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" /></svg
-                  ><span class="sidebar-label">{{ t("workspace.home") }}</span></a
+                    <path
+                      d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"
+                    /></svg
+                  ><span class="sidebar-label">{{
+                    t("workspace.home")
+                  }}</span></a
                 >
               }
               <a
                 routerLink="/knowledge"
-                [class.selected]="url() === '/knowledge' || url().startsWith('/knowledge/')"
+                [class.selected]="
+                  url() === '/knowledge' || url().startsWith('/knowledge/')
+                "
                 [attr.aria-current]="
-                  url() === '/knowledge' || url().startsWith('/knowledge/') ? 'page' : null
+                  url() === '/knowledge' || url().startsWith('/knowledge/')
+                    ? 'page'
+                    : null
                 "
                 [attr.aria-label]="t('workspace.knowledge')"
                 [attr.title]="collapsed() ? t('workspace.knowledge') : null"
                 (click)="closeMobile()"
                 ><svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 4h6v16H4zM14 4l5-1 3 16-5 1z" /></svg
-                ><span class="sidebar-label">{{ t("workspace.knowledge") }}</span></a
+                ><span class="sidebar-label">{{
+                  t("workspace.knowledge")
+                }}</span></a
               >
-              @if (account.accessRole === "ADMIN") {
+              @if (account.accessRole === "OWNER") {
                 <a
-                  routerLink="/company/team"
+                  routerLink="/workspace/team"
                   [class.selected]="
-                    url().startsWith('/company/team') || url() === '/company/invitations'
+                    url().startsWith('/workspace/team') ||
+                    url() === '/workspace/invitations'
                   "
                   [attr.aria-current]="
-                    url().startsWith('/company/team') || url() === '/company/invitations'
+                    url().startsWith('/workspace/team') ||
+                    url() === '/workspace/invitations'
                       ? 'page'
                       : null
                   "
@@ -83,7 +127,9 @@
                     <path
                       d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"
                     /></svg
-                  ><span class="sidebar-label">{{ t("workspace.team") }}</span></a
+                  ><span class="sidebar-label">{{
+                    t("workspace.team")
+                  }}</span></a
                 >
               }
             </nav>
@@ -92,7 +138,9 @@
             <button
               class="sidebar-toggle"
               type="button"
-              [attr.aria-label]="t(collapsed() ? 'workspace.expand' : 'workspace.collapse')"
+              [attr.aria-label]="
+                t(collapsed() ? 'workspace.expand' : 'workspace.collapse')
+              "
               [attr.aria-expanded]="!collapsed()"
               aria-controls="workspace-navigation"
               (click)="collapsed.set(!collapsed())"
@@ -104,16 +152,16 @@
             </button>
             <details class="sidebar-account">
               <summary [attr.aria-label]="t('workspace.account')">
-                <span class="account-avatar" aria-hidden="true">{{ initials() }}</span
+                <span class="account-avatar" aria-hidden="true">{{
+                  initials()
+                }}</span
                 ><span class="sidebar-label"
                   ><strong>{{ account.fullName }}</strong
                   ><small>{{
                     t(
-                      account.accessRole === "INDIVIDUAL"
-                        ? "individual.account"
-                        : account.accessRole === "ADMIN"
-                          ? "identity.home.administrator"
-                          : "identity.home.member"
+                      account.accessRole === "OWNER"
+                        ? "identity.home.administrator"
+                        : "identity.home.member"
                     )
                   }}</small></span
                 >
@@ -123,11 +171,9 @@
                 ><span>{{ account.email }}</span
                 ><small>{{
                   t(
-                    account.accessRole === "INDIVIDUAL"
-                      ? "individual.account"
-                      : account.accessRole === "ADMIN"
-                        ? "identity.home.administrator"
-                        : "identity.home.member"
+                    account.accessRole === "OWNER"
+                      ? "identity.home.administrator"
+                      : "identity.home.member"
                   )
                 }}</small
                 ><button
@@ -164,7 +210,10 @@
         }
       }
     }
-    <div class="workspace-page" [attr.inert]="mobileOpen() && active() ? '' : null">
+    <div
+      class="workspace-page"
+      [attr.inert]="mobileOpen() && active() ? '' : null"
+    >
       @if (active()) {
         <header class="workspace-topbar">
           <div>
@@ -180,16 +229,24 @@
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg></button
-            ><span>{{ auth.account()?.organizationName ?? t("individual.workspace") }}</span
-            ><span aria-hidden="true">/</span><strong>{{ t(section()) }}</strong>
+            ><span>{{
+              auth.account()?.workspaceName ?? t("individual.workspace")
+            }}</span
+            ><span aria-hidden="true">/</span
+            ><strong>{{ t(section()) }}</strong>
           </div>
-          @if (section() === "workspace.knowledge" && url() !== "/knowledge/new") {
-            <a class="button workspace-capture-shortcut" routerLink="/knowledge/new">{{
-              t("knowledge.newCapture")
-            }}</a>
+          @if (
+            section() === "workspace.knowledge" && url() !== "/knowledge/new"
+          ) {
+            <a
+              class="button workspace-capture-shortcut"
+              routerLink="/knowledge/new"
+              >{{ t("knowledge.newCapture") }}</a
+            >
           } @else {
             <span class="workspace-topbar-status"
-              ><span aria-hidden="true">●</span>{{ t("identity.home.active") }}</span
+              ><span aria-hidden="true">●</span
+              >{{ t("identity.home.active") }}</span
             >
           }
         </header>

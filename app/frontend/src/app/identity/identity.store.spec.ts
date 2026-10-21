@@ -58,15 +58,13 @@ describe('Identity workflow', () => {
   it('can recover from failed verification without reporting success or retaining credentials', () => {
     store.run({ kind: 'verify', id: 'id', token: 'secret' });
     csrf();
-    http
-      .expectOne('/api/registration/verify')
-      .flush(
-        {
-          data: null,
-          error: { code: 'EXPIRED_VERIFICATION', message: 'Expired' },
-        },
-        { status: 400, statusText: 'Bad request' },
-      );
+    http.expectOne('/api/registration/verify').flush(
+      {
+        data: null,
+        error: { code: 'EXPIRED_VERIFICATION', message: 'Expired' },
+      },
+      { status: 400, statusText: 'Bad request' },
+    );
     expect(store.verified()).toBe(false);
     expect(store.error()).toBe('Expired');
     store.run({ kind: 'verify', id: 'id', token: 'replacement' });
@@ -90,7 +88,7 @@ describe('Identity workflow', () => {
     store.run({ kind: 'login', email: 'other@example.com', password: 'other' });
     csrf();
     http.expectOne('/api/auth/login').flush({
-      data: { id: 'one', email: 'ada@example.com', organizationName: 'Acme' },
+      data: { id: 'one', email: 'ada@example.com', workspaceName: 'Acme' },
       error: null,
     });
     expect(store.account()?.id).toBe('one');

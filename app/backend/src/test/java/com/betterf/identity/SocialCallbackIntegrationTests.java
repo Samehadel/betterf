@@ -57,15 +57,10 @@ class SocialCallbackIntegrationTests {
         registry.add("spring.datasource.password", database::getPassword);
     }
 
-    @Autowired
-
-    MockMvc mvc;
-    @Autowired
-    JdbcTemplate jdbc;
-    @Autowired
-    IdentityService identity;
-    @MockitoBean
-    ClientRegistrationRepository registrations;
+    @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired IdentityService identity;
+    @MockitoBean ClientRegistrationRepository registrations;
     static HttpServer server;
     static RSAKey key;
     static String origin;
@@ -120,14 +115,14 @@ class SocialCallbackIntegrationTests {
 
     @BeforeEach
     void setup() {
-        jdbc.execute("TRUNCATE ACCOUNT, ORGANIZATION, REFRESH_SESSION CASCADE");
+        jdbc.execute("TRUNCATE ACCOUNT, WORKSPACE, REFRESH_SESSION CASCADE");
         tokenStatus = 200;
         profileStatus = 200;
         tokenBody.set(
                 "{\"access_token\":\"test-token\",\"token_type\":\"Bearer\",\"expires_in\":3600}");
         profileBody.set(
                 "{\"id\":\"facebook-subject\",\"name\":\"Personal"
-                    + " User\",\"email\":\"person@example.com\"}");
+                        + " User\",\"email\":\"person@example.com\"}");
         when(registrations.findByRegistrationId("facebook")).thenReturn(registration("facebook"));
         when(registrations.findByRegistrationId("linkedin")).thenReturn(registration("linkedin"));
     }
@@ -225,16 +220,13 @@ class SocialCallbackIntegrationTests {
     void facebookMissingVerificationCreatesPersonalSessionAndRejectsRepeatedCallback()
             throws Exception {
         var authorization = begin("facebook");
-        callback("facebook", authorization).andExpect(redirectedUrl("/knowledge"));
+        callback("facebook", authorization)
+                .andExpect(redirectedUrl("/login?social=SIGNUP_REQUIRED"));
         mvc.perform(get("/api/auth/me").session(authorization.session()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.email").value("person@example.com"))
-                .andExpect(jsonPath("$.data.organizationId").isEmpty());
+                .andExpect(status().isUnauthorized());
         callback("facebook", authorization)
                 .andExpect(redirectedUrl("/login?social=PROVIDER_AUTHENTICATION_FAILED"));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Long.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class))
-                .isEqualTo(1);
+        noIdentity();
     }
 
     @Test
@@ -284,15 +276,15 @@ class SocialCallbackIntegrationTests {
         oidcToken(authorization, null, "person@example.com", null, key);
         profileStatus = 503;
         profileBody.set("{}");
-        callback("linkedin", authorization).andExpect(redirectedUrl("/knowledge"));
-        assertThat(identity.current("person@example.com").organizationId()).isNull();
+        callback("linkedin", authorization)
+                .andExpect(redirectedUrl("/login?social=SIGNUP_REQUIRED"));
+        noIdentity();
         var rejected = begin("linkedin");
         oidcToken(rejected, false, "other@example.com", null, key);
         callback("linkedin", rejected)
                 .andExpect(redirectedUrl("/login?social=PROVIDER_EMAIL_UNVERIFIED"));
         assertThat(identity.credentials("other@example.com")).isNull();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class))
-                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class)).isZero();
     }
 
     @Test
@@ -322,8 +314,8 @@ class SocialCallbackIntegrationTests {
 
     @Test
     void existingEmailCreatesPendingLinkWithoutGrantingAccess() throws Exception {
-        identity.registerIndividual(
-                new com.betterf.identity.api.dto.IndividualRegistrationRequest(
+        identity.register(
+                new com.betterf.identity.api.dto.RegistrationRequest(
                         "Person", "person@example.com", "Validpass!"));
         var authorization = begin("facebook");
         callback("facebook", authorization).andExpect(redirectedUrl("/login?social=LINK_REQUIRED"));

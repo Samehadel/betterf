@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import { IdentityApi } from '../identity/identity.api';
+import { firstValueFrom } from 'rxjs';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -15,22 +23,34 @@ import { AcceptanceStore } from './acceptance.store';
 })
 export class AcceptancePage {
   readonly store = inject(AcceptanceStore);
-  private readonly auth = inject(AuthStore);
+  private readonly api = inject(IdentityApi);
+  readonly signingIn = signal(false);
+  readonly loginError = signal('');
+  readonly existingAccount = signal(false);
+  readonly auth = inject(AuthStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder).nonNullable;
   private link: InvitationLink | null = null;
   readonly invalidLink = signal(false);
   readonly form = this.fb.group({
-    fullName: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(200)]],
-    professionalRole: ['', Validators.required],
+    fullName: [
+      '',
+      [
+        Validators.required,
+        Validators.pattern(/\S/),
+        Validators.maxLength(200),
+      ],
+    ],
     password: [
       '',
       [
         Validators.required,
         Validators.minLength(10),
         Validators.maxLength(128),
-        Validators.pattern(/^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u),
+        Validators.pattern(
+          /^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u,
+        ),
       ],
     ],
   });
@@ -54,15 +74,50 @@ export class AcceptancePage {
       if (this.link) this.load();
     });
     effect(() => {
-      // Preview can end an existing browser session; discard any cached account.
-      if (this.store.preview() || this.store.error()) this.auth.clear();
       const account = this.store.account();
-      if (account) this.auth.setAccount(account);
+      if (account) {
+        this.auth.setAccount(account);
+        void this.router.navigateByUrl('/knowledge');
+      }
     });
   }
 
   load() {
     if (this.link && !this.store.submitting()) this.store.load(this.link);
+  }
+
+  async signIn() {
+    const email = this.store.preview()?.email;
+    if (!email || this.signingIn()) return;
+    this.signingIn.set(true);
+    this.loginError.set('');
+    try {
+      const account = await firstValueFrom(
+        this.api.login(email, this.form.controls.password.value),
+      );
+      this.auth.setAccount(account);
+      this.form.controls.password.reset();
+    } catch {
+      this.loginError.set(
+        'Sign in failed. Check your password. For a pending signup, use the same password with Create account and join.',
+      );
+    } finally {
+      this.signingIn.set(false);
+    }
+  }
+
+  async switchAccount() {
+    try {
+      await firstValueFrom(this.api.logout());
+      this.auth.clear();
+      this.existingAccount.set(true);
+    } catch {
+      this.loginError.set('Unable to sign out. Try again.');
+    }
+  }
+
+  acceptExisting() {
+    if (this.link) this.store.accept({ invitation: this.link });
   }
 
   submit() {

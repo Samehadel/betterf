@@ -13,7 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
 import java.util.Map;
 
-/** Sends content-only JSON, never entities, author information, or organization metadata. */
+/** Sends content-only JSON, never entities, author information, or workspace metadata. */
 @RequiredArgsConstructor
 public class SpringAiKnowledgeAi implements KnowledgeAi {
     private static final Resource TITLE_PROMPT =

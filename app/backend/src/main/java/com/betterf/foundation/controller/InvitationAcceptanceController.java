@@ -30,39 +30,29 @@ public class InvitationAcceptanceController {
 
     @PostMapping("/preview")
     public InvitationAcceptanceView preview(
-            @Valid
-            @RequestBody
-            InvitationLinkRequest body,
+            @Valid @RequestBody InvitationLinkRequest body,
             Authentication principal,
             HttpServletRequest request,
             HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         var result = acceptance.preview(body);
-        if (result.email() != null
-                && (principal == null || !result.email().equalsIgnoreCase(principal.getName()))) {
-            clearSession(principal, request, response);
-        }
         return result;
     }
 
     @PostMapping("/accept")
     public AccountView accept(
-            @Valid
-            @RequestBody
-            MemberRegistrationRequest body,
+            @Valid @RequestBody MemberRegistrationRequest body,
             Authentication principal,
             HttpServletRequest request,
             HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         // Commit acceptance before session creation. A retry sees the used-link result, never a
         // login grant.
-        var account = acceptance.accept(body);
+        var account = acceptance.accept(body, principal == null ? null : principal.getName());
         clearSession(principal, request, response);
         var authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
-                        account.email(),
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + account.accessRole())));
+                        account.email(), null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
         login.establish(authentication, request, response);
         return account;
     }

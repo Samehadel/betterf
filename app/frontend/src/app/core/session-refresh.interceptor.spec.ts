@@ -40,10 +40,27 @@ describe('Session recovery', () => {
     csrf();
     const request = http.expectOne('/api/auth/refresh');
     expect(request.request.headers.get('X-CSRF-TOKEN')).toBe('fresh');
-    request.flush({ data: { id: 'refreshed', accessRole: 'ADMIN' } });
+    request.flush({ data: { id: 'refreshed', accessRole: 'OWNER' } });
     expect(TestBed.inject(AuthStore).account()?.id).toBe('refreshed');
     csrf('rotated');
   }
+  it('clears inaccessible knowledge when the selected membership is revoked', () => {
+    const auth = TestBed.inject(AuthStore);
+    auth.setAccount({ id: 'person', workspaceId: 'revoked' } as Account);
+    const version = auth.sessionVersion();
+    client
+      .get('/api/knowledge', { headers: { 'X-Workspace-Id': 'revoked' } })
+      .subscribe({ error: () => undefined });
+    http
+      .expectOne('/api/knowledge')
+      .flush(rejected('WORKSPACE_ACCESS_DENIED'), {
+        status: 403,
+        statusText: 'Forbidden',
+      });
+    expect(auth.account()).toBeNull();
+    expect(auth.sessionVersion()).toBeGreaterThan(version);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/login');
+  });
   it('shares refresh for simultaneous 401s and preserves the original mutation', () => {
     const result = jest.fn();
     client.get('/api/auth/me').subscribe();
@@ -155,7 +172,13 @@ describe('Session recovery', () => {
       .expectOne('https://other.example/api/auth/me')
       .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
   });
-  it.each(['/api/auth/logout', '/api/auth/invitation/preview'])(
+  it('preview preserves the current session and does not initiate logout or refresh', () => {
+    client.post('/api/auth/invitation/preview', {}).subscribe();
+    http.expectOne('/api/auth/invitation/preview').flush({});
+    http.expectNone('/api/auth/refresh');
+    http.expectNone('/api/auth/logout');
+  });
+  it.each(['/api/auth/logout'])(
     'waits for in-flight refresh before %s revokes its replacement cookie',
     (url) => {
       client.get('/api/auth/me').subscribe();

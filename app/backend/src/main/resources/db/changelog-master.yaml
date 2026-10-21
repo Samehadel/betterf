@@ -23,3 +23,5 @@ databaseChangeLog:
       file: db/identity/20261021-001-individuals.sql
   - include:
       file: db/knowledge/20261021-001-personal-tickets.sql
+  - include:
+      file: db/identity/20261021-004-workspaces.sql

@@ -6,5 +6,5 @@ import com.betterf.identity.api.dto.IdentityViews.AccountView;
 public interface InvitationAcceptanceService {
     InvitationAcceptanceView preview(InvitationLinkRequest request);
 
-    AccountView accept(MemberRegistrationRequest request);
+    AccountView accept(MemberRegistrationRequest request, String authenticatedEmail);
 }

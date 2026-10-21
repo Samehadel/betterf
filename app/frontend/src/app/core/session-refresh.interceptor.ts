@@ -74,7 +74,22 @@ export class SessionRefresh {
           },
         ),
       ),
-      tap((result) => this.auth.setAccount(result.data)),
+      tap((result) => {
+        const selected = this.auth.account()?.workspaceId;
+        const workspace = result.data.workspaces?.find(
+          (w) => w.id === selected,
+        );
+        this.auth.setAccount(
+          workspace
+            ? {
+                ...result.data,
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                accessRole: workspace.role,
+              }
+            : result.data,
+        );
+      }),
       switchMap(() => this.csrf()),
     );
   }
@@ -97,7 +112,22 @@ export class SessionRefresh {
         context: new HttpContext().set(INTERNAL, true),
       })
       .pipe(
-        tap((result) => this.auth.setAccount(result.data)),
+        tap((result) => {
+          const selected = this.auth.account()?.workspaceId;
+          const workspace = result.data.workspaces?.find(
+            (w) => w.id === selected,
+          );
+          this.auth.setAccount(
+            workspace
+              ? {
+                  ...result.data,
+                  workspaceId: workspace.id,
+                  workspaceName: workspace.name,
+                  accessRole: workspace.role,
+                }
+              : result.data,
+          );
+        }),
         map(() => true),
         catchError((error) =>
           error instanceof HttpErrorResponse && error.status === 401
@@ -124,7 +154,8 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
   const protectedRequest =
     request.url === '/api/auth/me' ||
     /^\/api\/knowledge(?:[/?]|$)/.test(request.url) ||
-    /^\/api\/invitations(?:[/?]|$)/.test(request.url);
+    /^\/api\/invitations(?:[/?]|$)/.test(request.url) ||
+    /^\/api\/workspaces(?:[/?]|$)/.test(request.url);
   const withCsrf = (csrf: Csrf) =>
     request.clone({ setHeaders: { [csrf.headerName]: csrf.token } });
   const send = () =>
@@ -167,11 +198,20 @@ export const sessionRefreshInterceptor: HttpInterceptorFn = (request, next) => {
           if (request.url !== '/api/auth/me')
             void router.navigateByUrl('/login');
         }
+        if (
+          request.url.startsWith('/api/knowledge') &&
+          error instanceof HttpErrorResponse &&
+          error.status === 403 &&
+          error.error?.error?.code === 'WORKSPACE_ACCESS_DENIED' &&
+          request.headers.get('X-Workspace-Id') === auth.account()?.workspaceId
+        ) {
+          auth.clear();
+          void router.navigateByUrl('/login');
+        }
         return throwError(() => error);
       }),
     );
-  return request.url === '/api/auth/logout' ||
-    request.url === '/api/auth/invitation/preview'
+  return request.url === '/api/auth/logout'
     ? sessions.beforeLogout().pipe(
         switchMap(() => sessions.csrf()),
         switchMap((csrf) => next(withCsrf(csrf))),

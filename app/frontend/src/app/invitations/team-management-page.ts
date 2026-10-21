@@ -50,7 +50,7 @@ export class TeamManagementPage {
       .load()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        if (this.auth.account()?.accessRole === 'ADMIN') this.refresh();
+        if (this.auth.account()?.accessRole === 'OWNER') this.refresh();
       });
   }
 

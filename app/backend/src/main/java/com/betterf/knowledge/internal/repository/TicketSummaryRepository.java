@@ -22,7 +22,7 @@ public class TicketSummaryRepository {
 
     /** Selects only summary fields and applies tenant/type constraints before the keyset limit. */
     public List<TicketSummary> browse(
-            UUID organization, UUID accountId, String type, TicketCursor cursor, int limit) {
+            UUID workspace, UUID accountId, String type, TicketCursor cursor, int limit) {
         var sql =
                 new StringBuilder(
                         """
@@ -33,13 +33,8 @@ public class TicketSummaryRepository {
                         FROM KNOWLEDGE_TICKET WHERE
                         """);
         var parameters = new ArrayList<Object>();
-        if (organization == null) {
-            sql.append(" ORGANIZATION_ID IS NULL AND AUTHOR_ID = ?");
-            parameters.add(accountId);
-        } else {
-            sql.append(" ORGANIZATION_ID = ?");
-            parameters.add(organization);
-        }
+        sql.append(" WORKSPACE_ID = ?");
+        parameters.add(workspace);
         if (!type.isEmpty()) {
             sql.append(" AND CONTENT::jsonb->>'template' = ?");
             parameters.add(type);

@@ -1,3 +1,6 @@
+import { IdentityApi } from './identity.api';
+import { AuthStore } from '../core/auth.store';
+import { firstValueFrom } from 'rxjs';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -11,27 +14,27 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoDirective } from '@jsverse/transloco';
-import { SocialButtons } from './social-buttons';
 import { IdentityStore } from './identity.store';
 @Component({
   selector: 'app-identity-page',
-  imports: [ReactiveFormsModule, RouterLink, TranslocoDirective, SocialButtons],
+  imports: [ReactiveFormsModule, RouterLink, TranslocoDirective],
   templateUrl: './identity-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class IdentityPage {
   readonly store = inject(IdentityStore);
+  private readonly api = inject(IdentityApi);
+  private readonly auth = inject(AuthStore);
+  readonly workspaceBusy = signal(false);
+  readonly workspaceError = signal('');
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   readonly mode = this.route.snapshot.data['mode'] as
-    | 'register'
-    | 'signup'
-    | 'verify'
-    | 'login'
-    | 'company';
-  readonly isRegistration = this.mode === 'register' || this.mode === 'signup';
+    'signup' | 'verify' | 'login' | 'workspace';
+  readonly isRegistration = this.mode === 'signup';
   readonly socialStatus = this.route.snapshot.queryParamMap.get('social');
   readonly socialMessage = [
+    'SIGNUP_REQUIRED',
     'LINK_REQUIRED',
     'PROVIDER_EMAIL_UNVERIFIED',
     'PROVIDER_EMAIL_MISSING',
@@ -43,21 +46,25 @@ export class IdentityPage {
     : '';
   private readonly fb = inject(FormBuilder).nonNullable;
   readonly registration = this.fb.group({
-    companyName: ['', [Validators.required, Validators.maxLength(200)]],
-    website: ['', [Validators.required, Validators.maxLength(253)]],
-    specialization: ['', [Validators.required, Validators.maxLength(200)]],
     fullName: ['', [Validators.required, Validators.maxLength(200)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    email: [
+      '',
+      [Validators.required, Validators.email, Validators.maxLength(254)],
+    ],
     password: [
       '',
       [
         Validators.required,
         Validators.minLength(10),
         Validators.maxLength(128),
-        Validators.pattern(/^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u),
+        Validators.pattern(
+          /^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u,
+        ),
       ],
     ],
-    professionalRole: ['', Validators.required],
+  });
+  readonly workspaceForm = this.fb.group({
+    name: ['', [Validators.required, Validators.maxLength(200)]],
   });
   readonly loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -72,7 +79,11 @@ export class IdentityPage {
     () =>
       Math.max(
         0,
-        Math.ceil((Date.parse(this.store.pending()?.resendAvailableAt ?? '') - this.now()) / 1000),
+        Math.ceil(
+          (Date.parse(this.store.pending()?.resendAvailableAt ?? '') -
+            this.now()) /
+            1000,
+        ),
       ) || 0,
   );
   readonly deliveryMessage = computed(() => {
@@ -88,24 +99,15 @@ export class IdentityPage {
     }
   });
   readonly deliveryInProgress = computed(() =>
-    ['PENDING', 'SENDING', 'FAILED'].includes(this.store.pending()?.deliveryStatus ?? ''),
+    ['PENDING', 'SENDING', 'FAILED'].includes(
+      this.store.pending()?.deliveryStatus ?? '',
+    ),
   );
   private verification: { id: string; token: string } | null = null;
   readonly invalidFragment = signal(false);
   constructor() {
     this.store.clear();
-    if (this.mode === 'register') this.store.loadRoles();
-    if (this.mode === 'signup') {
-      for (const field of [
-        'companyName',
-        'website',
-        'specialization',
-        'professionalRole',
-      ] as const) {
-        this.registration.controls[field].disable();
-      }
-    }
-    if (this.mode === 'company') this.store.run({ kind: 'current' });
+    if (this.mode === 'workspace') this.store.run({ kind: 'current' });
     if (this.mode === 'verify') {
       this.route.fragment.pipe(takeUntilDestroyed()).subscribe((fragment) => {
         // Removing the credential from history must not discard the in-memory link.
@@ -135,7 +137,8 @@ export class IdentityPage {
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
     const deliveryTimer = setInterval(() => {
       const pending = this.store.pending();
-      if (pending && this.deliveryInProgress()) this.store.refreshDelivery(pending.email);
+      if (pending && this.deliveryInProgress())
+        this.store.refreshDelivery(pending.email);
     }, 5000);
     inject(DestroyRef).onDestroy(() => {
       clearInterval(timer);
@@ -143,10 +146,7 @@ export class IdentityPage {
     });
     effect(() => {
       if (this.mode === 'verify' && this.store.verified())
-        void this.router.navigateByUrl(
-          this.store.account()?.organizationId ? '/company' : '/knowledge',
-          { replaceUrl: true },
-        );
+        void this.router.navigateByUrl('/knowledge', { replaceUrl: true });
       if (
         this.mode === 'login' &&
         this.store.account() &&
@@ -155,37 +155,53 @@ export class IdentityPage {
         void this.router.navigateByUrl(
           this.socialStatus === 'LINK_REQUIRED'
             ? '/link-account'
-            : this.store.account()?.organizationId
-              ? '/company'
-              : '/knowledge',
+            : '/knowledge',
         );
       }
       if (
-        this.mode === 'company' &&
+        this.mode === 'workspace' &&
         this.store.account() &&
-        !this.store.account()?.organizationId
+        !this.store.account()?.workspaceId
       ) {
         void this.router.navigateByUrl('/knowledge', { replaceUrl: true });
       }
-      if (this.mode === 'company' && this.store.signedOut())
+      if (this.mode === 'workspace' && this.store.signedOut())
         void this.router.navigateByUrl('/login');
     });
   }
+  async saveWorkspace(rename: boolean) {
+    this.workspaceForm.markAllAsTouched();
+    if (this.workspaceForm.invalid || this.workspaceBusy()) return;
+    const name = this.workspaceForm.controls.name.value.trim();
+    const selected = this.store.account()?.workspaceId;
+    if (!name || (rename && !selected)) return;
+    this.workspaceBusy.set(true);
+    this.workspaceError.set('');
+    try {
+      const account = await firstValueFrom(
+        rename
+          ? this.api.renameWorkspace(selected!, name)
+          : this.api.createWorkspace(name),
+      );
+      this.auth.setAccount(account);
+      this.workspaceForm.reset();
+      await this.router.navigateByUrl('/knowledge');
+    } catch {
+      this.workspaceError.set(
+        'Unable to save the workspace. Check your access and try again.',
+      );
+    } finally {
+      this.workspaceBusy.set(false);
+    }
+  }
+
   register() {
     this.submitted.set(true);
     this.registration.markAllAsTouched();
     if (this.registration.invalid) return;
     const body = this.registration.getRawValue();
     this.resendForm.controls.email.setValue(body.email);
-    if (this.mode === 'signup') {
-      const { fullName, email, password } = body;
-      this.store.run({
-        kind: 'individual',
-        body: { fullName, email, password },
-      });
-    } else {
-      this.store.run({ kind: 'register', body });
-    }
+    this.store.run({ kind: 'register', body });
     this.registration.controls.password.reset();
   }
   login() {
@@ -197,7 +213,8 @@ export class IdentityPage {
     this.loginForm.controls.password.reset();
   }
   resend() {
-    if (this.store.busy() || this.remaining() > 0 || this.deliveryInProgress()) return;
+    if (this.store.busy() || this.remaining() > 0 || this.deliveryInProgress())
+      return;
     const pending = this.store.pending();
     if (pending) {
       this.store.run({ kind: 'resend', email: pending.email });
@@ -211,7 +228,8 @@ export class IdentityPage {
       });
   }
   verify() {
-    if (this.verification) this.store.run({ kind: 'verify', ...this.verification });
+    if (this.verification)
+      this.store.run({ kind: 'verify', ...this.verification });
   }
   invalid(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];

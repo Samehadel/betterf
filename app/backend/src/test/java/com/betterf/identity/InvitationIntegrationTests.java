@@ -53,22 +53,14 @@ class InvitationIntegrationTests {
 
     @BeforeEach
     void setup() {
-        jdbc.execute("TRUNCATE TEAM_INVITATION, VERIFICATION_EMAIL, ACCOUNT, ORGANIZATION CASCADE");
+        jdbc.execute("TRUNCATE TEAM_INVITATION, VERIFICATION_EMAIL, ACCOUNT, WORKSPACE CASCADE");
         when(clock.instant()).thenReturn(now);
         when(mail.send(any(), anyString())).thenReturn("<invitation@test.local>");
         admin("admin@example.com", "acme.com");
     }
 
     void admin(String email, String domain) {
-        identity.register(
-                new RegistrationRequest(
-                        "Acme",
-                        "https://" + domain,
-                        "Engineering",
-                        "Ada",
-                        email,
-                        "Validpass!",
-                        "OTHER"));
+        identity.register(new RegistrationRequest("Ada", email, "Validpass!"));
         var link = new String[1];
         var id = new UUID[1];
         doAnswer(
@@ -84,7 +76,10 @@ class InvitationIntegrationTests {
     }
 
     InvitationView send(String email) {
-        return invitations.send("admin@example.com", new InvitationRequest(email));
+        return invitations.send(
+                "admin@example.com",
+                identity.current("admin@example.com").workspaceId(),
+                new InvitationRequest(email));
     }
 
     void rejected(String email, String code) {
@@ -111,31 +106,32 @@ class InvitationIntegrationTests {
     }
 
     @Test
-    void membershipWinsOverPendingAndSelfAndOtherCompanyAreRejected() {
+    void membershipWinsOverPendingAndSelfAndOtherWorkspaceAreRejected() {
         rejected("admin@example.com", "ALREADY_MEMBER");
         admin("other@example.com", "other.com");
-        rejected("other@example.com", "OTHER_COMPANY_MEMBER");
-        send("new@example.com");
-        // A concurrently accepted invitation must take precedence over the old pending one.
-        jdbc.update("UPDATE ACCOUNT SET EMAIL='new@example.com' WHERE EMAIL='other@example.com'");
-        rejected("new@example.com", "OTHER_COMPANY_MEMBER");
+        assertThat(send("other@example.com").status()).isEqualTo("SMTP_ACCEPTED");
+        assertThat(identity.current("other@example.com").workspaces()).hasSize(1);
+        rejected("other@example.com", "INVITATION_PENDING");
         verify(mail, times(1)).send(any(), anyString());
     }
 
     @Test
-    void pendingOtherCompanyDoesNotReserveMembershipAndExpiredOrRevokedCanBeReplaced() {
+    void pendingOtherWorkspaceDoesNotReserveMembershipAndExpiredOrRevokedCanBeReplaced() {
         send("new@example.com");
         admin("other@example.com", "other.com");
         assertThat(
                         invitations
-                                .send("other@example.com", new InvitationRequest("new@example.com"))
+                                .send(
+                                        "other@example.com",
+                                        identity.current("other@example.com").workspaceId(),
+                                        new InvitationRequest("new@example.com"))
                                 .status())
                 .isEqualTo("SMTP_ACCEPTED");
         when(clock.instant()).thenReturn(now.plus(Duration.ofDays(7)));
         send("new@example.com");
         jdbc.update(
-                "UPDATE TEAM_INVITATION SET STATUS='REVOKED' WHERE ORGANIZATION_ID=(SELECT"
-                        + " ORGANIZATION_ID FROM ACCOUNT WHERE EMAIL='admin@example.com')");
+                "UPDATE TEAM_INVITATION SET STATUS='REVOKED' WHERE WORKSPACE_ID=(SELECT"
+                        + " DEFAULT_WORKSPACE_ID FROM ACCOUNT WHERE EMAIL='admin@example.com')");
         send("new@example.com");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TEAM_INVITATION", Integer.class))
                 .isEqualTo(2);
@@ -144,13 +140,13 @@ class InvitationIntegrationTests {
 
     @Test
     void configurableCapCountsAdminButNotInvitationsAndAlsoBlocksFreshExpiredInvitations() {
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=2");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=2");
         for (int i = 0; i < 4; i++) send("person" + i + "@gmail.com");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Integer.class)).isEqualTo(1);
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=1");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=1");
         assertThatThrownBy(() -> send("fresh@example.com"))
                 .hasMessage(
-                        "Your organization has reached its limit of 1 active accounts. You cannot"
+                        "Your workspace has reached its limit of 1 active accounts. You cannot"
                                 + " send invitations.");
         when(clock.instant()).thenReturn(now.plus(Duration.ofDays(8)));
         rejected("person0@gmail.com", "ACCOUNT_LIMIT");
@@ -159,16 +155,9 @@ class InvitationIntegrationTests {
 
     @Test
     void defaultCapIncludesAdministrator() {
-        var org = identity.current("admin@example.com").organizationId();
+        var workspace = identity.current("admin@example.com").workspaceId();
         for (int i = 0; i < 9; i++)
-            jdbc.update(
-                    "INSERT INTO ACCOUNT(ID, EMAIL, FULL_NAME, PASSWORD_HASH, PROFESSIONAL_ROLE,"
-                            + " STATUS, ORGANIZATION_ID, ACCESS_ROLE, UPDATED_AT) VALUES (?, ?,"
-                            + " 'Member', 'unused', 'OTHER', 'ACTIVE', ?, 'MEMBER', ?)",
-                    UUID.randomUUID(),
-                    "member" + i + "@example.com",
-                    org,
-                    java.sql.Timestamp.from(now));
+            seedMember("member" + i + "@example.com", workspace, now.plusSeconds(i));
         assertThatThrownBy(() -> send("fresh@example.com"))
                 .hasMessageContaining("limit of 10 active accounts");
         verifyNoInteractions(mail);
@@ -207,6 +196,7 @@ class InvitationIntegrationTests {
                                 invitations
                                         .status(
                                                 "admin@example.com",
+                                                identity.current("admin@example.com").workspaceId(),
                                                 new InvitationRequest("new@example.com"))
                                         .status())
                         .isEqualTo("SENDING");
@@ -238,7 +228,7 @@ class InvitationIntegrationTests {
     }
 
     @Test
-    void serviceAndHttpRecheckRoleVerificationCompanyOwnershipCsrfAndInput() throws Exception {
+    void serviceAndHttpRecheckRoleVerificationWorkspaceOwnershipCsrfAndInput() throws Exception {
         mvc.perform(
                         post("/api/invitations")
                                 .with(csrf())
@@ -248,12 +238,18 @@ class InvitationIntegrationTests {
         mvc.perform(
                         post("/api/invitations")
                                 .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId())
                                 .contentType("application/json")
                                 .content("{\"email\":\"new@gmail.com\"}"))
                 .andExpect(status().isForbidden());
         mvc.perform(
                         post("/api/invitations")
                                 .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId())
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"email\":\"invalid\"}"))
@@ -261,6 +257,9 @@ class InvitationIntegrationTests {
         mvc.perform(
                         post("/api/invitations")
                                 .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId())
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"email\":\"new@gmail.com\"}"))
@@ -270,31 +269,56 @@ class InvitationIntegrationTests {
         mvc.perform(
                         post("/api/invitations/status")
                                 .with(user("other@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("other@example.com").workspaceId())
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content("{\"email\":\"new@gmail.com\"}"))
                 .andExpect(status().isNotFound());
-        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE='MEMBER' WHERE EMAIL='admin@example.com'");
+        jdbc.update(
+                "UPDATE WORKSPACE_MEMBERSHIP SET ROLE='MEMBER' WHERE ACCOUNT_ID=(SELECT ID FROM"
+                    + " ACCOUNT WHERE EMAIL='admin@example.com')");
         assertThatThrownBy(() -> send("fresh@example.com"))
                 .isInstanceOfSatisfying(
                         IdentityException.class, e -> assertThat(e.status()).isEqualTo(403));
-        jdbc.update(
-                "UPDATE ACCOUNT SET ACCESS_ROLE='ADMIN', STATUS='PENDING' WHERE"
-                        + " EMAIL='admin@example.com'");
+        jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE" + " EMAIL='admin@example.com'");
         assertThatThrownBy(() -> send("fresh@example.com"))
-                .hasMessageContaining("verified administrator");
+                .hasMessageContaining("Verify your email");
     }
 
     @Test
-    void historySurvivesNavigationAndIsScopedToTheVerifiedAdministratorsCompany() throws Exception {
-        assertThat(invitations.history("admin@example.com", 0).invitations()).isEmpty();
+    void historySurvivesNavigationAndIsScopedToTheVerifiedAdministratorsWorkspace()
+            throws Exception {
+        assertThat(
+                        invitations
+                                .history(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        0)
+                                .invitations())
+                .isEmpty();
         var saved = send("saved@gmail.com");
         admin("other@example.com", "other.com");
-        invitations.send("other@example.com", new InvitationRequest("other-recipient@gmail.com"));
-        assertThat(invitations.history("admin@example.com", 0).invitations())
+        invitations.send(
+                "other@example.com",
+                identity.current("other@example.com").workspaceId(),
+                new InvitationRequest("other-recipient@gmail.com"));
+        assertThat(
+                        invitations
+                                .history(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        0)
+                                .invitations())
                 .extracting(InvitationView::id)
                 .containsExactly(saved.id());
-        mvc.perform(get("/api/invitations").with(user("admin@example.com").roles("ADMIN")))
+        mvc.perform(
+                        get("/api/invitations")
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.invitations[0].email").value("saved@gmail.com"))
                 .andExpect(jsonPath("$.data.invitations[0].status").value("SMTP_ACCEPTED"))
@@ -308,8 +332,16 @@ class InvitationIntegrationTests {
             when(clock.instant()).thenReturn(now.plusSeconds(i));
             send("recipient" + i + "@gmail.com");
         }
-        var first = invitations.history("admin@example.com", 0);
-        var second = invitations.history("admin@example.com", 1);
+        var first =
+                invitations.history(
+                        "admin@example.com",
+                        identity.current("admin@example.com").workspaceId(),
+                        0);
+        var second =
+                invitations.history(
+                        "admin@example.com",
+                        identity.current("admin@example.com").workspaceId(),
+                        1);
         assertThat(first.invitations()).hasSize(25);
         assertThat(first.hasMore()).isTrue();
         assertThat(second.invitations()).hasSize(1);
@@ -322,15 +354,28 @@ class InvitationIntegrationTests {
     void historyRejectsAnonymousUnverifiedAndNonAdministratorAccessAndInvalidPages()
             throws Exception {
         mvc.perform(get("/api/invitations")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/invitations").with(user("admin@example.com").roles("MEMBER")))
-                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/invitations")
+                                .with(user("admin@example.com").roles("MEMBER"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId()))
+                .andExpect(status().isOk());
         mvc.perform(
                         get("/api/invitations")
                                 .param("page", "-1")
-                                .with(user("admin@example.com").roles("ADMIN")))
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId()))
                 .andExpect(status().isBadRequest());
         jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='admin@example.com'");
-        assertThatThrownBy(() -> invitations.history("admin@example.com", 0))
+        assertThatThrownBy(
+                        () ->
+                                invitations.history(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        0))
                 .isInstanceOfSatisfying(
                         IdentityException.class,
                         error -> assertThat(error.status()).isEqualTo(403));
@@ -350,12 +395,21 @@ class InvitationIntegrationTests {
                 .send(any(), anyString());
         var original = send("resend@example.com");
         assertThat(original.sentAt()).isEqualTo(now);
-        assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+        assertThatThrownBy(
+                        () ->
+                                invitations.resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        original.id()))
                 .isInstanceOfSatisfying(
                         IdentityException.class,
                         e -> assertThat(e.code()).isEqualTo("RESEND_COOLDOWN"));
         when(clock.instant()).thenReturn(now.plusSeconds(60));
-        var replacement = invitations.resend("admin@example.com", original.id());
+        var replacement =
+                invitations.resend(
+                        "admin@example.com",
+                        identity.current("admin@example.com").workspaceId(),
+                        original.id());
         assertThat(replacement.expiresAt()).isEqualTo(now.plusSeconds(60).plus(Duration.ofDays(7)));
         assertThat(replacement.sentAt()).isEqualTo(now.plusSeconds(60));
         assertThat(
@@ -368,7 +422,11 @@ class InvitationIntegrationTests {
                 .isNotNull();
         when(clock.instant()).thenReturn(now.plusSeconds(120));
         doThrow(new EmailDeliveryException()).when(mail).send(any(), anyString());
-        var failed = invitations.resend("admin@example.com", original.id());
+        var failed =
+                invitations.resend(
+                        "admin@example.com",
+                        identity.current("admin@example.com").workspaceId(),
+                        original.id());
         assertThat(failed.deliveryFailed()).isTrue();
         assertThat(failed.status()).isEqualTo("SMTP_ACCEPTED");
         assertThat(failed.sentAt()).isEqualTo(replacement.sentAt());
@@ -381,27 +439,54 @@ class InvitationIntegrationTests {
     void failedInvitationsAreListedWithNoSentDateAndRetryChecksCapacityAndEligibility() {
         doThrow(new EmailDeliveryException()).when(mail).send(any(), anyString());
         var failed = send("retry@example.com");
-        assertThat(invitations.sent("admin@example.com").getFirst().sentAt()).isNull();
+        assertThat(
+                        invitations
+                                .sent(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId())
+                                .getFirst()
+                                .sentAt())
+                .isNull();
         when(clock.instant()).thenReturn(now.plusSeconds(60));
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=1");
-        assertThatThrownBy(() -> invitations.resend("admin@example.com", failed.id()))
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=1");
+        assertThatThrownBy(
+                        () ->
+                                invitations.resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        failed.id()))
                 .hasMessageContaining("limit of 1 active accounts");
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=10");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=10");
         doReturn("<retry@test>").when(mail).send(any(), anyString());
-        assertThat(invitations.resend("admin@example.com", failed.id()).status())
+        assertThat(
+                        invitations
+                                .resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        failed.id())
+                                .status())
                 .isEqualTo("SMTP_ACCEPTED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM TEAM_INVITATION", Integer.class))
                 .isEqualTo(1);
         admin("other@example.com", "other.com");
         when(clock.instant()).thenReturn(now.plusSeconds(120));
-        assertThatThrownBy(() -> invitations.resend("other@example.com", failed.id()))
+        assertThatThrownBy(
+                        () ->
+                                invitations.resend(
+                                        "other@example.com",
+                                        identity.current("other@example.com").workspaceId(),
+                                        failed.id()))
                 .isInstanceOfSatisfying(
                         IdentityException.class, e -> assertThat(e.status()).isEqualTo(404));
         jdbc.update("UPDATE ACCOUNT SET EMAIL='retry@example.com' WHERE EMAIL='other@example.com'");
-        assertThatThrownBy(() -> invitations.resend("admin@example.com", failed.id()))
-                .isInstanceOfSatisfying(
-                        IdentityException.class,
-                        e -> assertThat(e.code()).isEqualTo("OTHER_COMPANY_MEMBER"));
+        assertThat(
+                        invitations
+                                .resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        failed.id())
+                                .status())
+                .isEqualTo("SMTP_ACCEPTED");
     }
 
     @Test
@@ -422,57 +507,120 @@ class InvitationIntegrationTests {
                                     new MemberRegistrationRequest(
                                             new InvitationLinkRequest(original.id(), token[0]),
                                             "Member Name",
-                                            "SOFTWARE_ENGINEER",
-                                            "Validpass!"));
+                                            "Validpass!"),
+                                    null);
                             return "<replacement@test>";
                         })
                 .when(mail)
                 .send(any(), anyString());
-        var result = invitations.resend("admin@example.com", original.id());
+        var result =
+                invitations.resend(
+                        "admin@example.com",
+                        identity.current("admin@example.com").workspaceId(),
+                        original.id());
         assertThat(result.status()).isEqualTo("ACCEPTED");
         assertThat(result.sentAt()).isEqualTo(original.sentAt());
-        assertThat(invitations.sent("admin@example.com").getFirst().status()).isEqualTo("ACCEPTED");
-        assertThat(invitations.members("admin@example.com"))
+        assertThat(
+                        invitations
+                                .sent(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId())
+                                .getFirst()
+                                .status())
+                .isEqualTo("ACCEPTED");
+        assertThat(
+                        invitations.members(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
                 .containsExactly(
-                        new ActiveMemberView(
-                                "Member Name", "accepted@example.com", "Software Engineer"),
-                        new ActiveMemberView("Ada", "admin@example.com", "Other"));
-        assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+                        new ActiveMemberView("Member Name", "accepted@example.com", "MEMBER"),
+                        new ActiveMemberView("Ada", "admin@example.com", "OWNER"));
+        assertThatThrownBy(
+                        () ->
+                                invitations.resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        original.id()))
                 .isInstanceOf(IdentityException.class);
     }
 
     @Test
-    void listsAreCompleteOrderedCompanyScopedAndExcludeUnusableLinks() throws Exception {
+    void listsAreCompleteOrderedWorkspaceScopedAndExcludeUnusableLinks() throws Exception {
         for (int i = 0; i < 30; i++) {
             when(clock.instant()).thenReturn(now.plusSeconds(i));
             send("listed" + i + "@example.com");
         }
-        assertThat(invitations.sent("admin@example.com")).hasSize(30);
-        assertThat(invitations.sent("admin@example.com").getFirst().email())
+        assertThat(
+                        invitations.sent(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
+                .hasSize(30);
+        assertThat(
+                        invitations
+                                .sent(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId())
+                                .getFirst()
+                                .email())
                 .isEqualTo("listed29@example.com");
         jdbc.update(
                 "UPDATE TEAM_INVITATION SET STATUS='REVOKED' WHERE EMAIL='listed0@example.com'");
         jdbc.update(
                 "UPDATE TEAM_INVITATION SET EXPIRES_AT=? WHERE EMAIL='listed1@example.com'",
                 java.sql.Timestamp.from(now));
-        assertThat(invitations.sent("admin@example.com")).hasSize(28);
-        assertThat(invitations.members("admin@example.com"))
-                .containsExactly(new ActiveMemberView("Ada", "admin@example.com", "Other"));
+        assertThat(
+                        invitations.sent(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
+                .hasSize(28);
+        assertThat(
+                        invitations.members(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
+                .containsExactly(new ActiveMemberView("Ada", "admin@example.com", "OWNER"));
         admin("other@example.com", "other.com");
-        assertThat(invitations.sent("other@example.com")).isEmpty();
+        assertThat(
+                        invitations.sent(
+                                "other@example.com",
+                                identity.current("other@example.com").workspaceId()))
+                .isEmpty();
         mvc.perform(get("/api/invitations/sent")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/invitations/members").with(user("admin@example.com").roles("MEMBER")))
-                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/invitations/members")
+                                .with(user("admin@example.com").roles("MEMBER"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId()))
+                .andExpect(status().isOk());
         mvc.perform(
                         post("/api/invitations/"
-                                        + invitations.sent("admin@example.com").getFirst().id()
+                                        + invitations
+                                                .sent(
+                                                        "admin@example.com",
+                                                        identity.current("admin@example.com")
+                                                                .workspaceId())
+                                                .getFirst()
+                                                .id()
                                         + "/resend")
-                                .with(user("admin@example.com").roles("ADMIN")))
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId()))
                 .andExpect(status().isForbidden());
-        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE='MEMBER' WHERE EMAIL='admin@example.com'");
-        assertThatThrownBy(() -> invitations.sent("admin@example.com"))
+        jdbc.update(
+                "UPDATE WORKSPACE_MEMBERSHIP SET ROLE='MEMBER' WHERE ACCOUNT_ID=(SELECT ID FROM"
+                    + " ACCOUNT WHERE EMAIL='admin@example.com')");
+        assertThatThrownBy(
+                        () ->
+                                invitations.sent(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId()))
                 .isInstanceOf(IdentityException.class);
-        assertThatThrownBy(() -> invitations.members("admin@example.com"))
+        assertThatThrownBy(
+                        () ->
+                                invitations.members(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId()))
                 .isInstanceOf(IdentityException.class);
     }
 
@@ -499,7 +647,13 @@ class InvitationIntegrationTests {
                 .when(mail)
                 .send(any(), anyString());
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            var first = pool.submit(() -> invitations.resend("admin@example.com", original.id()));
+            var first =
+                    pool.submit(
+                            () ->
+                                    invitations.resend(
+                                            "admin@example.com",
+                                            identity.current("admin@example.com").workspaceId(),
+                                            original.id()));
             try {
                 assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
                 assertThat(
@@ -507,7 +661,12 @@ class InvitationIntegrationTests {
                                         .preview(new InvitationLinkRequest(original.id(), token[0]))
                                         .status())
                         .isEqualTo("READY");
-                assertThatThrownBy(() -> invitations.resend("admin@example.com", original.id()))
+                assertThatThrownBy(
+                                () ->
+                                        invitations.resend(
+                                                "admin@example.com",
+                                                identity.current("admin@example.com").workspaceId(),
+                                                original.id()))
                         .isInstanceOfSatisfying(
                                 IdentityException.class,
                                 e -> assertThat(e.code()).isEqualTo("RESEND_IN_PROGRESS"));
@@ -521,33 +680,72 @@ class InvitationIntegrationTests {
 
     @Test
     void memberListIncludesAdministratorsAndExcludesInactiveAccountsAndOtherCompanies() {
-        var org = identity.current("admin@example.com").organizationId();
-        for (int i = 0; i < 30; i++) {
-            jdbc.update(
-                    "INSERT INTO ACCOUNT(ID, EMAIL, FULL_NAME, PASSWORD_HASH, PROFESSIONAL_ROLE,"
-                            + " STATUS, ORGANIZATION_ID, ACCESS_ROLE, UPDATED_AT) VALUES (?, ?,"
-                            + " 'Member', 'unused', 'OTHER', 'ACTIVE', ?, 'MEMBER', ?)",
-                    UUID.randomUUID(),
-                    "member" + i + "@example.com",
-                    org,
-                    java.sql.Timestamp.from(now.plusSeconds(i)));
-        }
-        assertThat(invitations.members("admin@example.com")).hasSize(31);
-        assertThat(invitations.members("admin@example.com").getFirst().email())
+        var org = identity.current("admin@example.com").workspaceId();
+        for (int i = 0; i < 30; i++)
+            seedMember("member" + i + "@example.com", org, now.plusSeconds(i));
+        assertThat(
+                        invitations.members(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
+                .hasSize(31);
+        assertThat(
+                        invitations
+                                .members(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId())
+                                .getFirst()
+                                .email())
                 .isEqualTo("member29@example.com");
         jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='member0@example.com'");
         admin("other@example.com", "other.com");
-        assertThat(invitations.members("admin@example.com")).hasSize(30);
-        assertThat(invitations.members("admin@example.com"))
+        assertThat(
+                        invitations.members(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
+                .hasSize(30);
+        assertThat(
+                        invitations.members(
+                                "admin@example.com",
+                                identity.current("admin@example.com").workspaceId()))
                 .extracting(ActiveMemberView::email)
                 .contains("admin@example.com")
                 .doesNotContain("other@example.com", "member0@example.com");
-        assertThat(invitations.members("other@example.com"))
-                .containsExactly(new ActiveMemberView("Ada", "other@example.com", "Other"));
+        assertThat(
+                        invitations.members(
+                                "other@example.com",
+                                identity.current("other@example.com").workspaceId()))
+                .containsExactly(new ActiveMemberView("Ada", "other@example.com", "OWNER"));
         jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING' WHERE EMAIL='admin@example.com'");
-        assertThatThrownBy(() -> invitations.members("admin@example.com"))
+        assertThatThrownBy(
+                        () ->
+                                invitations.members(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId()))
                 .isInstanceOf(IdentityException.class);
-        assertThatThrownBy(() -> invitations.resend("admin@example.com", UUID.randomUUID()))
+        assertThatThrownBy(
+                        () ->
+                                invitations.resend(
+                                        "admin@example.com",
+                                        identity.current("admin@example.com").workspaceId(),
+                                        UUID.randomUUID()))
                 .isInstanceOf(IdentityException.class);
+    }
+
+    void seedMember(String email, UUID workspace, Instant updatedAt) {
+        UUID id = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO ACCOUNT(ID, EMAIL, FULL_NAME, PASSWORD_HASH, STATUS,"
+                    + " DEFAULT_WORKSPACE_ID, UPDATED_AT) VALUES (?, ?, 'Member', 'unused',"
+                    + " 'ACTIVE', ?, ?)",
+                id,
+                email,
+                workspace,
+                java.sql.Timestamp.from(updatedAt));
+        jdbc.update(
+                "INSERT INTO WORKSPACE_MEMBERSHIP(ID, ACCOUNT_ID, WORKSPACE_ID, ROLE) VALUES (?, ?,"
+                    + " ?, 'MEMBER')",
+                UUID.randomUUID(),
+                id,
+                workspace);
     }
 }

@@ -6,6 +6,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;
 
-public interface OrganizationRepository extends JpaRepository<OrganizationEntity, UUID> {
-    boolean existsByDomainAndStatus(String domain, OrganizationStatus status);
-}
+public interface WorkspaceRepository extends JpaRepository<WorkspaceEntity, UUID> {}

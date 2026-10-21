@@ -5,7 +5,6 @@ import com.betterf.identity.api.dto.SocialIdentityView;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.SocialIdentityService;
 import com.betterf.identity.internal.entity.*;
-import com.betterf.identity.internal.mapper.AccountMapper;
 import com.betterf.identity.internal.repository.*;
 
 import jakarta.validation.Validator;
@@ -28,7 +27,7 @@ public class SocialIdentityServiceImpl implements SocialIdentityService {
     private final AccountRepository accounts;
     private final OAuthIdentityRepository providers;
     private final RegistrationLocks locks;
-    private final AccountMapper mapper;
+    private final WorkspaceAccess workspaces;
     private final Validator validator;
     private final Clock clock;
 
@@ -49,22 +48,8 @@ public class SocialIdentityServiceImpl implements SocialIdentityService {
                     "LINK_REQUIRED",
                     "Log in using your existing method, then confirm linking this provider.");
         }
-        var account = new AccountEntity();
-        account.setId(UUID.randomUUID());
-        account.setAccountType("INDIVIDUAL");
-        account.setEmail(email);
-        String name = identity.name() == null ? "" : identity.name().trim();
-        account.setFullName(
-                name.isEmpty() ? email : name.substring(0, Math.min(name.length(), 200)));
-        // An invalid encoded-password marker cannot authenticate and supports refresh revocation.
-        account.setPasswordHash("!oauth:" + UUID.randomUUID());
-        account.setProfessionalRole("OTHER");
-        account.setStatus(AccountStatus.ACTIVE);
-        account.setAccessRole("INDIVIDUAL");
-        account.setUpdatedAt(clock.instant());
-        accounts.save(account);
-        attach(account, identity);
-        return mapper.view(account);
+        throw new IdentityException(
+                409, "SIGNUP_REQUIRED", "Create an account using email and password first.");
     }
 
     @Override
@@ -87,7 +72,7 @@ public class SocialIdentityServiceImpl implements SocialIdentityService {
                         409,
                         "PROVIDER_ALREADY_LINKED",
                         "This provider login is already linked to an account. Use its existing"
-                            + " login method.");
+                                + " login method.");
             }
             return view;
         }
@@ -122,7 +107,7 @@ public class SocialIdentityServiceImpl implements SocialIdentityService {
                     400,
                     "PROVIDER_EMAIL_MISSING",
                     "Allow the provider to share a valid email, or sign up using email and"
-                        + " password.");
+                            + " password.");
         }
         return email;
     }
@@ -139,7 +124,7 @@ public class SocialIdentityServiceImpl implements SocialIdentityService {
                     "ACCOUNT_INACTIVE",
                     "Verify your email and log in using your existing method.");
         }
-        return mapper.view(account);
+        return workspaces.view(account, null);
     }
 
     private void attach(AccountEntity account, SocialIdentityView identity) {

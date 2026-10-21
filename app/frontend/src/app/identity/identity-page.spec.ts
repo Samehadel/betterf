@@ -1,3 +1,5 @@
+import { IdentityApi } from './identity.api';
+import { AuthStore } from '../core/auth.store';
 import { signal } from '@angular/core';
 import { Pending } from './identity.api';
 import { TestBed } from '@angular/core/testing';
@@ -16,7 +18,7 @@ describe('Verification link navigation', () => {
       clear: jest.fn(),
       run: jest.fn(),
       verified: signal(false),
-      account: signal({ organizationId: 'company-id' }),
+      account: signal({ workspaceId: 'workspace-id' }),
     };
     const router = {
       navigate: jest.fn().mockResolvedValue(true),
@@ -24,6 +26,8 @@ describe('Verification link navigation', () => {
     };
     TestBed.configureTestingModule({
       providers: [
+        { provide: IdentityApi, useValue: {} },
+        { provide: AuthStore, useValue: {} },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -64,7 +68,7 @@ describe('Verification link navigation', () => {
     expect(page.invalidFragment()).toBe(true);
     store.verified.set(true);
     TestBed.tick();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/company', {
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/knowledge', {
       replaceUrl: true,
     });
   });
@@ -82,12 +86,14 @@ describe('Registration email recovery', () => {
     };
     TestBed.configureTestingModule({
       providers: [
+        { provide: IdentityApi, useValue: {} },
+        { provide: AuthStore, useValue: {} },
         {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
               queryParamMap: convertToParamMap({}),
-              data: { mode: 'register' },
+              data: { mode: 'signup' },
             },
           },
         },
@@ -136,13 +142,13 @@ describe('Registration email recovery', () => {
     expect(store.run).not.toHaveBeenCalled();
   });
 
-  it('shows actionable errors for missing website and invalid email/password', () => {
+  it('shows actionable errors for missing name and invalid email/password', () => {
     const { page, store } = createPage();
     page.registration.controls.email.setValue('invalid');
     page.registration.controls.password.setValue('short');
     page.register();
-    expect(page.invalid('website')).toBe(true);
-    expect(page.fieldError('website')).toBe('identity.errors.website');
+    expect(page.invalid('fullName')).toBe(true);
+    expect(page.fieldError('fullName')).toBe('identity.errors.fullName');
     expect(page.fieldError('email')).toBe('identity.emailError');
     expect(page.fieldError('password')).toBe('identity.passwordHint');
     expect(store.run).not.toHaveBeenCalled();
@@ -158,15 +164,18 @@ describe('Registration email recovery', () => {
     ['A!' + 'a'.repeat(126), true],
     ['Éabcdefg!h', true],
     ['Abcdefgh€i', true],
-  ])('validates the registration password %s consistently with the API', (value, valid) => {
-    const { page } = createPage();
-    page.registration.controls.password.setValue(value);
-    expect(page.registration.controls.password.valid).toBe(valid);
-  });
+  ])(
+    'validates the registration password %s consistently with the API',
+    (value, valid) => {
+      const { page } = createPage();
+      page.registration.controls.password.setValue(value);
+      expect(page.registration.controls.password.valid).toBe(valid);
+    },
+  );
 });
 
 describe('Individual signup', () => {
-  it('submits only personal fields without loading organization roles', () => {
+  it('submits only personal fields without loading workspace roles', () => {
     const store = {
       clear: jest.fn(),
       run: jest.fn(),
@@ -176,6 +185,8 @@ describe('Individual signup', () => {
     };
     TestBed.configureTestingModule({
       providers: [
+        { provide: IdentityApi, useValue: {} },
+        { provide: AuthStore, useValue: {} },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -199,7 +210,7 @@ describe('Individual signup', () => {
     page.register();
     expect(store.loadRoles).not.toHaveBeenCalled();
     expect(store.run).toHaveBeenCalledWith({
-      kind: 'individual',
+      kind: 'register',
       body: {
         fullName: 'Personal User',
         email: 'person@example.com',
@@ -214,7 +225,7 @@ describe('Trusted reauthentication for linking', () => {
   it('keeps the login form open for an existing session until password authentication succeeds', () => {
     const store = {
       clear: jest.fn(),
-      account: signal({ organizationId: null }),
+      account: signal({ workspaceId: null }),
       loginSucceeded: signal(false),
       pending: signal(null),
       busy: signal(false),
@@ -222,6 +233,8 @@ describe('Trusted reauthentication for linking', () => {
     const router = { navigateByUrl: jest.fn() };
     TestBed.configureTestingModule({
       providers: [
+        { provide: IdentityApi, useValue: {} },
+        { provide: AuthStore, useValue: {} },
         {
           provide: ActivatedRoute,
           useValue: {

@@ -22,20 +22,9 @@ public class RegistrationController {
 
     public record ResendRequest(@NotBlank @Email @Size(max = 254) String email) {}
 
-    @GetMapping("/roles")
-    public List<RoleView> roles() {
-        return identity.roles();
-    }
-
     @PostMapping
     public PendingView register(@Valid @RequestBody RegistrationRequest request) {
         return identity.register(request);
-    }
-
-    @PostMapping("/individual")
-    public PendingView registerIndividual(
-            @Valid @RequestBody IndividualRegistrationRequest request) {
-        return identity.registerIndividual(request);
     }
 
     @PostMapping("/resend")

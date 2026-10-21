@@ -11,10 +11,9 @@ const account: Account = {
   id: 'one',
   fullName: 'Ada',
   email: 'ada@example.com',
-  professionalRole: 'OTHER',
-  organizationId: 'org',
-  organizationName: 'Acme',
-  accessRole: 'ADMIN',
+  workspaceId: 'org',
+  workspaceName: 'Acme',
+  accessRole: 'OWNER',
 };
 
 describe('Shared authentication account', () => {

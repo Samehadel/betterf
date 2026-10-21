@@ -15,14 +15,14 @@ for (const viewport of [
       const ids: string[] = [];
       await page.route('**/api/**', async (route) => {
         const path = new URL(route.request().url()).pathname;
-        if (path === '/api/auth/me')
+        if (path === '/api/auth/me' || path.startsWith('/api/workspaces/'))
           return route.fulfill({
             json: {
               data: {
                 id: 'author',
                 fullName: 'Ada',
                 accessRole: 'MEMBER',
-                organizationName: 'Acme',
+                workspaceName: 'Acme',
               },
             },
           });
@@ -198,9 +198,7 @@ for (const viewport of [
       await expect(
         page.getByRole('heading', { name: 'Retry safely' }),
       ).toBeVisible();
-      await expect(
-        page.getByText('Backend', { exact: true }),
-      ).toBeVisible();
+      await expect(page.getByText('Backend', { exact: true })).toBeVisible();
       await expect(page.locator('pre')).toContainText('return key;');
       await page
         .getByRole('link', { name: 'Capture knowledge', exact: true })

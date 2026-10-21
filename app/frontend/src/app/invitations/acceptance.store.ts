@@ -1,8 +1,8 @@
 import { inject } from '@angular/core';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { catchError, EMPTY, exhaustMap, forkJoin, pipe, switchMap, tap } from 'rxjs';
-import { IdentityApi, Account, Role } from '../identity/identity.api';
+import { catchError, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
+import { Account } from '../identity/identity.api';
 import {
   AcceptanceApi,
   AcceptancePreview,
@@ -13,14 +13,13 @@ import {
 export const AcceptanceStore = signalStore(
   withState({
     preview: null as AcceptancePreview | null,
-    roles: [] as Role[],
     account: null as Account | null,
     loading: false,
     submitting: false,
     error: '',
     errorCode: '',
   }),
-  withMethods((store, api = inject(AcceptanceApi), identity = inject(IdentityApi)) => ({
+  withMethods((store, api = inject(AcceptanceApi)) => ({
     load: rxMethod<InvitationLink>(
       pipe(
         switchMap((link) => {
@@ -31,11 +30,8 @@ export const AcceptanceStore = signalStore(
             errorCode: '',
             account: null,
           });
-          return forkJoin({
-            preview: api.preview(link),
-            roles: identity.roles(),
-          }).pipe(
-            tap((result) => patchState(store, { ...result, loading: false })),
+          return api.preview(link).pipe(
+            tap((preview) => patchState(store, { preview, loading: false })),
             catchError(() => {
               patchState(store, {
                 loading: false,
@@ -64,7 +60,12 @@ export const AcceptanceStore = signalStore(
                   : 'acceptance.uncertain',
                 errorCode: code ?? 'UNAVAILABLE',
                 preview:
-                  known && !['INVALID_REQUEST', 'INVALID_ROLE'].includes(code)
+                  known &&
+                  ![
+                    'INVALID_REQUEST',
+                    'SIGN_IN_REQUIRED',
+                    'ACCOUNT_MISMATCH',
+                  ].includes(code)
                     ? null
                     : store.preview(),
               });

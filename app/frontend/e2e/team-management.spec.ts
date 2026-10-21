@@ -24,13 +24,13 @@ for (const viewport of [
       let failMembers = true;
       await page.route('**/api/**', async (route) => {
         const path = new URL(route.request().url()).pathname;
-        if (path === '/api/auth/me')
+        if (path === '/api/auth/me' || path.startsWith('/api/workspaces/'))
           await route.fulfill({
             json: {
               data: {
                 fullName: 'Ada',
-                accessRole: 'ADMIN',
-                organizationName: 'Acme',
+                accessRole: 'OWNER',
+                workspaceName: 'Acme',
               },
             },
           });
@@ -69,7 +69,7 @@ for (const viewport of [
             },
           });
       });
-      await page.goto('/company/team');
+      await page.goto('/workspace/team');
       await expect(
         page.getByRole('tab', { name: 'Sent invitations' }),
       ).toHaveAttribute('aria-selected', 'true');
@@ -129,13 +129,13 @@ for (const viewport of [
         await route.fulfill({
           json: {
             data:
-              path === '/api/auth/me'
-                ? { accessRole: admin ? 'ADMIN' : 'MEMBER' }
+              path === '/api/auth/me' || path.startsWith('/api/workspaces/')
+                ? { accessRole: admin ? 'OWNER' : 'MEMBER' }
                 : [],
           },
         });
       });
-      await page.goto('/company/team');
+      await page.goto('/workspace/team');
       await expect(
         page.getByRole('heading', { name: 'No sent invitations' }),
       ).toBeVisible();

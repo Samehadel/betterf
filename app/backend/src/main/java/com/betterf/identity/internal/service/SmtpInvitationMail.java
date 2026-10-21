@@ -46,18 +46,18 @@ public class SmtpInvitationMail implements InvitationMail {
                             .replace(
                                     "{{expiry}}",
                                     HtmlUtils.htmlEscape(claim.view().expiresAt().toString()))
-                            .replace("{{company}}", HtmlUtils.htmlEscape(claim.companyName()))
+                            .replace("{{workspace}}", HtmlUtils.htmlEscape(claim.workspaceName()))
                             .replace(
                                     "{{administrator}}",
                                     HtmlUtils.htmlEscape(claim.administratorName()));
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(from);
             helper.setTo(claim.view().email());
-            helper.setSubject("You are invited to join your team on BetterF");
+            helper.setSubject("You are invited to join your team on theeverthread");
             helper.setText(
                     claim.administratorName()
                             + " invited you to "
-                            + claim.companyName()
+                            + claim.workspaceName()
                             + ". Accept invitation: "
                             + link
                             + "\nExpires: "

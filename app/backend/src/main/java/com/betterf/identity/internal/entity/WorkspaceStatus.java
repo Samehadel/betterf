@@ -1,6 +1,6 @@
 package com.betterf.identity.internal.entity;
 
-public enum OrganizationStatus {
+public enum WorkspaceStatus {
     PENDING,
     ACTIVE
 }

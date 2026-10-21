@@ -34,20 +34,21 @@ describe('Invitation registration page', () => {
     const page = TestBed.runInInjectionContext(() => new AcceptancePage());
     expect(store.load).toHaveBeenCalledWith({ id, token });
     expect(store.accept).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ replaceUrl: true }));
+    expect(router.navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ replaceUrl: true }),
+    );
     fragments.next(null);
     page.submit();
     expect(store.accept).not.toHaveBeenCalled();
     page.form.setValue({
       fullName: 'Alice',
-      professionalRole: 'OTHER',
       password: 'Memberpass!',
     });
     page.submit();
     expect(store.accept).toHaveBeenCalledWith({
       invitation: { id, token },
       fullName: 'Alice',
-      professionalRole: 'OTHER',
       password: 'Memberpass!',
     });
     expect(page.form.controls.password.value).toBe('');

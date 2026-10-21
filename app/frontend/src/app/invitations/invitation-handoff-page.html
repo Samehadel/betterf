@@ -1,8 +1,8 @@
 <ng-container *transloco="let t">
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
-      <a class="brand" routerLink="/company">BetterF.</a
-      ><a routerLink="/company/invitations">{{ t("invitations.title") }}</a>
+      <a class="brand" routerLink="/workspace">theeverthread.</a
+      ><a routerLink="/workspace/invitations">{{ t("invitations.title") }}</a>
     </nav>
   </header>
   <main class="mx-auto max-w-3xl px-5 py-16">
@@ -13,7 +13,7 @@
       <button type="button" class="button mt-6" (click)="load()">
         {{ t("foundation.retry") }}
       </button>
-    } @else if (account()?.accessRole !== "ADMIN") {
+    } @else if (account()?.accessRole !== "OWNER") {
       <p role="alert">{{ t("invitations.denied") }}</p>
       <a class="button mt-6" routerLink="/login">{{ t("identity.login") }}</a>
     } @else {
@@ -27,7 +27,7 @@
         <p class="my-6 text-[var(--muted)]">
           {{ t("invitations.pendingHint") }}
         </p>
-        <a class="button secondary" routerLink="/company/invitations">{{
+        <a class="button secondary" routerLink="/workspace/invitations">{{
           t("invitations.backToInvitations")
         }}</a>
       </section>

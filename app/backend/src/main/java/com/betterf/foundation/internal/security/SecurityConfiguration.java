@@ -13,7 +13,6 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.password.*;
 import org.springframework.security.web.SecurityFilterChain;
@@ -125,7 +124,6 @@ class SecurityConfiguration {
                                                 "/actuator/health/liveness",
                                                 "/actuator/health/readiness",
                                                 "/api/auth/csrf",
-                                                "/api/registration/roles",
                                                 "/api/auth/social/providers",
                                                 "/api/auth/social/pending",
                                                 "/api/auth/oauth/authorize/*",
@@ -134,7 +132,6 @@ class SecurityConfiguration {
                                         .requestMatchers(
                                                 HttpMethod.POST,
                                                 "/api/registration",
-                                                "/api/registration/individual",
                                                 "/api/registration/resend",
                                                 "/api/registration/status",
                                                 "/api/registration/verify",
@@ -143,13 +140,12 @@ class SecurityConfiguration {
                                                 "/api/auth/login",
                                                 "/api/auth/refresh")
                                         .permitAll()
+                                        .requestMatchers("/api/workspaces", "/api/workspaces/*")
+                                        .authenticated()
                                         .requestMatchers("/actuator/**")
                                         .access(
                                                 (authentication, context) ->
-                                                        new AuthorizationDecision(
-                                                                activeAdministrator(
-                                                                        authentication.get(),
-                                                                        identity)))
+                                                        new AuthorizationDecision(false))
                                         .requestMatchers(HttpMethod.POST, "/api/auth/social/link")
                                         .authenticated()
                                         .requestMatchers(HttpMethod.GET, "/api/auth/me")
@@ -159,13 +155,13 @@ class SecurityConfiguration {
                                                 "/api/invitations",
                                                 "/api/invitations/status",
                                                 "/api/invitations/*/resend")
-                                        .hasRole("ADMIN")
+                                        .authenticated()
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/api/invitations",
                                                 "/api/invitations/sent",
                                                 "/api/invitations/members")
-                                        .hasRole("ADMIN")
+                                        .authenticated()
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/api/knowledge/tickets",
@@ -211,18 +207,6 @@ class SecurityConfiguration {
                                                                         : "ACCESS_DENIED",
                                                                 "Access is denied.")))
                 .build();
-    }
-
-    private boolean activeAdministrator(Authentication authentication, IdentityService identity) {
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getAuthorities().stream()
-                        .noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) return false;
-        try {
-            return "ADMIN".equals(identity.current(authentication.getName()).accessRole());
-        } catch (com.betterf.identity.api.exception.IdentityException exception) {
-            return false;
-        }
     }
 
     private void failure(

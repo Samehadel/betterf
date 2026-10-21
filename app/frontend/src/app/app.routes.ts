@@ -10,6 +10,15 @@ import { Routes } from '@angular/router';
 import { StatusStore } from './foundation/status.store';
 
 export const routes: Routes = [
+  { path: 'register', redirectTo: 'signup', pathMatch: 'full' },
+  { path: 'company', redirectTo: 'knowledge', pathMatch: 'full' },
+  { path: 'company/team', redirectTo: 'workspace/team', pathMatch: 'full' },
+  {
+    path: 'company/invitations',
+    redirectTo: 'workspace/invitations',
+    pathMatch: 'full',
+  },
+
   {
     path: 'knowledge',
     pathMatch: 'full',
@@ -49,12 +58,12 @@ export const routes: Routes = [
       import('./foundation/status-page').then((m) => m.StatusPage),
   },
   {
-    path: 'company/invitations/pending',
-    redirectTo: 'company/team',
+    path: 'workspace/invitations/pending',
+    redirectTo: 'workspace/team',
     pathMatch: 'full',
   },
   {
-    path: 'company/team',
+    path: 'workspace/team',
     providers: [TeamManagementStore],
     loadComponent: () =>
       import('./invitations/team-management-page').then(
@@ -62,20 +71,18 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'company/invitations',
+    path: 'workspace/invitations',
     providers: [InvitationStore],
     loadComponent: () =>
       import('./invitations/invitation-page').then((m) => m.InvitationPage),
   },
-  ...(['register', 'signup', 'verify', 'login', 'company'] as const).map(
-    (mode) => ({
-      path: mode,
-      data: { mode },
-      providers: [IdentityStore],
-      loadComponent: () =>
-        import('./identity/identity-page').then((m) => m.IdentityPage),
-    }),
-  ),
+  ...(['signup', 'verify', 'login', 'workspace'] as const).map((mode) => ({
+    path: mode,
+    data: { mode },
+    providers: [IdentityStore],
+    loadComponent: () =>
+      import('./identity/identity-page').then((m) => m.IdentityPage),
+  })),
   {
     path: 'link-account',
     loadComponent: () =>

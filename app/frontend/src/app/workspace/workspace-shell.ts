@@ -1,3 +1,5 @@
+import { firstValueFrom } from 'rxjs';
+import { IdentityApi } from '../identity/identity.api';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -33,6 +35,9 @@ import { IdentityStore } from '../identity/identity.store';
 })
 export class WorkspaceShell {
   readonly auth = inject(AuthStore);
+  private readonly api = inject(IdentityApi);
+  readonly switchError = signal('');
+  readonly switching = signal(false);
   readonly session = inject(IdentityStore);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -52,8 +57,8 @@ export class WorkspaceShell {
     const url = this.url();
     return (
       !!this.auth.account() &&
-      (url === '/company' ||
-        url.startsWith('/company/') ||
+      (url === '/workspace' ||
+        url.startsWith('/workspace/') ||
         url === '/knowledge' ||
         url.startsWith('/knowledge/'))
     );
@@ -61,8 +66,8 @@ export class WorkspaceShell {
   readonly section = computed(() => {
     if (this.url() === '/knowledge' || this.url().startsWith('/knowledge/'))
       return 'workspace.knowledge';
-    if (this.url() === '/company/invitations') return 'invitations.formTitle';
-    if (this.url().startsWith('/company/team')) return 'workspace.team';
+    if (this.url() === '/workspace/invitations') return 'invitations.formTitle';
+    if (this.url().startsWith('/workspace/team')) return 'workspace.team';
     return 'workspace.home';
   });
   readonly initials = computed(
@@ -88,6 +93,28 @@ export class WorkspaceShell {
         void this.router.navigateByUrl('/login');
       }
     });
+  }
+
+  async switchWorkspace(event: Event) {
+    const picker = event.target as HTMLSelectElement;
+    const id = picker.value;
+    if (this.switching() || id === this.auth.account()?.workspaceId) return;
+    this.switching.set(true);
+    this.switchError.set('');
+    try {
+      // Leaving the current route destroys its caches and runs unsaved-change guards.
+      if (!(await this.router.navigateByUrl('/workspace'))) return;
+      const account = await firstValueFrom(this.api.selectWorkspace(id));
+      this.auth.setAccount(account);
+      await this.router.navigateByUrl('/knowledge');
+    } catch {
+      this.switchError.set(
+        'Unable to open that workspace. Refresh your session and try again.',
+      );
+    } finally {
+      this.switching.set(false);
+      picker.value = this.auth.account()?.workspaceId ?? '';
+    }
   }
 
   openMobile() {
@@ -126,7 +153,7 @@ export class WorkspaceShell {
     if (event.key !== 'Tab') return;
     const controls = Array.from(
       this.sidebar()?.nativeElement.querySelectorAll<HTMLElement>(
-        'a, button:not(:disabled), summary',
+        'a, button:not(:disabled), select:not(:disabled), summary',
       ) ?? [],
     ).filter((element) => element.getClientRects().length > 0);
     const first = controls[0];

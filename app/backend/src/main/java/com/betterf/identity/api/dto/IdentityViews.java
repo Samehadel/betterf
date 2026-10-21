@@ -10,17 +10,17 @@ public final class IdentityViews {
 
     public record VerificationView(String status, AccountView account) {}
 
+    public record WorkspaceView(UUID id, String name, String role) {}
+
     public record AccountView(
             UUID id,
             String fullName,
             String email,
-            String professionalRole,
-            UUID organizationId,
-            String organizationName,
-            String accessRole) {}
+            UUID workspaceId,
+            String workspaceName,
+            String accessRole,
+            java.util.List<WorkspaceView> workspaces) {}
 
     public record CredentialsView(
             String email, String passwordHash, String accessRole, boolean active) {}
-
-    public record RoleView(String id, String label) {}
 }

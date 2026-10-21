@@ -1,12 +1,17 @@
 import { inject } from '@angular/core';
-import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
+import {
+  patchState,
+  signalStore,
+  withComputed,
+  withMethods,
+  withState,
+} from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, Observable, pipe, tap } from 'rxjs';
-import { IdentityApi, Pending, Registration, Role, IndividualRegistration } from './identity.api';
+import { IdentityApi, Pending, Registration } from './identity.api';
 import { AuthStore } from '../core/auth.store';
 type Action =
   | { kind: 'register'; body: Registration }
-  | { kind: 'individual'; body: IndividualRegistration }
   | { kind: 'resend'; email: string }
   | { kind: 'verify'; id: string; token: string }
   | { kind: 'login'; email: string; password: string }
@@ -21,8 +26,6 @@ export const IdentityStore = signalStore(
     verified: false,
     loginSucceeded: false,
     alreadyVerified: false,
-    roles: [] as Role[],
-    rolesError: false,
     signedOut: false,
   }),
   withComputed(() => ({ account: inject(AuthStore).account })),
@@ -38,25 +41,13 @@ export const IdentityStore = signalStore(
         signedOut: false,
       });
     },
-    loadRoles: rxMethod<void>(
-      pipe(
-        exhaustMap(() =>
-          api.roles().pipe(
-            tap((roles) => patchState(store, { roles, rolesError: false })),
-            catchError(() => {
-              patchState(store, { rolesError: true });
-              return EMPTY;
-            }),
-          ),
-        ),
-      ),
-    ),
     refreshDelivery: rxMethod<string>(
       pipe(
         exhaustMap((email) =>
           api.deliveryStatus(email).pipe(
             tap((pending) => {
-              if (store.pending()?.email === email) patchState(store, { pending });
+              if (store.pending()?.email === email)
+                patchState(store, { pending });
             }),
             catchError(() => EMPTY),
           ),
@@ -74,11 +65,6 @@ export const IdentityStore = signalStore(
           });
           let operation: Observable<unknown>;
           switch (action.kind) {
-            case 'individual':
-              operation = api
-                .registerIndividual(action.body)
-                .pipe(tap((pending) => patchState(store, { pending })));
-              break;
             case 'register':
               operation = api
                 .register(action.body)
@@ -95,7 +81,8 @@ export const IdentityStore = signalStore(
                   if (result.account) auth.setAccount(result.account);
                   patchState(store, {
                     verified: !!result.account,
-                    alreadyVerified: result.status === 'ALREADY_VERIFIED' && !result.account,
+                    alreadyVerified:
+                      result.status === 'ALREADY_VERIFIED' && !result.account,
                   });
                 }),
               );

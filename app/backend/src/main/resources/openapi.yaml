@@ -1,46 +1,23 @@
 openapi: 3.1.0
 info:
-  title: BetterF API
+  title: theeverthread API
   version: 0.1.1
   description:
-    'BTF-5 implementation follows the product owner correction of 2026-10-04: separate account,
-    organization, and email-delivery status records. Same-origin session cookie (HttpOnly, SameSite=Lax,
-    Secure by default), 30-minute inactivity timeout. A rotating HttpOnly refresh cookie restores expired sessions for up to 14 days by default. All mutations require CSRF.'
+    One global account with many-to-many workspace memberships. Email/password activation creates one
+    default owned workspace. Invitation acceptance adds membership alongside the default. All protected workspace
+    resources require explicit X-Workspace-Id; mutations require CSRF. Sessions and refresh cookies retain their
+    established lifetimes.
 paths:
-  /api/registration/individual:
-    post:
-      operationId: registerIndividual
-      summary: Create a pending individual account without an organization and queue email verification.
-      description: Requires session-bound CSRF. Canonical email is globally unique. Existing emails return EMAIL_IN_USE without overwriting credentials. Verification, resend and 30-day pending retention reuse the existing registration lifecycle.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [fullName, email, password]
-              properties:
-                fullName: { type: string, minLength: 1, maxLength: 200 }
-                email: { type: string, format: email, maxLength: 254 }
-                password: { type: string, minLength: 10, maxLength: 128, description: Requires uppercase and special characters. }
-      responses:
-        '200':
-          description: Pending registration queued for verification.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/PendingEnvelope' }
-        '400': { description: Invalid name, email, or password. }
-        '403': { description: Missing or invalid CSRF. }
-        '409': { description: EMAIL_IN_USE. Log in or request verification. }
-        '503': { description: Retryable service failure. }
   /api/auth/social/providers:
     get:
       operationId: socialProviders
       security: []
       responses:
-        '200':
-          description: Envelope data contains provider IDs linkedin/facebook and availability booleans. No credentials are returned.
+        "200":
+          description:
+            Envelope data contains provider IDs linkedin/facebook and availability booleans. No credentials
+            are returned.
+      summary: List configured providers for existing accounts.
   /api/auth/oauth/authorize/{provider}:
     get:
       operationId: startSocialAuthentication
@@ -49,9 +26,15 @@ paths:
         - in: path
           name: provider
           required: true
-          schema: { type: string, enum: [linkedin, facebook] }
+          schema:
+            type: string
+            enum:
+              - linkedin
+              - facebook
       responses:
-        '302': { description: Redirect to configured provider with session-bound OAuth state and OIDC nonce where applicable. }
+        "302":
+          description: Redirect to configured provider with session-bound OAuth state and OIDC nonce where applicable.
+      summary: Start trusted provider login or linking.
   /api/auth/oauth/callback/{provider}:
     get:
       operationId: completeSocialAuthentication
@@ -60,166 +43,287 @@ paths:
         - in: path
           name: provider
           required: true
-          schema: { type: string, enum: [linkedin, facebook] }
+          schema:
+            type: string
+            enum:
+              - linkedin
+              - facebook
         - in: query
           name: state
-          schema: { type: string }
+          schema:
+            type: string
         - in: query
           name: code
-          schema: { type: string }
+          schema:
+            type: string
         - in: query
           name: error
-          schema: { type: string }
+          schema:
+            type: string
       responses:
-        '302': { description: Validated authentication redirects to knowledge or explicit linking. Failures redirect to login with a safe error code. No raw provider principal grants product access. }
+        "302":
+          description:
+            Validated authentication redirects to knowledge or explicit linking. Failures redirect to
+            login with a safe error code. New social account creation returns SIGNUP_REQUIRED; only existing identities
+            can log in or link. No raw provider principal grants product access.
+      summary: Complete provider login or linking; new social signup is disabled.
   /api/auth/social/pending:
     get:
       operationId: pendingSocialLink
       security: []
       responses:
-        '200': { description: Envelope data contains provider name or null for this session's live five-minute linking challenge. }
+        "200":
+          description:
+            Envelope data contains provider name or null for this session's live five-minute linking
+            challenge.
+      summary: Read the pending explicit provider-link challenge.
   /api/auth/social/link:
     post:
       operationId: confirmSocialLink
       summary: Link the session-bound provider identity after fresh trusted authentication.
-      description: Requires CSRF, a live server-side challenge, fresh password or already-linked provider authentication after challenge creation, and matching canonical email. Refresh and email verification do not qualify. Provider identity cannot be reassigned.
-      security: [{ SessionCookie: [] }]
+      description:
+        Requires CSRF, a live server-side challenge, fresh password or already-linked provider authentication
+        after challenge creation, and matching canonical email. Refresh and email verification do not qualify. Provider
+        identity cannot be reassigned.
+      security:
+        - SessionCookie: []
       responses:
-        '200': { description: Account envelope for the existing user. Challenge is cleared. }
-        '401': { description: Fresh trusted authentication or a live linking challenge is required. }
-        '403': { description: Invalid CSRF, inactive account, or account email mismatch. }
-        '409': { description: Provider already linked to another account. }
-        '503': { description: Retryable database failure; no partial link. }
+        "200":
+          description: Account envelope for the existing user. Challenge is cleared.
+        "401":
+          description: Fresh trusted authentication or a live linking challenge is required.
+        "403":
+          description: Invalid CSRF, inactive account, or account email mismatch.
+        "409":
+          description: Provider already linked to another account.
+        "503":
+          description: Retryable database failure; no partial link.
   /api/knowledge/tickets:
     get:
       operationId: browseKnowledgeTickets
-      summary: Browse summaries in the active account's personal or organization workspace.
-      description: Ordered by createdAt DESC then id DESC. Details type is applied before keyset pagination. Classification state never affects inclusion or ordering. No full Details or internal job fields are returned.
-      security: [{ SessionCookie: [] }]
+      summary: Browse summaries in the explicitly selected workspace.
+      description:
+        Ordered by createdAt DESC then id DESC. Details type is applied before keyset pagination. Classification
+        state never affects inclusion or ordering. No full Details or internal job fields are returned.
+      security:
+        - SessionCookie: []
       parameters:
         - in: query
           name: detailsType
-          schema: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
+          schema:
+            type: string
+            enum:
+              - Knowledge
+              - Coding
+              - Problem
+              - Decision
+              - Accomplishment
+              - Learning
           description: Omit for all Details writing types; independent of extracted attributes.
         - in: query
           name: limit
-          schema: { type: integer, minimum: 1, default: 20 }
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
           description: Requested size, capped at 50.
         - in: query
           name: cursor
-          schema: { type: string, maxLength: 1024 }
+          schema:
+            type: string
+            maxLength: 1024
           description: Opaque continuation from the same Details type selection.
       responses:
-        '200':
+        "200":
           description: Bounded summaries and an optional continuation cursor.
           content:
             application/json:
               schema:
                 type: object
-                required: [data, error]
+                required:
+                  - data
+                  - error
                 properties:
-                  error: { type: 'null' }
+                  error:
+                    type: "null"
                   data:
                     type: object
-                    required: [items, nextCursor]
+                    required:
+                      - items
+                      - nextCursor
                     properties:
                       items:
                         type: array
                         maxItems: 50
-                        items: { $ref: '#/components/schemas/TicketSummary' }
-                      nextCursor: { type: [string, 'null'] }
-        '400': { description: Invalid Details type, page size, malformed cursor, or cursor/type mismatch. }
-        '401': { description: Authentication required. }
-        '403': { description: Inactive account or organization. }
+                        items:
+                          $ref: "#/components/schemas/TicketSummary"
+                      nextCursor:
+                        type:
+                          - string
+                          - "null"
+        "400":
+          description: Invalid Details type, page size, malformed cursor, or cursor/type mismatch.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Inactive account or workspace.
     post:
       operationId: createKnowledgeTicket
-      summary: Publish a ticket immediately within the active member's organization.
-      description: Same submission ID and content safely return the original ticket. Changed content under the same ID returns 409. Classification runs after commit independently.
-      security: [{ SessionCookie: [] }]
+      summary: Publish a ticket immediately within the active member's workspace.
+      description:
+        Same submission ID and content safely return the original ticket. Changed content under the same
+        ID returns 409. Classification runs after commit independently.
+      security:
+        - SessionCookie: []
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [submissionId, content]
+              required:
+                - submissionId
+                - content
               properties:
-                submissionId: { type: string, format: uuid }
-                content: { $ref: '#/components/schemas/TicketContent' }
+                submissionId:
+                  type: string
+                  format: uuid
+                content:
+                  $ref: "#/components/schemas/TicketContent"
       responses:
-        '201':
+        "201":
           description: Published ticket or an identical previous submission.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TicketEnvelope' }
-        '400': { description: INVALID_TICKET or malformed request. }
-        '401': { description: Authentication required. }
-        '403': { description: Inactive membership or invalid CSRF. }
-        '409': { description: SUBMISSION_CONFLICT. }
+              schema:
+                $ref: "#/components/schemas/TicketEnvelope"
+        "400":
+          description: INVALID_TICKET or malformed request.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Inactive membership or invalid CSRF.
+        "409":
+          description: SUBMISSION_CONFLICT.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/knowledge/tickets/{id}:
     get:
       operationId: getKnowledgeTicket
-      summary: Read a published ticket from the current organization.
-      security: [{ SessionCookie: [] }]
+      summary: Read a published ticket from the current workspace.
+      security:
+        - SessionCookie: []
       parameters:
         - in: path
           name: id
           required: true
-          schema: { type: string, format: uuid }
+          schema:
+            type: string
+            format: uuid
       responses:
-        '200':
+        "200":
           description: Published content and current automatic classification.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TicketEnvelope' }
-        '401': { description: Authentication required. }
-        '403': { description: Inactive membership. }
-        '404': { description: TICKET_NOT_FOUND, including cross-organization access. }
+              schema:
+                $ref: "#/components/schemas/TicketEnvelope"
+        "401":
+          description: Authentication required.
+        "403":
+          description: Inactive membership.
+        "404":
+          description: TICKET_NOT_FOUND, including cross-workspace access.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/knowledge/tickets/refine:
     post:
       operationId: refineKnowledgeTicket
       summary: Concisely rephrase existing wording in the selected Title or Capture.
-      security: [{ SessionCookie: [] }]
+      security:
+        - SessionCookie: []
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RefinementRequest' }
+            schema:
+              $ref: "#/components/schemas/RefinementRequest"
       responses:
-        '200':
+        "200":
           description: Optional suggestions; no content has been persisted or changed.
           content:
             application/json:
               schema:
                 type: object
-                required: [data, error]
+                required:
+                  - data
+                  - error
                 properties:
-                  error: { type: 'null' }
+                  error:
+                    type: "null"
                   data:
                     type: object
-                    required: [field, text]
+                    required:
+                      - field
+                      - text
                     properties:
-                      field: { type: string, enum: [title, capture] }
+                      field:
+                        type: string
+                        enum:
+                          - title
+                          - capture
                       text:
                         type: string
                         minLength: 1
                         maxLength: 1000
                         description: Suggested wording for only the selected field; Title is limited to 200 characters.
-        '400': { description: INVALID_TICKET; complete required Details first. }
-        '401': { description: Authentication required. }
-        '403': { description: Inactive membership or invalid CSRF. }
-        '503': { description: REFINEMENT_UNAVAILABLE; original content remains unchanged. }
+        "400":
+          description: INVALID_TICKET; complete required Details first.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Inactive membership or invalid CSRF.
+        "503":
+          description: REFINEMENT_UNAVAILABLE; original content remains unchanged.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /actuator/health:
     get:
       operationId: aggregateHealth
-      summary: Unwrapped aggregate health status; details require administrator role.
+      summary: Public aggregate health status without privileged details.
       responses:
-        '200': { description: UP. }
-        '503': { description: A configured health contributor is down. }
+        "200":
+          description: UP.
+        "503":
+          description: A configured health contributor is down.
+      security: []
   /actuator/health/{probe}:
     get:
       operationId: healthProbe
@@ -228,415 +332,520 @@ paths:
         - in: path
           name: probe
           required: true
-          schema: { type: string, enum: [liveness, readiness] }
+          schema:
+            type: string
+            enum:
+              - liveness
+              - readiness
       responses:
-        '200': { description: UP. }
-        '503': { description: DOWN or out of service. }
+        "200":
+          description: UP.
+        "503":
+          description: DOWN or out of service.
+      security: []
   /actuator/metrics:
     get:
       operationId: listMetrics
-      summary: Unwrapped metric names, active administrators only.
-      security: [{ SessionCookie: [] }]
+      summary: Metric names are unavailable to product accounts.
+      security:
+        - SessionCookie: []
       responses:
-        '200': { description: Available Micrometer metric names. }
-        '401': { description: Authentication required. }
-        '403': { description: Active administrator required. }
+        "200":
+          description: Available Micrometer metric names.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Product accounts, including workspace owners, are denied.
   /actuator/metrics/{name}:
     get:
       operationId: metricMeasurements
-      summary: Unwrapped measurements and tags, active administrators only.
-      security: [{ SessionCookie: [] }]
+      summary: Metric measurements are unavailable to product accounts.
+      security:
+        - SessionCookie: []
       parameters:
         - in: path
           name: name
           required: true
-          schema: { type: string }
+          schema:
+            type: string
       responses:
-        '200': { description: Metric measurements. }
-        '401': { description: Authentication required. }
-        '403': { description: Active administrator required. }
-        '404': { description: Metric not found. }
+        "200":
+          description: Metric measurements.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Product accounts, including workspace owners, are denied.
+        "404":
+          description: Metric not found.
   /actuator/prometheus:
     get:
       operationId: prometheusScrape
-      summary: Prometheus text exposition, active administrators only.
-      security: [{ SessionCookie: [] }]
+      summary: Prometheus exposition is unavailable to product accounts.
+      security:
+        - SessionCookie: []
       responses:
-        '200': { description: Prometheus metrics, not wrapped in an API envelope. }
-        '401': { description: Authentication required. }
-        '403': { description: Active administrator required. }
+        "200":
+          description: Prometheus metrics, not wrapped in an API envelope.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Product accounts, including workspace owners, are denied.
   /api/auth/invitation/preview:
     post:
       operationId: previewInvitationAcceptance
       summary: Inspect an invitation without registering or activating the recipient.
-      description: |
-        Requires CSRF. Returns READY or a safe invitation outcome. Checks expiry,
-        membership and configured active-account capacity. A recognized link clears
-        a different browser account's session and refresh credential. No-store response.
+      description:
+        Read-only invitation preview. Does not accept membership, sign out, or alter the current session.
+        The UI offers an explicit account switch on recipient mismatch.
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/InvitationLink'
+              $ref: "#/components/schemas/InvitationLink"
       responses:
-        '200':
-          description: Invitation status, message, and recipient/company for recognized credentials.
+        "200":
+          description: Invitation status, message, and recipient/workspace for recognized credentials.
           content:
             application/json:
               schema:
                 type: object
-                required: [data, error]
+                required:
+                  - data
+                  - error
                 properties:
-                  error: { type: 'null' }
+                  error:
+                    type: "null"
                   data:
                     type: object
-                    required: [status, message, companyName, email]
+                    required:
+                      - status
+                      - message
+                      - workspaceName
+                      - email
                     properties:
                       status:
                         type: string
-                        enum: [READY, INVALID_INVITATION, INVITATION_UNUSABLE, INVITATION_USED, ALREADY_MEMBER, OTHER_COMPANY_MEMBER, ACCOUNT_LIMIT]
-                      message: { type: string }
-                      companyName: { type: [string, 'null'] }
-                      email: { type: [string, 'null'] }
-        '400':
+                        enum:
+                          - READY
+                          - INVALID_INVITATION
+                          - INVITATION_UNUSABLE
+                          - INVITATION_USED
+                          - ALREADY_MEMBER
+                          - ACCOUNT_LIMIT
+                      message:
+                        type: string
+                      workspaceName:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+        "400":
           description: Malformed invitation identifier or token.
-        '403':
+        "403":
           description: CSRF_INVALID.
+      security: []
   /api/auth/invitation/accept:
     post:
       operationId: acceptInvitation
       summary: Explicitly register an invited member and establish a browser session.
-      description: |
-        Rechecks invitation, membership and capacity atomically. The company/email
-        come only from the invitation. Uses administrator password and role conventions.
-        Cancels an unfinished recipient administrator signup and invalidates its links.
-        Assigns MEMBER regardless of professional role. Commits before session creation.
-        Used links cannot log in, overwrite data or reactivate accounts. If session setup
-        or the response fails after commit, reconcile via preview and use password login.
+      description:
+        Atomically consume a valid invitation and add workspace membership. New users supply fullName/password
+        and receive a default workspace plus the invited membership. Existing active accounts must sign in as the
+        recipient; pending accounts must supply their original password. Never replaces credentials/profile. Opens
+        the invited workspace. Used links cannot issue sessions.
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [invitation, fullName, professionalRole, password]
+              required:
+                - invitation
               properties:
                 invitation:
-                  $ref: '#/components/schemas/InvitationLink'
-                fullName: { type: string, minLength: 1, maxLength: 200 }
-                professionalRole: { type: string, description: Identifier from registration roles. }
+                  $ref: "#/components/schemas/InvitationLink"
+                fullName:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
                 password:
                   type: string
                   minLength: 10
                   maxLength: 128
                   description: At least one Unicode uppercase letter and punctuation or symbol.
       responses:
-        '200':
+        "200":
           description: Activated member and new session/refresh cookies. No-store response.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountEnvelope'
-        '400':
+                $ref: "#/components/schemas/AccountEnvelope"
+        "400":
           description: INVALID_REQUEST or INVALID_ROLE; invitation unchanged.
-        '403':
+        "403":
           description: CSRF_INVALID.
-        '409':
-          description: INVALID_INVITATION, INVITATION_UNUSABLE, INVITATION_USED, ALREADY_MEMBER, OTHER_COMPANY_MEMBER or ACCOUNT_LIMIT. No membership or account changes.
-        '500':
+        "409":
+          description:
+            INVALID_INVITATION, INVITATION_UNUSABLE, INVITATION_USED, ALREADY_MEMBER or ACCOUNT_LIMIT.
+            No membership or account changes.
+        "500":
           description: Registration or session failure; preview status before retrying, or log in if already accepted.
+      security: []
   /api/invitations:
     get:
       operationId: getInvitationHistory
-      summary: Load saved invitation records for the verified administrator's company.
+      summary: Load saved invitation records for the verified administrator's workspace.
       description: Returns 25 records per page, newest attempt first. Read-only; does not send email or expose tokens.
       security:
         - SessionCookie: []
       parameters:
         - in: query
           name: page
-          schema: { type: integer, minimum: 0, maximum: 85899345, default: 0 }
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 85899345
+            default: 0
       responses:
-        '200':
-          description: Company-scoped invitation records and whether older records exist.
+        "200":
+          description: Workspace-scoped invitation records and whether older records exist.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvitationHistoryEnvelope'
-        '400':
+                $ref: "#/components/schemas/InvitationHistoryEnvelope"
+        "400":
           description: Invalid page.
-        '403':
+        "403":
           description: Verified-administrator authorization denied.
-        '401':
+        "401":
           description: AUTHENTICATION_REQUIRED; session absent or expired.
     post:
       operationId: sendTeamInvitation
-      summary: Send one team invitation as a verified company administrator.
-      description: |
-        Recipient membership is checked before pending invitation status. New sends
-        check the organization's configured active-account cap (default 10), including
+      summary: Send one team invitation as a verified workspace administrator.
+      description:
+        "Recipient membership is checked before pending invitation status. New sends
+
+        check the workspace's configured active-account cap (default 10), including
+
         its administrator. Pending invitations reserve neither membership nor capacity.
+
         SENDING is persisted before SMTP; SMTP_ACCEPTED is success after relay acceptance
+
         and persistence, not guaranteed inbox delivery. FAILED remains retryable.
+
         Repeated requests during SENDING do not submit another email. Lost responses
+
         must be reconciled with /api/invitations/status before retrying.
+
+        "
       security:
         - SessionCookie: []
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
-        $ref: '#/components/requestBodies/InvitationEmail'
+        $ref: "#/components/requestBodies/InvitationEmail"
       responses:
-        '200':
+        "200":
           description: SMTP_ACCEPTED, FAILED, or an already SENDING attempt.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvitationEnvelope'
-        '400':
+                $ref: "#/components/schemas/InvitationEnvelope"
+        "400":
           description: Invalid email; INVALID_REQUEST.
-        '403':
+        "403":
           description: CSRF_INVALID or verified-administrator authorization denied.
-        '401':
+        "401":
           description: AUTHENTICATION_REQUIRED; session absent or expired.
-        '409':
-          description: ALREADY_MEMBER, OTHER_COMPANY_MEMBER, INVITATION_PENDING, or ACCOUNT_LIMIT. No email sent.
-        '500':
+        "409":
+          description: ALREADY_MEMBER, INVITATION_PENDING, or ACCOUNT_LIMIT. No email sent.
+        "500":
           description: Persistence failure; outcome may be uncertain. Check status before retry.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/invitations/sent:
     get:
       operationId: listSentInvitations
-      summary: All pending, failed and accepted invitations in the verified administrator's company.
-      description: |
-        No truncation or pagination. Ordered by COALESCE(sentAt, attemptedAt) descending,
+      summary: All pending, failed and accepted invitations in the verified administrator's workspace.
+      description:
+        "No truncation or pagination. Ordered by COALESCE(sentAt, attemptedAt) descending,
+
         then UUID descending. Expired pending and revoked records are excluded; accepted
+
         and failed records remain visible. sentAt is null until a confirmed SMTP submission.
+
         resendAvailableAt is the latest send/attempt plus 60 seconds. resending indicates
+
         a reserved replacement; deliveryFailed describes a failed delivery attempt without
+
         changing the current link status. No tokens are exposed.
-      security: [{ SessionCookie: [] }]
+
+        "
+      security:
+        - SessionCookie: []
       responses:
-        '200':
-          description: Envelope containing an array of invitation views (id, email, status, expiresAt, message, sentAt, resendAvailableAt, resending, deliveryFailed).
-        '401': { description: Authentication required. }
-        '403': { description: Verified administrator required. }
+        "200":
+          description:
+            Envelope containing an array of invitation views (id, email, status, expiresAt, message,
+            sentAt, resendAvailableAt, resending, deliveryFailed).
+        "401":
+          description: Authentication required.
+        "403":
+          description: Verified administrator required.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/invitations/members:
     get:
       operationId: listActiveMembers
-      summary: All active members, including administrators, of the verified administrator's company.
-      description: |
-        No truncation or pagination. Ordered by activation timestamp (ACCOUNT.UPDATED_AT)
-        descending, then UUID descending. Only ACTIVE accounts with MEMBER or ADMIN access role.
+      summary: All active members, including administrators, of the verified administrator's workspace.
+      description:
+        "No truncation or pagination. Ordered by activation timestamp (ACCOUNT.UPDATED_AT)
+
+        descending, then UUID descending. Only active workspace memberships belonging to active accounts.
+
         Administrator accounts are included in both this list and capacity checks.
-      security: [{ SessionCookie: [] }]
+
+        "
+      security:
+        - SessionCookie: []
       responses:
-        '200':
-          description: Envelope containing an array with fullName, email and professionalRole (display label).
-        '401': { description: Authentication required. }
-        '403': { description: Verified administrator required. }
+        "200":
+          description: Envelope containing an array with fullName, email and role (OWNER or MEMBER).
+        "401":
+          description: Authentication required.
+        "403":
+          description: Verified administrator required.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/invitations/{id}/resend:
     post:
       operationId: resendInvitation
       summary: Replace an eligible invitation after a 60-second cooldown.
-      description: |
-        Company isolation, recipient eligibility and active-account capacity are checked
-        under the same recipient/company locks as acceptance. Only FAILED or unexpired
+      description:
+        "Workspace isolation, recipient eligibility and active-account capacity are checked
+
+        under the same recipient/workspace locks as acceptance. Only FAILED or unexpired
+
         SMTP_ACCEPTED invitations are eligible. Reserve a replacement hash separately and
+
         send outside the transaction. Confirmed submission promotes the replacement with
+
         a fresh seven-day expiry, invalidating the old hash. Failure or SMTP timeout discards
+
         the replacement and preserves the old link/expiry; an ambiguously delivered replacement
+
         is unusable. Acceptance during delivery wins and completion never reopens it.
+
         Persistence failure after SMTP leaves a reserved replacement, blocking duplicate
+
         retries while keeping the old link usable; operational reconciliation is required.
+
         A lost HTTP response must be reconciled by reloading the sent list before retrying.
-      security: [{ SessionCookie: [] }]
+
+        "
+      security:
+        - SessionCookie: []
       parameters:
         - in: path
           name: id
           required: true
-          schema: { type: string, format: uuid }
-        - $ref: '#/components/parameters/InvitationCsrf'
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/InvitationCsrf"
       responses:
-        '200':
-          description: Current invitation view and result message. deliveryFailed=true means no replacement promotion; ACCEPTED means acceptance won the race.
-        '401': { description: Authentication required. }
-        '403': { description: Verified administrator required or CSRF invalid. }
-        '404': { description: Invitation absent or belongs to another company. }
-        '409':
-          description: RESEND_COOLDOWN, RESEND_IN_PROGRESS, INVITATION_UNUSABLE, ALREADY_MEMBER, OTHER_COMPANY_MEMBER or ACCOUNT_LIMIT. Existing invitation unchanged.
-        '500': { description: Uncertain persistence outcome; reload list before retry. }
+        "200":
+          description:
+            Current invitation view and result message. deliveryFailed=true means no replacement promotion;
+            ACCEPTED means acceptance won the race.
+        "401":
+          description: Authentication required.
+        "403":
+          description: Verified administrator required or CSRF invalid.
+        "404":
+          description: Invitation absent or belongs to another workspace.
+        "409":
+          description:
+            RESEND_COOLDOWN, RESEND_IN_PROGRESS, INVITATION_UNUSABLE, ALREADY_MEMBER or ACCOUNT_LIMIT.
+            Existing invitation unchanged.
+        "500":
+          description: Uncertain persistence outcome; reload list before retry.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/invitations/status:
     post:
       operationId: getTeamInvitationSendStatus
-      summary: Reconcile a send outcome within the authenticated administrator's company.
+      summary: Reconcile a send outcome within the authenticated administrator's workspace.
       security:
         - SessionCookie: []
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       requestBody:
-        $ref: '#/components/requestBodies/InvitationEmail'
+        $ref: "#/components/requestBodies/InvitationEmail"
       responses:
-        '200':
+        "200":
           description: Current send state; does not send email.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvitationEnvelope'
-        '400':
+                $ref: "#/components/schemas/InvitationEnvelope"
+        "400":
           description: Invalid email.
-        '403':
+        "403":
           description: CSRF_INVALID or verified-administrator authorization denied.
-        '401':
+        "401":
           description: AUTHENTICATION_REQUIRED; session absent or expired.
-        '404':
-          description: INVITATION_NOT_FOUND in this company; safe to retry sending.
+        "404":
+          description: INVITATION_NOT_FOUND in this workspace; safe to retry sending.
+    parameters:
+      - name: X-Workspace-Id
+        in: header
+        required: true
+        description:
+          Explicit active workspace; the server requires active membership and owner role for invitation
+          management.
+        schema:
+          type: string
+          format: uuid
   /api/status:
     get:
       operationId: getStatus
       summary: Application and database availability
       security: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StatusEnvelope'
-        '503':
+                $ref: "#/components/schemas/StatusEnvelope"
+        "503":
           description: Database unavailable
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/registration/roles:
-    get:
-      operationId: getProfessionalRoles
-      summary: Predefined professional roles for onboarding
-      security: []
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RolesEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /api/registration:
     post:
-      operationId: registerOrganization
-      summary:
-        Persist PENDING organization and account and queue verification email. Repeated email submission
-        reuses original data without overwriting credentials or sending again.
+      operationId: registerAccount
+      summary: Create a pending global account and queue verification.
+      description:
+        Minimal name/email/password signup. Activation provisions exactly one default workspace and owner
+        membership transactionally. Global normalized email uniqueness and existing credentials are preserved.
       security: []
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PendingEnvelope'
-        '400':
-          description: Invalid required input or link
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Missing/invalid CSRF or access denied
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Database unavailable; queued email delivery happens asynchronously.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description:
-            Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
-            behavior.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Registration'
-      parameters:
-        - in: header
-          name: X-CSRF-TOKEN
-          required: true
-          schema:
-            type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+              $ref: "#/components/schemas/Registration"
+      responses:
+        "200":
+          description: Pending registration queued for verification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingEnvelope"
+        "400":
+          description: Invalid name, email, or password.
+        "403":
+          description: Missing or invalid CSRF.
+        "409":
+          description: EMAIL_IN_USE. Log in or request verification.
+        "503":
+          description: Retryable service failure.
   /api/registration/resend:
     post:
       operationId: resendVerification
-      summary: Queue a replacement using the same email row. Coalesce pending or retrying requests.
-        The worker retries failures and rotates the token only after SMTP acceptance.
+      summary:
+        Queue a replacement using the same email row. Coalesce pending or retrying requests. The worker retries
+        failures and rotates the token only after SMTP acceptance.
       security: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PendingEnvelope'
-        '400':
+                $ref: "#/components/schemas/PendingEnvelope"
+        "400":
           description: Invalid required input or link
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
           description: Missing/invalid CSRF or access denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "DUPLICATE_REGISTRATION: You cannot register this workspace. It is already registered."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
           description: Database unavailable; queued email delivery happens asynchronously.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
           description:
             Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
             behavior.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '429':
-          description:
-            'RESEND_COOLDOWN: wait 60 seconds since the last successful send; current link
-            unchanged'
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: "RESEND_COOLDOWN: wait 60 seconds since the last successful send; current link unchanged"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
       requestBody:
         required: true
         content:
@@ -656,7 +865,9 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+          description:
+            Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification
+            sign-in, or logout.
   /api/registration/status:
     post:
       operationId: getRegistrationDeliveryStatus
@@ -675,78 +886,79 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email]
+              required:
+                - email
               properties:
                 email:
                   type: string
                   format: email
                   maxLength: 254
       responses:
-        '200':
+        "200":
           description: Current status; SMTP_ACCEPTED does not mean inbox delivery.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PendingEnvelope'
-        '400':
+                $ref: "#/components/schemas/PendingEnvelope"
+        "400":
           description: Invalid input or registration not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
           description: Missing or invalid CSRF.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /api/registration/verify:
     post:
       operationId: verifyRegistration
       summary:
-        Atomically activate pending account and organization and grant ADMIN. First verification
-        establishes a session and rotates session ID and CSRF. Recheck active-domain uniqueness;
+        Atomically activate the pending account and provision its default workspace with OWNER membership.
+        First verification establishes a session and rotates session ID and CSRF. Recheck active-domain uniqueness;
         losing registrant gets no access. Already-used links never create a new session.
       security: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationEnvelope'
-        '400':
+                $ref: "#/components/schemas/VerificationEnvelope"
+        "400":
           description: Invalid required input or link
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
           description: Missing/invalid CSRF or access denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: 'DUPLICATE_REGISTRATION: You cannot register this company. It is already registered.'
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: "DUPLICATE_REGISTRATION: You cannot register this workspace. It is already registered."
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
           description: Database unavailable; queued email delivery happens asynchronously.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
           description:
             Unexpected failure; outcome may be uncertain. Retry through documented registration/resend
             behavior.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
       requestBody:
         required: true
         content:
@@ -770,51 +982,53 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+          description:
+            Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification
+            sign-in, or logout.
   /api/auth/csrf:
     get:
       operationId: getCsrf
       summary: Establish session and retrieve masked CSRF token. Call before mutations.
       security: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CsrfEnvelope'
+                $ref: "#/components/schemas/CsrfEnvelope"
   /api/auth/login:
     post:
       operationId: login
       summary:
-        Email/password login; both account and organization must be ACTIVE. Rotate session ID and
-        CSRF and issue a rotating refresh cookie.
+        Email/password login; both account and workspace must be ACTIVE. Rotate session ID and CSRF and issue
+        a rotating refresh cookie.
       security: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountEnvelope'
-        '400':
+                $ref: "#/components/schemas/AccountEnvelope"
+        "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: 'LOGIN_FAILED: invalid credentials or inactive account/organization'
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "LOGIN_FAILED: invalid credentials or inactive account/workspace"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
           description: Invalid CSRF
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
       requestBody:
         required: true
         content:
@@ -839,56 +1053,65 @@ paths:
           required: true
           schema:
             type: string
-          description: Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification sign-in, or logout.
+          description:
+            Masked token from /api/auth/csrf; include its session cookie. Refresh after login, verification
+            sign-in, or logout.
   /api/auth/refresh:
     post:
       operationId: refreshSession
       summary: Restore a session and rotate the refresh cookie without extending its absolute expiry
-      description: |
-        Fetch /api/auth/csrf first, including the anonymous session cookie and masked token.
-        Rechecks account and organization status, current role, and password fingerprint.
+      description:
+        "Fetch /api/auth/csrf first, including the anonymous session cookie and masked token.
+
+        Rechecks account and workspace status, current role, and password fingerprint.
+
         On success rotates JSESSIONID, invalidates the CSRF token, and replaces BETTERF_REFRESH.
+
         Fetch CSRF again before retrying a rejected mutation. Never retry uncertain network/server failures.
+
+        "
       security:
         - RefreshCookie: []
       parameters:
-        - $ref: '#/components/parameters/InvitationCsrf'
+        - $ref: "#/components/parameters/InvitationCsrf"
       responses:
-        '200':
+        "200":
           description: Session restored; Cache-Control no-store and rotated HttpOnly cookie.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountEnvelope'
-        '401':
-          description: SESSION_EXPIRED; refresh cookie absent, invalid, expired, replayed, revoked, or account no longer eligible.
+                $ref: "#/components/schemas/AccountEnvelope"
+        "401":
+          description:
+            SESSION_EXPIRED; refresh cookie absent, invalid, expired, replayed, revoked, or account no
+            longer eligible.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
           description: CSRF_INVALID; fetch a new masked CSRF token before submission.
   /api/auth/me:
     get:
       operationId: currentAccount
-      summary: Read active authenticated account and organization; recheck both statuses
+      summary: Read active authenticated account and workspace; recheck both statuses
       security:
         - SessionCookie: []
       responses:
-        '200':
+        "200":
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountEnvelope'
-        '401':
+                $ref: "#/components/schemas/AccountEnvelope"
+        "401":
           description: AUTHENTICATION_REQUIRED; session absent or expired.
-        '403':
-          description: Access denied or account/organization no longer active
+        "403":
+          description: Access denied or account/workspace no longer active
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
   /api/auth/logout:
     post:
       operationId: logout
@@ -902,21 +1125,65 @@ paths:
           schema:
             type: string
       responses:
-        '204':
+        "204":
           description: Logged out, no body
-        '403':
+        "403":
           description: Invalid CSRF
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /api/workspaces:
+    post:
+      operationId: createWorkspace
+      summary: Create an additional owned workspace
+      requestBody: &id002
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses: &id001
+        "200":
+          description: Selected account and workspace membership list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountEnvelope"
+        "403":
+          description: No active workspace access, owner permission, or valid CSRF.
+  /api/workspaces/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: selectWorkspace
+      summary: Validate membership and return selected workspace context
+      responses: *id001
+    patch:
+      operationId: renameWorkspace
+      summary: Owner renames a workspace
+      requestBody: *id002
+      responses: *id001
 components:
   parameters:
     InvitationCsrf:
       in: header
       name: X-CSRF-TOKEN
       required: true
-      schema: { type: string }
+      schema:
+        type: string
       description: Token from /api/auth/csrf with its session cookie.
   requestBodies:
     InvitationEmail:
@@ -925,9 +1192,13 @@ components:
         application/json:
           schema:
             type: object
-            required: [email]
+            required:
+              - email
             properties:
-              email: { type: string, format: email, maxLength: 254 }
+              email:
+                type: string
+                format: email
+                maxLength: 254
   securitySchemes:
     RefreshCookie:
       type: apiKey
@@ -941,58 +1212,138 @@ components:
   schemas:
     TicketSummary:
       type: object
-      required: [id, title, capturePreview, detailsType, authorName, createdAt, classificationStatus, attributes]
+      required:
+        - id
+        - title
+        - capturePreview
+        - detailsType
+        - authorName
+        - createdAt
+        - classificationStatus
+        - attributes
       properties:
-        id: { type: string, format: uuid }
-        title: { type: string, maxLength: 200 }
-        capturePreview: { type: [string, 'null'], maxLength: 280 }
-        detailsType: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
-        authorName: { type: string }
-        createdAt: { type: string, format: date-time }
-        classificationStatus: { type: string, enum: [PENDING, PROCESSING, RETRYING, COMPLETE, FAILED] }
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+        capturePreview:
+          type:
+            - string
+            - "null"
+          maxLength: 280
+        detailsType:
+          type: string
+          enum:
+            - Knowledge
+            - Coding
+            - Problem
+            - Decision
+            - Accomplishment
+            - Learning
+        authorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        classificationStatus:
+          type: string
+          enum:
+            - PENDING
+            - PROCESSING
+            - RETRYING
+            - COMPLETE
+            - FAILED
         attributes:
           type: array
-          items: { type: string }
+          items:
+            type: string
           description: Extracted stable catalog IDs; clients display catalog labels in type, area, technology order.
     InvitationLink:
       type: object
-      required: [id, token]
+      required:
+        - id
+        - token
       properties:
-        id: { type: string, format: uuid }
-        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$', writeOnly: true }
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
     InvitationHistoryEnvelope:
       type: object
-      required: [data, error]
+      required:
+        - data
+        - error
       properties:
-        error: { type: 'null' }
+        error:
+          type: "null"
         data:
           type: object
-          required: [invitations, hasMore]
+          required:
+            - invitations
+            - hasMore
           properties:
             invitations:
               type: array
               maxItems: 25
               items:
-                $ref: '#/components/schemas/InvitationEnvelope/properties/data'
-            hasMore: { type: boolean }
+                $ref: "#/components/schemas/InvitationEnvelope/properties/data"
+            hasMore:
+              type: boolean
     InvitationEnvelope:
       type: object
-      required: [data, error]
+      required:
+        - data
+        - error
       properties:
-        error: { type: 'null' }
+        error:
+          type: "null"
         data:
           type: object
-          required: [id, email, status, expiresAt, message]
+          required:
+            - id
+            - email
+            - status
+            - expiresAt
+            - message
           properties:
-            id: { type: string, format: uuid }
-            email: { type: string, format: email }
-            status: { type: string, enum: [SENDING, SMTP_ACCEPTED, FAILED, REVOKED, ACCEPTED] }
-            expiresAt: { type: string, format: date-time }
-            message: { type: string }
-            sentAt: { type: [string, 'null'], format: date-time }
-            resendAvailableAt: { type: [string, 'null'], format: date-time }
-            resending: { type: boolean }
-            deliveryFailed: { type: boolean }
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            status:
+              type: string
+              enum:
+                - SENDING
+                - SMTP_ACCEPTED
+                - FAILED
+                - REVOKED
+                - ACCEPTED
+            expiresAt:
+              type: string
+              format: date-time
+            message:
+              type: string
+            sentAt:
+              type:
+                - string
+                - "null"
+              format: date-time
+            resendAvailableAt:
+              type:
+                - string
+                - "null"
+              format: date-time
+            resending:
+              type: boolean
+            deliveryFailed:
+              type: boolean
     ErrorEnvelope:
       type: object
       required:
@@ -1000,7 +1351,7 @@ components:
         - error
       properties:
         data:
-          type: 'null'
+          type: "null"
         error:
           type: object
           required:
@@ -1011,16 +1362,6 @@ components:
               type: string
             message:
               type: string
-    Role:
-      type: object
-      required:
-        - id
-        - label
-      properties:
-        id:
-          type: string
-        label:
-          type: string
     Pending:
       type: object
       required:
@@ -1054,10 +1395,12 @@ components:
             - VERIFIED
             - ALREADY_VERIFIED
         account:
-          description: Authenticated account after first verification or when this browser already holds its session. Null for an already-used link without a matching session; use password login.
+          description:
+            Authenticated account after first verification or when this browser already holds its session.
+            Null for an already-used link without a matching session; use password login.
           oneOf:
-            - $ref: '#/components/schemas/Account'
-            - type: 'null'
+            - $ref: "#/components/schemas/Account"
+            - type: "null"
     Csrf:
       type: object
       required:
@@ -1074,10 +1417,10 @@ components:
         - id
         - fullName
         - email
-        - professionalRole
-        - organizationId
-        - organizationName
+        - workspaceId
+        - workspaceName
         - accessRole
+        - workspaces
       properties:
         id:
           type: string
@@ -1087,45 +1430,35 @@ components:
         email:
           type: string
           format: email
-        professionalRole:
-          type: string
-        organizationId:
-          type: [string, 'null']
+        workspaceId:
+          type:
+            - string
+            - "null"
           format: uuid
-          description: Null for an individual account.
-        organizationName:
-          type: [string, 'null']
+          description: Selected workspace in this response; null only when no active memberships remain.
+        workspaceName:
+          type:
+            - string
+            - "null"
         accessRole:
-          type: string
+          type:
+            - string
+            - "null"
           enum:
-            - ADMIN
+            - OWNER
             - MEMBER
-            - INDIVIDUAL
+            - null
+        workspaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/Workspace"
     Registration:
       type: object
       required:
-        - companyName
-        - website
-        - specialization
         - fullName
         - email
         - password
-        - professionalRole
       properties:
-        companyName:
-          type: string
-          minLength: 1
-          maxLength: 200
-        website:
-          type: string
-          maxLength: 253
-          description:
-            HTTPS registry root domain; root slash optional. No subdomain, non-root path, query,
-            fragment, credentials, or explicit port. Valid multi-label registry suffixes supported.
-        specialization:
-          type: string
-          minLength: 1
-          maxLength: 200
         fullName:
           type: string
           minLength: 1
@@ -1138,12 +1471,7 @@ components:
           type: string
           minLength: 10
           maxLength: 128
-          pattern: '^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$'
-          description: At least one uppercase letter and one punctuation or symbol character. Whitespace alone does not count as a special character.
-          writeOnly: true
-        professionalRole:
-          type: string
-          description: ID returned by GET /api/registration/roles. Unrelated to access role.
+          description: Requires uppercase and special characters.
     PendingEnvelope:
       type: object
       required:
@@ -1151,9 +1479,9 @@ components:
         - error
       properties:
         data:
-          $ref: '#/components/schemas/Pending'
+          $ref: "#/components/schemas/Pending"
         error:
-          type: 'null'
+          type: "null"
     VerificationEnvelope:
       type: object
       required:
@@ -1161,9 +1489,9 @@ components:
         - error
       properties:
         data:
-          $ref: '#/components/schemas/Verification'
+          $ref: "#/components/schemas/Verification"
         error:
-          type: 'null'
+          type: "null"
     CsrfEnvelope:
       type: object
       required:
@@ -1171,9 +1499,9 @@ components:
         - error
       properties:
         data:
-          $ref: '#/components/schemas/Csrf'
+          $ref: "#/components/schemas/Csrf"
         error:
-          type: 'null'
+          type: "null"
     AccountEnvelope:
       type: object
       required:
@@ -1181,21 +1509,9 @@ components:
         - error
       properties:
         data:
-          $ref: '#/components/schemas/Account'
+          $ref: "#/components/schemas/Account"
         error:
-          type: 'null'
-    RolesEnvelope:
-      type: object
-      required:
-        - data
-        - error
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Role'
-        error:
-          type: 'null'
+          type: "null"
     StatusEnvelope:
       type: object
       required:
@@ -1212,57 +1528,157 @@ components:
               enum:
                 - UP
         error:
-          type: 'null'
+          type: "null"
     DetailBlock:
       type: object
-      required: [type, text]
+      required:
+        - type
+        - text
       properties:
-        type: { type: string, enum: [paragraph, heading, bulletList, orderedList, link, code] }
-        text: { type: string, maxLength: 30000 }
+        type:
+          type: string
+          enum:
+            - paragraph
+            - heading
+            - bulletList
+            - orderedList
+            - link
+            - code
+        text:
+          type: string
+          maxLength: 30000
         language:
-          type: [string, 'null']
-          description: Required for code only; plaintext, java, typescript, javascript, python, sql, bash, json, yaml, html, css, csharp, cpp, go, rust, kotlin.
+          type:
+            - string
+            - "null"
+          description:
+            Required for code only; plaintext, java, typescript, javascript, python, sql, bash, json,
+            yaml, html, css, csharp, cpp, go, rust, kotlin.
         url:
-          type: [string, 'null']
+          type:
+            - string
+            - "null"
           maxLength: 30000
           description: Required for links only; absolute HTTP(S), without credentials.
     TicketContent:
       type: object
-      required: [title, template, details]
-      description: Required content rejects Unicode whitespace/format-only values. Details count text plus URLs across all blocks in UTF-16 code units, excluding JSON markup, up to 30000. Coding requires a nonempty code block. Lists use one item per line.
+      required:
+        - title
+        - template
+        - details
+      description:
+        Required content rejects Unicode whitespace/format-only values. Details count text plus URLs
+        across all blocks in UTF-16 code units, excluding JSON markup, up to 30000. Coding requires a nonempty code
+        block. Lists use one item per line.
       properties:
-        title: { type: string, minLength: 1, maxLength: 200 }
-        capture: { type: [string, 'null'], maxLength: 1000, description: Optional; may be omitted or blank. }
-        template: { type: string, enum: [Knowledge, Coding, Problem, Decision, Accomplishment, Learning] }
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        capture:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+          description: Optional; may be omitted or blank.
+        template:
+          type: string
+          enum:
+            - Knowledge
+            - Coding
+            - Problem
+            - Decision
+            - Accomplishment
+            - Learning
         details:
           type: array
           minItems: 1
           maxItems: 200
-          items: { $ref: '#/components/schemas/DetailBlock' }
+          items:
+            $ref: "#/components/schemas/DetailBlock"
     TicketEnvelope:
       type: object
-      required: [data, error]
+      required:
+        - data
+        - error
       properties:
-        error: { type: 'null' }
+        error:
+          type: "null"
         data:
           type: object
-          required: [id, content, authorId, authorName, createdAt, classificationStatus, attributes]
+          required:
+            - id
+            - content
+            - authorId
+            - authorName
+            - createdAt
+            - classificationStatus
+            - attributes
           properties:
-            id: { type: string, format: uuid }
-            content: { $ref: '#/components/schemas/TicketContent' }
-            authorId: { type: string, format: uuid }
-            authorName: { type: string }
-            createdAt: { type: string, format: date-time }
-            classificationStatus: { type: string, enum: [PENDING, PROCESSING, RETRYING, COMPLETE, FAILED] }
+            id:
+              type: string
+              format: uuid
+            content:
+              $ref: "#/components/schemas/TicketContent"
+            authorId:
+              type: string
+              format: uuid
+            authorName:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            classificationStatus:
+              type: string
+              enum:
+                - PENDING
+                - PROCESSING
+                - RETRYING
+                - COMPLETE
+                - FAILED
             attributes:
               type: array
               uniqueItems: true
               description: Valid IDs from AttributeCatalog.ALL only. Empty on no-match or before successful classification.
-              items: { type: string }
+              items:
+                type: string
     RefinementRequest:
       type: object
-      required: [field, content]
+      required:
+        - field
+        - content
       properties:
-        field: { type: string, enum: [title, capture] }
-        content: { $ref: '#/components/schemas/TicketContent' }
-      description: Only existing selected-field wording is sent to the provider. Blank fields cannot be refined. Details are not refinement context or targets. All required ticket content must validate. Suggestions retain meaning and are bounded to the original trimmed length plus 20 percent (rounded up), with a minimum four-character allowance, and the field limit.
+        field:
+          type: string
+          enum:
+            - title
+            - capture
+        content:
+          $ref: "#/components/schemas/TicketContent"
+      description:
+        Only existing selected-field wording is sent to the provider. Blank fields cannot be refined.
+        Details are not refinement context or targets. All required ticket content must validate. Suggestions retain
+        meaning and are bounded to the original trimmed length plus 20 percent (rounded up), with a minimum four-character
+        allowance, and the field limit.
+    Workspace:
+      type: object
+      required:
+        - id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            - OWNER
+            - MEMBER
+servers:
+  - url: /
+    description: Same-origin application server
+security:
+  - SessionCookie: []

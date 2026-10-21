@@ -9,16 +9,14 @@
       <a class="navlink" href="#why">{{ t("landing.why_betterf") }}</a>
       <a class="navlink" href="#workflow">{{ t("landing.the_vision") }}</a>
       <a class="navlink" routerLink="/login">{{ t("identity.login") }}</a>
-      <a class="button secondary" routerLink="/register"
+      <a class="button secondary" routerLink="/signup"
         >{{ t("identity.register") }}<span aria-hidden="true">↗</span>
       </a>
     </nav>
   </header>
   <main class="wrap" id="main" tabindex="-1">
     <section class="hero center">
-      <p class="eyebrow">
-        {{ t("landing.organizational_memory_made_useful") }}
-      </p>
+      <p class="eyebrow">{{ t("landing.workspaceal_memory_made_useful") }}</p>
       <h1>
         {{ t("landing.great_teams_shouldn_t") }}<br />{{ t("landing.have_to")
         }}<em>{{ t("landing.learn_twice") }}</em>
@@ -26,9 +24,9 @@
       <p class="lead">{{ t("landing.hero_description") }}</p>
       <div class="actions">
         <a class="button" routerLink="/signup">{{ t("individual.signup") }}</a>
-        <a class="button secondary" routerLink="/register">{{ t("identity.register") }}</a
-        ><a class="button" href="#workflow"
-          >{{ t("landing.explore_the_vision") }}<span aria-hidden="true">↗</span>
+        <a class="button" href="#workflow"
+          >{{ t("landing.explore_the_vision")
+          }}<span aria-hidden="true">↗</span>
         </a>
         <a class="button secondary" href="#why"
           >{{ t("landing.explore_the_idea") }}<span aria-hidden="true">↓</span>
@@ -45,14 +43,20 @@
         <div class="app">
           <aside class="sidebar">
             <strong>◈ &nbsp;{{ t("landing.acme_engineering") }}</strong>
-            <div class="sideitem active">◫ &nbsp;{{ t("landing.team_memory") }}</div>
+            <div class="sideitem active">
+              ◫ &nbsp;{{ t("landing.team_memory") }}
+            </div>
             <div class="sideitem">◇ &nbsp;{{ t("landing.decisions") }}</div>
             <div class="sideitem">↗ &nbsp;{{ t("landing.sources") }}</div>
             <div class="sideitem">◎ &nbsp;{{ t("landing.people") }}</div>
           </aside>
           <div class="appmain">
             <div class="search">
-              <span>⌕ &nbsp;{{ t("landing.find_a_problem_decision_or_lesson") }}</span>
+              <span
+                >⌕ &nbsp;{{
+                  t("landing.find_a_problem_decision_or_lesson")
+                }}</span
+              >
               <span>{{ t("landing.preview_shortcut") }}</span>
             </div>
             <div class="appheading">
@@ -65,21 +69,27 @@
               <span class="symbol">✓</span>
               <span>{{ t("landing.what_fixed_the_checkout_timeout") }}</span>
               <span class="small"
-                >{{ t("landing.problem_resolved") }}&nbsp; · &nbsp;{{ t("landing.today") }}</span
+                >{{ t("landing.problem_resolved") }}&nbsp; · &nbsp;{{
+                  t("landing.today")
+                }}</span
               >
             </div>
             <div class="row">
               <span class="symbol">◇</span>
               <span>{{ t("landing.why_we_chose_asynchronous_exports") }}</span>
               <span class="small"
-                >{{ t("landing.decision") }}&nbsp; · &nbsp;{{ t("landing.yesterday") }}</span
+                >{{ t("landing.decision") }}&nbsp; · &nbsp;{{
+                  t("landing.yesterday")
+                }}</span
               >
             </div>
             <div class="row">
               <span class="symbol">↗</span>
               <span>{{ t("landing.what_we_learned_from_the_release") }}</span>
               <span class="small"
-                >{{ t("landing.lesson") }}&nbsp; · &nbsp;{{ t("landing.mon") }}</span
+                >{{ t("landing.lesson") }}&nbsp; · &nbsp;{{
+                  t("landing.mon")
+                }}</span
               >
             </div>
           </div>
@@ -94,7 +104,9 @@
             {{ t("landing.less_rediscovery_more_progress") }}
           </p>
           <h2>
-            {{ t("landing.your_work_has_context") }}<br />{{ t("landing.give_it_a_place_to_stay") }}
+            {{ t("landing.your_work_has_context") }}<br />{{
+              t("landing.give_it_a_place_to_stay")
+            }}
           </h2>
         </div>
         <p>{{ t("landing.value_description") }}</p>
@@ -125,7 +137,8 @@
           <p>{{ t("landing.closing_description") }}</p>
         </div>
         <a class="button" href="#workflow"
-          >{{ t("landing.explore_the_vision") }}<span aria-hidden="true">↗</span>
+          >{{ t("landing.explore_the_vision")
+          }}<span aria-hidden="true">↗</span>
         </a>
       </div>
     </section>

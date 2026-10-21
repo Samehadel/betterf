@@ -2,15 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { switchMap, map } from 'rxjs';
 export interface Registration {
-  companyName: string;
-  website: string;
-  specialization: string;
   fullName: string;
   email: string;
   password: string;
-  professionalRole: string;
 }
-export type IndividualRegistration = Pick<Registration, 'fullName' | 'email' | 'password'>;
 export interface Provider {
   id: 'linkedin' | 'facebook';
   available: boolean;
@@ -18,20 +13,17 @@ export interface Provider {
 export interface Pending {
   email: string;
   resendAvailableAt: string;
-  deliveryStatus: 'PENDING' | 'SENDING' | 'SMTP_ACCEPTED' | 'FAILED' | 'CANCELLED';
-}
-export interface Role {
-  id: string;
-  label: string;
+  deliveryStatus:
+    'PENDING' | 'SENDING' | 'SMTP_ACCEPTED' | 'FAILED' | 'CANCELLED';
 }
 export interface Account {
   id: string;
   fullName: string;
   email: string;
-  professionalRole: string;
-  organizationId: string | null;
-  organizationName: string | null;
+  workspaceId: string | null;
+  workspaceName: string | null;
   accessRole: string;
+  workspaces: { id: string; name: string; role: string }[];
 }
 interface Envelope<T> {
   data: T;
@@ -40,23 +32,44 @@ interface Envelope<T> {
 @Injectable({ providedIn: 'root' })
 export class IdentityApi {
   private readonly http = inject(HttpClient);
-  roles() {
+  selectWorkspace(id: string) {
     return this.http
-      .get<Envelope<Role[]>>('/api/registration/roles')
+      .get<Envelope<Account>>('/api/workspaces/' + id)
       .pipe(map((result) => result.data));
   }
+  renameWorkspace(id: string, name: string) {
+    return this.http
+      .get<Envelope<{ token: string; headerName: string }>>('/api/auth/csrf')
+      .pipe(
+        switchMap(({ data }) =>
+          this.http.patch<Envelope<Account>>(
+            '/api/workspaces/' + id,
+            { name },
+            { headers: { [data.headerName]: data.token } },
+          ),
+        ),
+        map((result) => result.data),
+      );
+  }
+  createWorkspace(name: string) {
+    return this.post<Account>('/api/workspaces', { name });
+  }
   current() {
-    return this.http.get<Envelope<Account>>('/api/auth/me').pipe(map((result) => result.data));
+    return this.http
+      .get<Envelope<Account>>('/api/auth/me')
+      .pipe(map((result) => result.data));
   }
   private post<T>(url: string, body: unknown) {
-    return this.http.get<Envelope<{ token: string; headerName: string }>>('/api/auth/csrf').pipe(
-      switchMap((csrf) =>
-        this.http.post<Envelope<T>>(url, body, {
-          headers: { [csrf.data.headerName]: csrf.data.token },
-        }),
-      ),
-      map((result) => result?.data),
-    );
+    return this.http
+      .get<Envelope<{ token: string; headerName: string }>>('/api/auth/csrf')
+      .pipe(
+        switchMap((csrf) =>
+          this.http.post<Envelope<T>>(url, body, {
+            headers: { [csrf.data.headerName]: csrf.data.token },
+          }),
+        ),
+        map((result) => result?.data),
+      );
   }
   providers() {
     return this.http
@@ -70,9 +83,6 @@ export class IdentityApi {
   }
   linkProvider() {
     return this.post<Account>('/api/auth/social/link', {});
-  }
-  registerIndividual(body: IndividualRegistration) {
-    return this.post<Pending>('/api/registration/individual', body);
   }
   register(body: Registration) {
     return this.post<Pending>('/api/registration', body);

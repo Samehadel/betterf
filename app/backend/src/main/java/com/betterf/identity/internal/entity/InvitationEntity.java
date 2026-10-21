@@ -16,8 +16,8 @@ public class InvitationEntity {
     @Id private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ORGANIZATION_ID", nullable = false)
-    private OrganizationEntity organization;
+    @JoinColumn(name = "WORKSPACE_ID", nullable = false)
+    private WorkspaceEntity workspace;
 
     @Column(nullable = false, length = 254)
     private String email;

@@ -2,7 +2,8 @@
   <a class="skip-link" href="#main">{{ t("landing.skip_to_content") }}</a>
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
-      <a class="brand" routerLink="/company">BetterF<span class="text-[var(--accent)]">.</span></a
+      <a class="brand" routerLink="/workspace"
+        >theeverthread<span class="text-[var(--accent)]">.</span></a
       ><span class="navlink">{{ t("knowledge.breadcrumb") }}</span>
     </nav>
   </header>
@@ -10,7 +11,9 @@
     <div class="knowledge-writing">
       <div class="flex items-center justify-between gap-4">
         <p class="eyebrow">{{ t("knowledge.eyebrow") }}</p>
-        <a class="button secondary" routerLink="/company">{{ t("knowledge.cancel") }}</a>
+        <a class="button secondary" routerLink="/workspace">{{
+          t("knowledge.cancel")
+        }}</a>
       </div>
       <h1>{{ t("knowledge.title") }}</h1>
       <p class="knowledge-intro">{{ t("knowledge.intro") }}</p>
@@ -20,7 +23,8 @@
           <div class="knowledge-field">
             <div class="knowledge-label">
               <label for="ticket-title"
-                >{{ t("knowledge.fields.title") }} <span>{{ t("knowledge.required") }}</span></label
+                >{{ t("knowledge.fields.title") }}
+                <span>{{ t("knowledge.required") }}</span></label
               ><button
                 class="knowledge-ai"
                 type="button"
@@ -117,10 +121,14 @@
               </div>
               <div class="knowledge-blocks">
                 @for (item of content().details; track $index; let i = $index) {
-                  <div class="knowledge-block" [class.knowledge-code]="item.type === 'code'">
+                  <div
+                    class="knowledge-block"
+                    [class.knowledge-code]="item.type === 'code'"
+                  >
                     <div class="knowledge-block-heading">
                       <label [for]="'block-' + i"
-                        >{{ t("knowledge.blocks." + item.type) }} {{ i + 1 }}</label
+                        >{{ t("knowledge.blocks." + item.type) }}
+                        {{ i + 1 }}</label
                       >
                       <div class="flex items-center gap-2">
                         @if (item.type === "code") {
@@ -128,7 +136,9 @@
                             [name]="'language-' + i"
                             [ngModel]="item.language"
                             (ngModelChange)="block(i, { language: $event })"
-                            [attr.aria-label]="t('knowledge.language') + ' ' + (i + 1)"
+                            [attr.aria-label]="
+                              t('knowledge.language') + ' ' + (i + 1)
+                            "
                           >
                             @for (language of languages; track language) {
                               <option [value]="language">{{ language }}</option>
@@ -139,20 +149,26 @@
                           type="button"
                           (click)="move(i, -1)"
                           [disabled]="i === 0"
-                          [attr.aria-label]="t('knowledge.moveUp') + ' ' + (i + 1)"
+                          [attr.aria-label]="
+                            t('knowledge.moveUp') + ' ' + (i + 1)
+                          "
                         >
                           ↑</button
                         ><button
                           type="button"
                           (click)="move(i, 1)"
                           [disabled]="i === content().details.length - 1"
-                          [attr.aria-label]="t('knowledge.moveDown') + ' ' + (i + 1)"
+                          [attr.aria-label]="
+                            t('knowledge.moveDown') + ' ' + (i + 1)
+                          "
                         >
                           ↓</button
                         ><button
                           type="button"
                           (click)="remove(i)"
-                          [attr.aria-label]="t('knowledge.remove') + ' ' + (i + 1)"
+                          [attr.aria-label]="
+                            t('knowledge.remove') + ' ' + (i + 1)
+                          "
                         >
                           ×
                         </button>
@@ -163,7 +179,13 @@
                       [name]="'block-' + i"
                       [ngModel]="item.text"
                       (ngModelChange)="block(i, { text: $event })"
-                      [rows]="item.type === 'code' ? 6 : item.type === 'heading' ? 1 : 3"
+                      [rows]="
+                        item.type === 'code'
+                          ? 6
+                          : item.type === 'heading'
+                            ? 1
+                            : 3
+                      "
                       maxlength="30000"
                       [spellcheck]="item.type !== 'code'"
                       [class.font-mono]="item.type === 'code'"
@@ -172,7 +194,9 @@
                     ></textarea>
                     @if (item.type === "link") {
                       <div class="knowledge-link-input">
-                        <label [for]="'url-' + i">{{ t("knowledge.url") }}</label
+                        <label [for]="'url-' + i">{{
+                          t("knowledge.url")
+                        }}</label
                         ><input
                           [id]="'url-' + i"
                           [name]="'url-' + i"
@@ -189,13 +213,23 @@
               </div>
             </div>
             <div class="knowledge-hint">
-              <span [class.field-error]="length() > 30000">{{ length() }}/30,000</span
-              ><button type="button" class="text-link" (click)="preview.set(!preview())">
-                {{ t(preview() ? "knowledge.hidePreview" : "knowledge.preview") }}
+              <span [class.field-error]="length() > 30000"
+                >{{ length() }}/30,000</span
+              ><button
+                type="button"
+                class="text-link"
+                (click)="preview.set(!preview())"
+              >
+                {{
+                  t(preview() ? "knowledge.hidePreview" : "knowledge.preview")
+                }}
               </button>
             </div>
             @if (preview()) {
-              <section class="knowledge-preview" [attr.aria-label]="t('knowledge.preview')">
+              <section
+                class="knowledge-preview"
+                [attr.aria-label]="t('knowledge.preview')"
+              >
                 <app-details-view [blocks]="content().details" />
               </section>
             }
@@ -208,9 +242,14 @@
         }
         <div class="knowledge-publish">
           <p>
-            {{ t("knowledge.visibility") }}<br /><span>{{ t("knowledge.autoAttributes") }}</span>
+            {{ t("knowledge.visibility") }}<br /><span>{{
+              t("knowledge.autoAttributes")
+            }}</span>
           </p>
-          <button class="button" [disabled]="!valid() || store.busy() || store.refining()">
+          <button
+            class="button"
+            [disabled]="!valid() || store.busy() || store.refining()"
+          >
             {{ t(store.busy() ? "knowledge.publishing" : "knowledge.publish") }}
           </button>
         </div>
@@ -252,27 +291,19 @@
           <div class="flex flex-wrap gap-2">
             <button type="button" class="button" (click)="accept()">
               {{ t("knowledge.accept") }}</button
-            ><button type="button" class="button secondary" (click)="store.discard()">
+            ><button
+              type="button"
+              class="button secondary"
+              (click)="store.discard()"
+            >
               {{ t("knowledge.discard") }}
             </button>
           </div>
         </section>
       }
       <hr />
-      <h3>
-        {{
-          t(
-            auth.account()?.organizationId
-              ? "knowledge.organizationVisibility"
-              : "individual.private"
-          )
-        }}
-      </h3>
-      <p>
-        {{
-          t(auth.account()?.organizationId ? "knowledge.organizationHint" : "individual.visibility")
-        }}
-      </p>
+      <h3>{{ t("knowledge.workspaceVisibility") }}</h3>
+      <p>{{ t("knowledge.workspaceHint") }}</p>
       <h3>{{ t("knowledge.attributes") }}</h3>
       <p>{{ t("knowledge.attributeHint") }}</p>
       <p class="knowledge-hint">{{ t("knowledge.externalAi") }}</p>

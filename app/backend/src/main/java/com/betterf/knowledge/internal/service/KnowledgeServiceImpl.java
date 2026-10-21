@@ -34,8 +34,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     @Transactional
-    public TicketView create(String email, CreateTicketRequest request) {
-        var account = identity.current(email);
+    public TicketView create(String email, UUID workspaceId, CreateTicketRequest request) {
+        var account = identity.current(email, workspaceId);
         if (request == null || request.submissionId() == null)
             TicketRules.invalid("A submission ID is required.");
         TicketRules.validate(request.content());
@@ -47,7 +47,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 account.id() + ":" + request.submissionId());
         var existing = tickets.findByAuthorIdAndSubmissionId(account.id(), request.submissionId());
         if (existing.isPresent()) {
-            if (!mapper.content(existing.get().getContent()).equals(request.content()))
+            if (!existing.get().getWorkspaceId().equals(workspaceId)
+                    || !mapper.content(existing.get().getContent()).equals(request.content()))
                 throw new KnowledgeException(
                         409,
                         "SUBMISSION_CONFLICT",
@@ -58,7 +59,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         var ticket = new TicketEntity();
         ticket.setId(UUID.randomUUID());
         ticket.setAuthorId(account.id());
-        ticket.setOrganizationId(account.organizationId());
+        ticket.setWorkspaceId(account.workspaceId());
         ticket.setAuthorName(account.fullName());
         ticket.setSubmissionId(request.submissionId());
         ticket.setContent(json.writeValueAsString(request.content()));
@@ -71,11 +72,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     @Transactional(readOnly = true)
-    public TicketView get(String email, UUID id) {
-        var account = identity.current(email);
-        return (account.organizationId() == null
-                        ? tickets.findByIdAndAuthorIdAndOrganizationIdIsNull(id, account.id())
-                        : tickets.findByIdAndOrganizationId(id, account.organizationId()))
+    public TicketView get(String email, UUID workspaceId, UUID id) {
+        var account = identity.current(email, workspaceId);
+        return tickets.findByIdAndWorkspaceId(id, account.workspaceId())
                 .map(mapper::view)
                 .orElseThrow(
                         () ->
@@ -88,15 +87,19 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     @Transactional(readOnly = true)
     public TicketPage browse(
-            String email, String detailsType, Integer limit, String encodedCursor) {
-        var account = identity.current(email);
+            String email,
+            UUID workspaceId,
+            String detailsType,
+            Integer limit,
+            String encodedCursor) {
+        var account = identity.current(email, workspaceId);
         var type = detailsType == null ? "" : detailsType;
         if (detailsType != null && !TicketRules.TEMPLATES.contains(type))
             TicketRules.invalid("Choose a supported Details type.");
         if (limit != null && limit < 1) TicketRules.invalid("Page size must be positive.");
         int size = limit == null ? 20 : Math.min(limit, 50);
         var cursor = TicketCursor.decode(encodedCursor, type);
-        var rows = summaries.browse(account.organizationId(), account.id(), type, cursor, size + 1);
+        var rows = summaries.browse(account.workspaceId(), account.id(), type, cursor, size + 1);
         var items = rows.stream().limit(size).toList();
         String next = null;
         if (rows.size() > size) {
@@ -107,8 +110,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public RefinementView refine(String email, RefinementRequest request) {
-        identity.current(email);
+    public RefinementView refine(String email, UUID workspaceId, RefinementRequest request) {
+        identity.current(email, workspaceId);
         if (request == null
                 || !("title".equals(request.field()) || "capture".equals(request.field()))) {
             TicketRules.invalid("Choose Title or Capture for refinement.");

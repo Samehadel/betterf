@@ -52,31 +52,18 @@ class IndividualIdentityIntegrationTests {
         registry.add("spring.datasource.password", database::getPassword);
     }
 
-    @Autowired
-
-    IdentityService identity;
-    @Autowired
-    SocialIdentityService social;
-    @Autowired
-    KnowledgeService knowledge;
-    @Autowired
-    InvitationAcceptanceService acceptance;
-    @Autowired
-    InvitationTransactions invitations;
-    @Autowired
-    VerificationEmailWorker worker;
-    @Autowired
-    PendingRegistrationCleanup cleanup;
-    @Autowired
-    JdbcTemplate jdbc;
-    @Autowired
-    MockMvc mvc;
-    @Autowired
-    JsonMapper json;
-    @MockitoBean
-    VerificationMail mail;
-    @MockitoBean
-    Clock clock;
+    @Autowired IdentityService identity;
+    @Autowired SocialIdentityService social;
+    @Autowired KnowledgeService knowledge;
+    @Autowired InvitationAcceptanceService acceptance;
+    @Autowired InvitationTransactions invitations;
+    @Autowired VerificationEmailWorker worker;
+    @Autowired PendingRegistrationCleanup cleanup;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mvc;
+    @Autowired JsonMapper json;
+    @MockitoBean VerificationMail mail;
+    @MockitoBean Clock clock;
     final Instant now = Instant.parse("2026-10-21T00:00:00Z");
     final Map<String, Link> links = new ConcurrentHashMap<>();
 
@@ -86,7 +73,7 @@ class IndividualIdentityIntegrationTests {
 
     @BeforeEach
     void setup() {
-        jdbc.execute("TRUNCATE ACCOUNT, ORGANIZATION, REFRESH_SESSION CASCADE");
+        jdbc.execute("TRUNCATE ACCOUNT, WORKSPACE, REFRESH_SESSION CASCADE");
         when(clock.instant()).thenReturn(now);
         doAnswer(
                         call -> {
@@ -99,8 +86,8 @@ class IndividualIdentityIntegrationTests {
                 .send(anyString(), any(), anyString());
     }
 
-    IndividualRegistrationRequest request(String email) {
-        return new IndividualRegistrationRequest("Personal User", email, password);
+    RegistrationRequest request(String email) {
+        return new RegistrationRequest("Personal User", email, password);
     }
 
     SocialIdentityView provider(String provider, String subject, String email, Boolean verified) {
@@ -108,25 +95,17 @@ class IndividualIdentityIntegrationTests {
     }
 
     void activate(String email) {
-        identity.registerIndividual(request(email));
+        identity.register(request(email));
         worker.runOnce();
         var link = links.get(email.toLowerCase(Locale.ROOT));
         identity.verify(link.id(), link.token());
     }
 
-    UUID organization() {
-        identity.register(
-                new RegistrationRequest(
-                        "Example",
-                        "https://example.com",
-                        "Software",
-                        "Admin",
-                        "admin@example.com",
-                        password,
-                        "OTHER"));
+    UUID workspace() {
+        identity.register(new RegistrationRequest("Admin", "admin@example.com", password));
         worker.runOnce();
         var link = links.get("admin@example.com");
-        return identity.verify(link.id(), link.token()).account().organizationId();
+        return identity.verify(link.id(), link.token()).account().workspaceId();
     }
 
     void code(Runnable operation, String code) {
@@ -138,15 +117,18 @@ class IndividualIdentityIntegrationTests {
 
     @Test
     void normalizationPreservesLegitimateDomainCharacters() {
-        var account =
-                social.authenticate(provider("linkedin", "gov-user", " Person@example.gov ", true));
+        activate("Person@example.gov");
+        var account = identity.current("person@example.gov");
         assertThat(account.email()).isEqualTo("person@example.gov");
         code(() -> identity.resend(account.email()), "EMAIL_IN_USE");
     }
 
     @Test
     void socialOnlyAccountsRejectPasswordLoginWithoutServerErrors() throws Exception {
-        social.authenticate(provider("facebook", "social-only", "person@example.com", null));
+        activate("person@example.com");
+        jdbc.update(
+                "UPDATE ACCOUNT SET PASSWORD_HASH='!oauth:legacy' WHERE"
+                    + " EMAIL='person@example.com'");
         mvc.perform(
                         post("/api/auth/login")
                                 .with(csrf())
@@ -162,15 +144,15 @@ class IndividualIdentityIntegrationTests {
     }
 
     @Test
-    void passwordSignupCreatesNoOrganizationAndGatesAccessUntilVerification() throws Exception {
+    void passwordSignupCreatesDefaultWorkspaceOnlyAfterVerification() throws Exception {
         mvc.perform(
-                        post("/api/registration/individual")
+                        post("/api/registration")
                                 .with(csrf())
                                 .contentType("application/json")
                                 .content(json.writeValueAsString(request("Person@Example.com"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.email").value("person@example.com"));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ORGANIZATION", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM WORKSPACE", Long.class)).isZero();
         assertThat(identity.credentials("PERSON@example.com").active()).isFalse();
         code(() -> identity.current("person@example.com"), "ACCESS_DENIED");
         mvc.perform(
@@ -188,12 +170,12 @@ class IndividualIdentityIntegrationTests {
         worker.runOnce();
         var link = links.get("person@example.com");
         var account = identity.verify(link.id(), link.token()).account();
-        assertThat(account.organizationId()).isNull();
-        assertThat(account.accessRole()).isEqualTo("INDIVIDUAL");
+        assertThat(account.workspaceId()).isNotNull();
+        assertThat(account.accessRole()).isEqualTo("OWNER");
         assertThat(identity.verify(link.id(), link.token()).account()).isNull();
         assertThat(identity.credentials("person@example.com").active()).isTrue();
         mvc.perform(
-                        post("/api/registration/individual")
+                        post("/api/registration")
                                 .contentType("application/json")
                                 .content(json.writeValueAsString(request("other@example.com"))))
                 .andExpect(status().isForbidden());
@@ -201,7 +183,7 @@ class IndividualIdentityIntegrationTests {
 
     @Test
     void verificationResendExpiryAndRetentionApplyToIndividuals() {
-        identity.registerIndividual(request("person@example.com"));
+        identity.register(request("person@example.com"));
         worker.runOnce();
         var old = links.get("person@example.com");
         code(() -> identity.resend("person@example.com"), "RESEND_COOLDOWN");
@@ -219,48 +201,34 @@ class IndividualIdentityIntegrationTests {
     }
 
     @Test
-    void allAccountKindsShareNormalizedEmailAndIndividualsCannotConvert() {
-        organization();
-        code(() -> identity.registerIndividual(request("ADMIN@example.com")), "EMAIL_IN_USE");
+    void oneAccountCanJoinSeveralWorkspacesWithoutChangingIdentity() {
+        var first = workspace();
         activate("person@example.com");
-        code(() -> identity.registerIndividual(request("PERSON@example.com")), "EMAIL_IN_USE");
-        code(
-                () ->
-                        identity.register(
-                                new RegistrationRequest(
-                                        "Other",
-                                        "https://other.com",
-                                        "Software",
-                                        "Other",
-                                        "person@example.com",
-                                        password,
-                                        "OTHER")),
-                "EMAIL_IN_USE");
-        assertThatThrownBy(
-                        () ->
-                                jdbc.update(
-                                        "UPDATE ACCOUNT SET ACCOUNT_TYPE='ORGANIZATION',"
-                                            + " ORGANIZATION_ID=(SELECT ID FROM ORGANIZATION LIMIT"
-                                            + " 1), ACCESS_ROLE='MEMBER' WHERE"
-                                            + " EMAIL='person@example.com'"))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        code(() -> identity.register(request("PERSON@example.com")), "EMAIL_IN_USE");
+        var account = identity.current("person@example.com");
+        jdbc.update(
+                "INSERT INTO WORKSPACE_MEMBERSHIP(ID, ACCOUNT_ID, WORKSPACE_ID, ROLE) VALUES (?, ?,"
+                    + " ?, 'MEMBER')",
+                UUID.randomUUID(),
+                account.id(),
+                first);
+        assertThat(identity.current("person@example.com").workspaces()).hasSize(2);
         assertThatThrownBy(
                         () ->
                                 jdbc.update(
                                         "UPDATE ACCOUNT SET EMAIL=' Person@example.com ' WHERE"
-                                                + " EMAIL='person@example.com'"))
+                                            + " EMAIL='person@example.com'"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    void socialVerificationRulesAndRetriesAreAtomic() {
-        var verified = provider("linkedin", "one", "Person@Example.com", true);
-        var account = social.authenticate(verified);
-        assertThat(social.authenticate(verified).id()).isEqualTo(account.id());
-        assertThat(
-                        social.authenticate(provider("facebook", "two", "other@example.com", null))
-                                .organizationId())
-                .isNull();
+    void unlinkedSocialSignupRemainsUnavailableWithoutCreatingIdentity() {
+        code(
+                () -> social.authenticate(provider("linkedin", "one", "person@example.com", true)),
+                "SIGNUP_REQUIRED");
+        code(
+                () -> social.authenticate(provider("facebook", "two", "other@example.com", null)),
+                "SIGNUP_REQUIRED");
         code(
                 () ->
                         social.authenticate(
@@ -269,12 +237,8 @@ class IndividualIdentityIntegrationTests {
         code(
                 () -> social.authenticate(provider("facebook", "four", null, null)),
                 "PROVIDER_EMAIL_MISSING");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class))
-                .isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Long.class)).isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM VERIFICATION_EMAIL", Long.class))
-                .isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ORGANIZATION", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Long.class)).isZero();
     }
 
     @Test
@@ -321,8 +285,7 @@ class IndividualIdentityIntegrationTests {
                                     start.await();
                                     try {
                                         if (operation % 2 == 0)
-                                            identity.registerIndividual(
-                                                    request("race@example.com"));
+                                            identity.register(request("race@example.com"));
                                         else
                                             social.authenticate(
                                                     provider(
@@ -332,7 +295,10 @@ class IndividualIdentityIntegrationTests {
                                                             null));
                                     } catch (IdentityException expected) {
                                         assertThat(expected.code())
-                                                .isIn("EMAIL_IN_USE", "LINK_REQUIRED");
+                                                .isIn(
+                                                        "EMAIL_IN_USE",
+                                                        "LINK_REQUIRED",
+                                                        "SIGNUP_REQUIRED");
                                     }
                                     return null;
                                 }));
@@ -343,12 +309,12 @@ class IndividualIdentityIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM OAUTH_IDENTITY", Long.class))
                 .isLessThanOrEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ORGANIZATION", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM WORKSPACE", Long.class)).isZero();
     }
 
     @Test
-    void personalCreationBrowsingAndViewingAreIsolatedFromEveryOtherScope() {
-        organization();
+    void defaultWorkspaceKnowledgeIsIsolatedFromOtherWorkspaces() {
+        workspace();
         activate("person@example.com");
         activate("other@example.com");
         var content =
@@ -360,81 +326,127 @@ class IndividualIdentityIntegrationTests {
                                 new TicketContent.DetailBlock(
                                         "code", "return key;", "java", null)));
         var request = new CreateTicketRequest(UUID.randomUUID(), content);
-        var personal = knowledge.create("person@example.com", request);
+        var personal =
+                knowledge.create("person@example.com", workspaceFor("person@example.com"), request);
         var company =
                 knowledge.create(
-                        "admin@example.com", new CreateTicketRequest(UUID.randomUUID(), content));
-        assertThat(knowledge.create("person@example.com", request).id()).isEqualTo(personal.id());
-        assertThat(knowledge.get("person@example.com", personal.id()).id())
+                        "admin@example.com",
+                        workspaceFor("admin@example.com"),
+                        new CreateTicketRequest(UUID.randomUUID(), content));
+        assertThat(
+                        knowledge
+                                .create(
+                                        "person@example.com",
+                                        workspaceFor("person@example.com"),
+                                        request)
+                                .id())
                 .isEqualTo(personal.id());
-        assertThat(knowledge.browse("person@example.com", null, 20, null).items())
+        assertThat(
+                        knowledge
+                                .get(
+                                        "person@example.com",
+                                        workspaceFor("person@example.com"),
+                                        personal.id())
+                                .id())
+                .isEqualTo(personal.id());
+        assertThat(
+                        knowledge
+                                .browse(
+                                        "person@example.com",
+                                        workspaceFor("person@example.com"),
+                                        null,
+                                        20,
+                                        null)
+                                .items())
                 .extracting(TicketSummary::id)
                 .containsExactly(personal.id());
-        assertThat(knowledge.browse("other@example.com", null, 20, null).items()).isEmpty();
-        assertThat(knowledge.browse("admin@example.com", null, 20, null).items())
+        assertThat(
+                        knowledge
+                                .browse(
+                                        "other@example.com",
+                                        workspaceFor("other@example.com"),
+                                        null,
+                                        20,
+                                        null)
+                                .items())
+                .isEmpty();
+        assertThat(
+                        knowledge
+                                .browse(
+                                        "admin@example.com",
+                                        workspaceFor("admin@example.com"),
+                                        null,
+                                        20,
+                                        null)
+                                .items())
                 .extracting(TicketSummary::id)
                 .containsExactly(company.id());
-        assertThatThrownBy(() -> knowledge.get("other@example.com", personal.id()))
+        assertThatThrownBy(
+                        () ->
+                                knowledge.get(
+                                        "other@example.com",
+                                        workspaceFor("other@example.com"),
+                                        personal.id()))
                 .isInstanceOf(KnowledgeException.class);
-        assertThatThrownBy(() -> knowledge.get("admin@example.com", personal.id()))
+        assertThatThrownBy(
+                        () ->
+                                knowledge.get(
+                                        "admin@example.com",
+                                        workspaceFor("admin@example.com"),
+                                        personal.id()))
                 .isInstanceOf(KnowledgeException.class);
-        assertThatThrownBy(() -> knowledge.get("person@example.com", company.id()))
+        assertThatThrownBy(
+                        () ->
+                                knowledge.get(
+                                        "person@example.com",
+                                        workspaceFor("person@example.com"),
+                                        company.id()))
                 .isInstanceOf(KnowledgeException.class);
         assertThatThrownBy(
                         () ->
                                 jdbc.update(
-                                        "UPDATE KNOWLEDGE_TICKET SET ORGANIZATION_ID=(SELECT ID"
-                                                + " FROM ORGANIZATION LIMIT 1) WHERE ID=?",
+                                        "UPDATE KNOWLEDGE_TICKET SET WORKSPACE_ID=(SELECT ID"
+                                                + " FROM WORKSPACE LIMIT 1) WHERE ID=?",
                                         personal.id()))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    void pendingAndActiveIndividualsCannotReceiveOrAcceptInvitations() {
-        organization();
-        // An invitation can predate individual registration; acceptance must recheck
-        // classification.
+    void pendingSignupAcceptsWorkspaceInvitationWithoutReplacingCredentials() {
+        var shared = workspace();
+        identity.register(request("person@example.com"));
         String token = "a".repeat(43);
         var invitation =
                 invitations
                         .claim(
                                 "admin@example.com",
+                                shared,
                                 new InvitationRequest("person@example.com"),
                                 token)
                         .view();
         invitations.complete(invitation.id(), token, "smtp-id", null);
-        identity.registerIndividual(request("person@example.com"));
+        var link = new InvitationLinkRequest(invitation.id(), token);
+        assertThat(acceptance.preview(link).status()).isEqualTo("READY");
+        var account =
+                acceptance.accept(
+                        new MemberRegistrationRequest(link, "Ignored replacement", password), null);
+        assertThat(account.fullName()).isEqualTo("Personal User");
+        assertThat(account.workspaceId()).isEqualTo(shared);
+        assertThat(account.workspaces()).hasSize(2);
+        assertThat(identity.current(account.email()).workspaceId()).isNotEqualTo(shared);
         code(
                 () ->
                         invitations.claim(
-                                "admin@example.com",
-                                new InvitationRequest("person@example.com"),
+                                account.email(),
+                                shared,
+                                new InvitationRequest("someone@example.com"),
                                 token),
-                "ACCOUNT_INELIGIBLE");
-        var link = new InvitationLinkRequest(invitation.id(), token);
-        assertThat(acceptance.preview(link).status()).isEqualTo("ACCOUNT_INELIGIBLE");
+                "WORKSPACE_ACCESS_DENIED");
         code(
                 () ->
                         acceptance.accept(
-                                new MemberRegistrationRequest(link, "Personal", "OTHER", password)),
-                "ACCOUNT_INELIGIBLE");
-        worker.runOnce();
-        var verify = links.get("person@example.com");
-        identity.verify(verify.id(), verify.token());
-        code(
-                () ->
-                        invitations.claim(
-                                "person@example.com",
-                                new InvitationRequest("someone@example.com"),
-                                token),
-                "ACCESS_DENIED");
-        code(
-                () ->
-                        invitations.claim(
-                                "admin@example.com",
-                                new InvitationRequest("person@example.com"),
-                                token),
-                "ACCOUNT_INELIGIBLE");
+                                new MemberRegistrationRequest(link, null, null), account.email()),
+                "INVITATION_USED");
     }
 
     @Test
@@ -474,5 +486,49 @@ class IndividualIdentityIntegrationTests {
                 .isEqualTo(1);
         mvc.perform(post("/api/auth/social/link").session(session).with(csrf()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Autowired com.betterf.identity.api.service.WorkspaceService workspaceService;
+
+    @Test
+    void explicitWorkspaceScopeAndOwnerPermissionsAreRequired() throws Exception {
+        activate("person@example.com");
+        activate("other@example.com");
+        var original = identity.current("person@example.com");
+        var additional = workspaceService.create(original.email(), "Second workspace");
+        assertThat(additional.workspaces()).hasSize(2);
+        assertThat(identity.current(original.email()).workspaceId())
+                .isEqualTo(original.workspaceId());
+        assertThat(
+                        workspaceService
+                                .rename(original.email(), additional.workspaceId(), "Renamed")
+                                .workspaceName())
+                .isEqualTo("Renamed");
+        code(
+                () -> workspaceService.select("other@example.com", additional.workspaceId()),
+                "WORKSPACE_ACCESS_DENIED");
+        code(
+                () -> workspaceService.rename("other@example.com", additional.workspaceId(), "No"),
+                "WORKSPACE_ACCESS_DENIED");
+        mvc.perform(get("/api/knowledge/tickets").with(user(original.email())))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        get("/api/knowledge/tickets")
+                                .with(user("other@example.com"))
+                                .header("X-Workspace-Id", additional.workspaceId()))
+                .andExpect(status().isForbidden());
+        jdbc.update(
+                "UPDATE WORKSPACE_MEMBERSHIP SET ACTIVE=FALSE WHERE ACCOUNT_ID=? AND"
+                    + " WORKSPACE_ID=?",
+                original.id(),
+                additional.workspaceId());
+        code(
+                () -> workspaceService.select(original.email(), additional.workspaceId()),
+                "WORKSPACE_ACCESS_DENIED");
+    }
+
+    UUID workspaceFor(String email) {
+        return jdbc.queryForObject(
+                "SELECT DEFAULT_WORKSPACE_ID FROM ACCOUNT WHERE EMAIL = ?", UUID.class, email);
     }
 }

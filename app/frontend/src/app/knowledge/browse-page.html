@@ -2,25 +2,25 @@
   <a class="skip-link" href="#main">{{ t("landing.skip_to_content") }}</a>
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
-      <a class="brand" routerLink="/company">BetterF<span class="text-[var(--accent)]">.</span></a>
-      <a class="button" routerLink="/knowledge/new">{{ t("knowledge.newCapture") }}</a>
+      <a class="brand" routerLink="/workspace"
+        >theeverthread<span class="text-[var(--accent)]">.</span></a
+      >
+      <a class="button" routerLink="/knowledge/new">{{
+        t("knowledge.newCapture")
+      }}</a>
     </nav>
   </header>
   <main id="main" class="wrap knowledge-browse" tabindex="-1">
-    @if (auth.account()?.organizationId) {
-      <a class="text-link" routerLink="/company">← {{ t("knowledge.back") }}</a>
+    @if (auth.account()?.workspaceId) {
+      <a class="text-link" routerLink="/workspace"
+        >← {{ t("knowledge.back") }}</a
+      >
     }
     <div class="knowledge-browse-heading">
       <div>
-        <p class="eyebrow">
-          {{ t(auth.account()?.organizationId ? "knowledge.visibility" : "individual.private") }}
-        </p>
+        <p class="eyebrow">{{ t("knowledge.visibility") }}</p>
         <h1>{{ t("knowledge.browseTitle") }}</h1>
-        <p class="text-[var(--muted)]">
-          {{
-            t(auth.account()?.organizationId ? "knowledge.browseIntro" : "individual.visibility")
-          }}
-        </p>
+        <p class="text-[var(--muted)]">{{ t("knowledge.browseIntro") }}</p>
       </div>
       <button
         class="button secondary"
@@ -73,7 +73,9 @@
             t("knowledge.templates." + ticket.detailsType)
           }}</span>
           <h2>
-            <a [routerLink]="['/knowledge/tickets', ticket.id]">{{ ticket.title }}</a>
+            <a [routerLink]="['/knowledge/tickets', ticket.id]">{{
+              ticket.title
+            }}</a>
           </h2>
           @if (ticket.capturePreview) {
             <p class="knowledge-capture-preview">{{ ticket.capturePreview }}</p>
@@ -88,12 +90,17 @@
             >
           </p>
           <div class="knowledge-summary-attributes">
-            @for (label of labels(ticket.attributes).slice(0, 3); track $index) {
+            @for (
+              label of labels(ticket.attributes).slice(0, 3);
+              track $index
+            ) {
               <span class="knowledge-attribute">{{ label }}</span>
             }
             @if (labels(ticket.attributes).length > 3) {
               <span class="knowledge-more">{{
-                t("knowledge.moreAttributes", { count: labels(ticket.attributes).length - 3 })
+                t("knowledge.moreAttributes", {
+                  count: labels(ticket.attributes).length - 3,
+                })
               }}</span>
             }
             @if (ticket.classificationStatus !== "COMPLETE") {
@@ -116,18 +123,32 @@
           }
         </div>
       }
-    } @else if (store.initialized() && !store.items().length && !store.error()) {
+    } @else if (
+      store.initialized() && !store.items().length && !store.error()
+    ) {
       <div class="knowledge-empty">
         <p class="eyebrow">{{ t("knowledge.browseTitle") }}</p>
         <h2>
-          {{ t(store.detailsType() ? "knowledge.filteredEmpty" : "knowledge.empty") }}
+          {{
+            t(
+              store.detailsType()
+                ? "knowledge.filteredEmpty"
+                : "knowledge.empty"
+            )
+          }}
         </h2>
         @if (store.detailsType()) {
-          <button class="button secondary" type="button" (click)="selectType('')">
+          <button
+            class="button secondary"
+            type="button"
+            (click)="selectType('')"
+          >
             {{ t("knowledge.clearFilter") }}
           </button>
         }
-        <a class="button" routerLink="/knowledge/new">{{ t("knowledge.newCapture") }}</a>
+        <a class="button" routerLink="/knowledge/new">{{
+          t("knowledge.newCapture")
+        }}</a>
       </div>
     }
     @if (store.nextCursor()) {

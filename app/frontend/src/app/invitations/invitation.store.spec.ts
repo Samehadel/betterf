@@ -106,7 +106,7 @@ describe('Invitation flow', () => {
         error: {
           code: 'ACCOUNT_LIMIT',
           message:
-            'Your organization has reached its limit of 3 active accounts. You cannot send invitations.',
+            'Your workspace has reached its limit of 3 active accounts. You cannot send invitations.',
         },
       },
     });

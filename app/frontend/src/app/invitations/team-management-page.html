@@ -1,11 +1,11 @@
 <ng-container *transloco="let t">
-  <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  <a class="skip-link" href="#main">{{ t("landing.skip_to_content") }}</a>
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
-      <a class="brand" routerLink="/company"
-        >BetterF<span class="text-[var(--accent)]">.</span></a
+      <a class="brand" routerLink="/workspace"
+        >theeverthread<span class="text-[var(--accent)]">.</span></a
       >
-      <a routerLink="/company">{{ t('invitations.back') }}</a>
+      <a routerLink="/workspace">{{ t("invitations.back") }}</a>
     </nav>
   </header>
   <main
@@ -14,33 +14,33 @@
     class="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-16"
   >
     @if (auth.loading()) {
-      <p role="status">{{ t('invitations.loading') }}</p>
+      <p role="status">{{ t("invitations.loading") }}</p>
     } @else if (authFailed()) {
-      <p role="alert">{{ t('invitations.loadFailed') }}</p>
+      <p role="alert">{{ t("invitations.loadFailed") }}</p>
       <button class="button mt-4" (click)="load()">
-        {{ t('foundation.retry') }}
+        {{ t("foundation.retry") }}
       </button>
-    } @else if (auth.account()?.accessRole !== 'ADMIN') {
-      <h1 class="text-3xl font-semibold">{{ t('team.title') }}</h1>
-      <p role="alert" class="my-6">{{ t('invitations.denied') }}</p>
-      <a class="button" routerLink="/login">{{ t('identity.login') }}</a>
+    } @else if (auth.account()?.accessRole !== "OWNER") {
+      <h1 class="text-3xl font-semibold">{{ t("team.title") }}</h1>
+      <p role="alert" class="my-6">{{ t("invitations.denied") }}</p>
+      <a class="button" routerLink="/login">{{ t("identity.login") }}</a>
     } @else {
       <div class="workspace-breadcrumb">
-        <a routerLink="/company">{{ auth.account()?.organizationName }}</a
-        ><span aria-hidden="true">/</span>{{ t('invitations.team') }}
+        <a routerLink="/workspace">{{ auth.account()?.workspaceName }}</a
+        ><span aria-hidden="true">/</span>{{ t("invitations.team") }}
       </div>
       <div
         class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"
       >
         <div>
-          <p class="eyebrow">{{ t('team.eyebrow') }}</p>
+          <p class="eyebrow">{{ t("team.eyebrow") }}</p>
           <h1 class="text-4xl font-semibold tracking-tight sm:text-5xl">
-            {{ t('team.title') }}
+            {{ t("team.title") }}
           </h1>
-          <p class="mt-4 text-[var(--muted)]">{{ t('team.intro') }}</p>
+          <p class="mt-4 text-[var(--muted)]">{{ t("team.intro") }}</p>
         </div>
-        <a class="button shrink-0" routerLink="/company/invitations">{{
-          t('invitations.title')
+        <a class="button shrink-0" routerLink="/workspace/invitations">{{
+          t("invitations.title")
         }}</a>
       </div>
       <section
@@ -52,7 +52,7 @@
           class="flex border-b border-[var(--line)] px-3 sm:px-6"
           (keydown)="tabKey($event)"
         >
-          @for (name of ['invitations', 'members']; track name) {
+          @for (name of ["invitations", "members"]; track name) {
             <button
               type="button"
               role="tab"
@@ -66,7 +66,7 @@
               [class.text-[var(--muted)]]="tab() !== name"
               (click)="select(name === 'members' ? 'members' : 'invitations')"
             >
-              {{ t('team.' + name) }}
+              {{ t("team." + name) }}
             </button>
           }
         </div>
@@ -82,7 +82,7 @@
               : store.membersLoading()
           "
         >
-          @if (tab() === 'invitations') {
+          @if (tab() === "invitations") {
             @if (store.feedback()) {
               <p
                 role="status"
@@ -92,37 +92,37 @@
                 [class.text-green-300]="!store.feedbackFailed()"
               >
                 {{
-                  store.feedback().startsWith('team.')
+                  store.feedback().startsWith("team.")
                     ? t(store.feedback())
                     : store.feedback()
                 }}
               </p>
             }
             @if (store.invitationsLoading()) {
-              <p role="status">{{ t('team.loading') }}</p>
+              <p role="status">{{ t("team.loading") }}</p>
             } @else if (store.invitationsError()) {
               <p role="alert">
                 {{
-                  store.invitationsError().startsWith('team.')
+                  store.invitationsError().startsWith("team.")
                     ? t(store.invitationsError())
                     : store.invitationsError()
                 }}
               </p>
               <button class="button secondary mt-4" (click)="refresh()">
-                {{ t('foundation.retry') }}
+                {{ t("foundation.retry") }}
               </button>
             } @else if (!visibleInvitations().length) {
               <div class="py-10 text-center">
                 <h2 class="text-xl font-semibold">
-                  {{ t('team.noInvitations') }}
+                  {{ t("team.noInvitations") }}
                 </h2>
                 <p class="mt-3 text-[var(--muted)]">
-                  {{ t('team.noInvitationsHint') }}
+                  {{ t("team.noInvitationsHint") }}
                 </p>
               </div>
             } @else {
               <p class="mb-3 text-xs text-[var(--muted)] sm:hidden">
-                {{ t('team.scrollHint') }}
+                {{ t("team.scrollHint") }}
               </p>
               <div
                 class="overflow-x-auto"
@@ -133,21 +133,21 @@
                 <table class="min-w-[640px] w-full text-left text-sm">
                   <caption class="sr-only">
                     {{
-                      t('team.invitations')
+                      t("team.invitations")
                     }}
                   </caption>
                   <thead class="text-[var(--muted)]">
                     <tr>
                       <th scope="col" class="pb-4 pr-5">
-                        {{ t('invitations.email') }}
+                        {{ t("invitations.email") }}
                       </th>
                       <th scope="col" class="pb-4 pr-5">
-                        {{ t('team.status') }}
+                        {{ t("team.status") }}
                       </th>
                       <th scope="col" class="pb-4 pr-5">
-                        {{ t('team.lastSent') }}
+                        {{ t("team.lastSent") }}
                       </th>
-                      <th scope="col" class="pb-4">{{ t('team.expiry') }}</th>
+                      <th scope="col" class="pb-4">{{ t("team.expiry") }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -179,15 +179,15 @@
                                   t(
                                     store.busyId() === invitation.id ||
                                       invitation.resending
-                                      ? 'invitations.sending'
-                                      : 'team.resend'
+                                      ? "invitations.sending"
+                                      : "team.resend"
                                   )
                                 }}
                               </button>
                               @if (cooldown(invitation) > 0) {
                                 <p class="mt-2 text-xs text-[var(--muted)]">
                                   {{
-                                    t('team.cooldown', {
+                                    t("team.cooldown", {
                                       seconds: cooldown(invitation),
                                     })
                                   }}
@@ -199,16 +199,20 @@
                         <td class="py-5 pr-5">
                           <span
                             class="invitation-status"
-                            [class.invitation-status-failed]="invitation.status === 'FAILED'"
-                            [class.invitation-status-accepted]="invitation.status === 'ACCEPTED'"
+                            [class.invitation-status-failed]="
+                              invitation.status === 'FAILED'
+                            "
+                            [class.invitation-status-accepted]="
+                              invitation.status === 'ACCEPTED'
+                            "
                           >
                             {{
                               t(
-                                invitation.status === 'ACCEPTED'
-                                  ? 'invitations.status.accepted'
-                                  : invitation.status === 'FAILED'
-                                    ? 'team.failedState'
-                                    : 'team.pending'
+                                invitation.status === "ACCEPTED"
+                                  ? "invitations.status.accepted"
+                                  : invitation.status === "FAILED"
+                                    ? "team.failedState"
+                                    : "team.pending"
                               )
                             }}
                           </span>
@@ -216,18 +220,18 @@
                         <td class="py-5 pr-5">
                           @if (invitation.sentAt) {
                             <time [attr.datetime]="invitation.sentAt">{{
-                              invitation.sentAt | date: 'medium'
+                              invitation.sentAt | date: "medium"
                             }}</time>
                           } @else {
-                            <span>{{ t('team.notSent') }}</span>
+                            <span>{{ t("team.notSent") }}</span>
                           }
                         </td>
                         <td class="py-5">
-                          @if (invitation.status === 'FAILED') {
+                          @if (invitation.status === "FAILED") {
                             <span aria-label="No active link">—</span>
                           } @else {
                             <time [attr.datetime]="invitation.expiresAt">{{
-                              invitation.expiresAt | date: 'medium'
+                              invitation.expiresAt | date: "medium"
                             }}</time>
                           }
                         </td>
@@ -239,28 +243,28 @@
             }
           } @else {
             @if (store.membersLoading()) {
-              <p role="status">{{ t('team.loading') }}</p>
+              <p role="status">{{ t("team.loading") }}</p>
             } @else if (store.membersError()) {
               <p role="alert">
                 {{
-                  store.membersError().startsWith('team.')
+                  store.membersError().startsWith("team.")
                     ? t(store.membersError())
                     : store.membersError()
                 }}
               </p>
               <button class="button secondary mt-4" (click)="refresh()">
-                {{ t('foundation.retry') }}
+                {{ t("foundation.retry") }}
               </button>
             } @else if (!store.members().length) {
               <div class="py-10 text-center">
-                <h2 class="text-xl font-semibold">{{ t('team.noMembers') }}</h2>
+                <h2 class="text-xl font-semibold">{{ t("team.noMembers") }}</h2>
                 <p class="mt-3 text-[var(--muted)]">
-                  {{ t('team.noMembersHint') }}
+                  {{ t("team.noMembersHint") }}
                 </p>
               </div>
             } @else {
               <p class="mb-3 text-xs text-[var(--muted)] sm:hidden">
-                {{ t('team.scrollHint') }}
+                {{ t("team.scrollHint") }}
               </p>
               <div
                 class="overflow-x-auto"
@@ -271,18 +275,18 @@
                 <table class="min-w-[640px] w-full text-left text-sm">
                   <caption class="sr-only">
                     {{
-                      t('team.members')
+                      t("team.members")
                     }}
                   </caption>
                   <thead class="text-[var(--muted)]">
                     <tr>
                       <th scope="col" class="pb-4 pr-5">
-                        {{ t('identity.fullName') }}
+                        {{ t("identity.fullName") }}
                       </th>
                       <th scope="col" class="pb-4 pr-5">
-                        {{ t('invitations.email') }}
+                        {{ t("invitations.email") }}
                       </th>
-                      <th scope="col" class="pb-4">{{ t('team.role') }}</th>
+                      <th scope="col" class="pb-4">{{ t("team.role") }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -292,7 +296,7 @@
                           {{ member.fullName }}
                         </td>
                         <td class="break-all py-5 pr-5">{{ member.email }}</td>
-                        <td class="py-5">{{ member.professionalRole }}</td>
+                        <td class="py-5">{{ member.role }}</td>
                       </tr>
                     }
                   </tbody>

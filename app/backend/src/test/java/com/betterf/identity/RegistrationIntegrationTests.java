@@ -64,7 +64,7 @@ class RegistrationIntegrationTests {
 
     @BeforeEach
     void setup() {
-        jdbc.execute("TRUNCATE REFRESH_SESSION, VERIFICATION_EMAIL, ACCOUNT, ORGANIZATION CASCADE");
+        jdbc.execute("TRUNCATE REFRESH_SESSION, VERIFICATION_EMAIL, ACCOUNT, WORKSPACE CASCADE");
         when(clock.instant()).thenReturn(start);
         doAnswer(
                         call -> {
@@ -78,14 +78,7 @@ class RegistrationIntegrationTests {
     }
 
     RegistrationRequest request(String email, String website) {
-        return new RegistrationRequest(
-                "Acme",
-                "https://" + website,
-                "Engineering",
-                "Ada Example",
-                email,
-                password,
-                "OTHER");
+        return new RegistrationRequest("Ada Example", email, password);
     }
 
     void register(String email, String domain) {
@@ -98,9 +91,9 @@ class RegistrationIntegrationTests {
         identity.verify(link.id(), link.token());
     }
 
-    int activeOrganizations() {
+    int activeWorkspaces() {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM ORGANIZATION WHERE STATUS='ACTIVE'", Integer.class);
+                "SELECT COUNT(*) FROM WORKSPACE WHERE STATUS='ACTIVE'", Integer.class);
     }
 
     int count(String table) {
@@ -109,7 +102,7 @@ class RegistrationIntegrationTests {
 
     @Test
     void registrationIsPendingAndPasswordIsHashedWithReusableRoles() throws Exception {
-        var body = request("Ada@elsewhere.com", "Company.CO.UK");
+        var body = request("Ada@elsewhere.com", "Workspace.CO.UK");
         mvc.perform(
                         post("/api/registration")
                                 .with(csrf())
@@ -117,12 +110,11 @@ class RegistrationIntegrationTests {
                                 .content(json.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.email").value("ada@elsewhere.com"));
-        assertThat(activeOrganizations()).isZero();
+        assertThat(activeWorkspaces()).isZero();
         assertThat(count("ACCOUNT")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT STATUS FROM ACCOUNT", String.class))
                 .isEqualTo("PENDING");
-        assertThat(jdbc.queryForObject("SELECT STATUS FROM ORGANIZATION", String.class))
-                .isEqualTo("PENDING");
+        assertThat(count("WORKSPACE")).isZero();
         assertThat(jdbc.queryForObject("SELECT PASSWORD_HASH FROM ACCOUNT", String.class))
                 .doesNotContain(password);
         assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
@@ -131,11 +123,6 @@ class RegistrationIntegrationTests {
         worker.runOnce();
         assertThat(jdbc.queryForObject("SELECT TOKEN_HASH FROM VERIFICATION_EMAIL", String.class))
                 .doesNotContain(links.get("ada@elsewhere.com").token());
-        assertThat(jdbc.queryForObject("SELECT DOMAIN FROM ORGANIZATION", String.class))
-                .isEqualTo("company.co.uk");
-        mvc.perform(get("/api/registration/roles"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(25));
         mvc.perform(
                         post("/api/auth/login")
                                 .with(csrf())
@@ -164,9 +151,9 @@ class RegistrationIntegrationTests {
                                 .content(json.writeValueAsString(link)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("VERIFIED"));
-        assertThat(activeOrganizations()).isEqualTo(1);
-        assertThat(identity.current("ada@example.com").accessRole()).isEqualTo("ADMIN");
-        assertThat(identity.current("ada@example.com").professionalRole()).isEqualTo("OTHER");
+        assertThat(activeWorkspaces()).isEqualTo(1);
+        assertThat(identity.current("ada@example.com").accessRole()).isEqualTo("OWNER");
+        assertThat(identity.current("ada@example.com").accessRole()).isEqualTo("OWNER");
         assertThat(identity.verify(link.id(), link.token()).status()).isEqualTo("ALREADY_VERIFIED");
         var old = new MockHttpSession();
         String oldId = old.getId();
@@ -184,7 +171,7 @@ class RegistrationIntegrationTests {
                                                                 "password",
                                                                 password))))
                         .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.data.organizationName").value("Acme"))
+                        .andExpect(jsonPath("$.data.workspaceName").value("My workspace"))
                         .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
                         .andReturn();
         var session = (MockHttpSession) response.getRequest().getSession(false);
@@ -230,70 +217,51 @@ class RegistrationIntegrationTests {
                                 .contentType("application/json")
                                 .content("{}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(
-                        jsonPath("$.error.message")
-                                .value(
-                                        org.hamcrest.Matchers.containsString(
-                                                "Company name is required")));
-        var bad =
-                new RegistrationRequest(
-                        "Acme",
-                        "https://company.com",
-                        "IT",
-                        "Ada",
-                        "ada@example.com",
-                        "short",
-                        "OTHER");
-        assertThatThrownBy(() -> identity.register(bad))
-                .isInstanceOf(IdentityException.class)
-                .hasMessageContaining("10–128");
-        var badRole =
-                new RegistrationRequest(
-                        "Acme",
-                        "https://company.com",
-                        "IT",
-                        "Ada",
-                        "ada@example.com",
-                        password,
-                        "SUPERADMIN");
-        assertThatThrownBy(() -> identity.register(badRole))
-                .hasMessageContaining("professional role");
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        assertThatThrownBy(
+                        () ->
+                                identity.register(
+                                        new RegistrationRequest("Ada", "ada@example.com", "short")))
+                .isInstanceOf(IdentityException.class);
+        assertThatThrownBy(
+                        () ->
+                                identity.register(
+                                        new RegistrationRequest(" ", "ada@example.com", password)))
+                .isInstanceOf(IdentityException.class);
         assertThat(count("ACCOUNT")).isZero();
         verifyNoInteractions(mail);
     }
 
     @Test
-    void duplicatesCheckDomainAndAnyAccountMembershipNotCompanyName() {
-        register("ada@example.com", "company.com");
+    void duplicatesCheckDomainAndAnyAccountMembershipNotWorkspaceName() {
+        register("ada@example.com", "same.com");
         verify("ada@example.com");
-        assertThatThrownBy(() -> register("other@example.com", "COMPANY.com"))
-                .hasMessage("You cannot register this company. It is already registered.");
-        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE='MEMBER'");
-        assertThatThrownBy(() -> register("ADA@example.com", "different.com"))
-                .hasMessage("You cannot register this company. It is already registered.");
-        register("other@example.com", "different.com");
+        register("other@example.com", "same.com");
         verify("other@example.com");
-        assertThat(activeOrganizations()).isEqualTo(2);
+        assertThatThrownBy(() -> register("ADA@example.com", "other.com"))
+                .isInstanceOf(IdentityException.class);
+        assertThat(activeWorkspaces()).isEqualTo(2);
+        assertThat(identity.current("ada@example.com").workspaceId())
+                .isNotEqualTo(identity.current("other@example.com").workspaceId());
     }
 
     @Test
     void repeatedRegistrationDoesNotChangeCredentialsOrSendAgain() {
         register("ada@example.com", "company.com");
         var original = links.get("ada@example.com");
-        identity.register(
-                new RegistrationRequest(
-                        "Attacker",
-                        "https://other.com",
-                        "Wrong",
-                        "Wrong",
-                        "ADA@example.com",
-                        "Another long password!",
-                        "SOFTWARE_ENGINEER"));
+        assertThatThrownBy(
+                        () ->
+                                identity.register(
+                                        new RegistrationRequest(
+                                                "Wrong",
+                                                "ADA@example.com",
+                                                "Another long password!")))
+                .isInstanceOf(IdentityException.class);
         assertThat(count("ACCOUNT")).isEqualTo(1);
         org.mockito.Mockito.verify(mail, times(1)).send(anyString(), any(), anyString());
         assertThat(links.get("ada@example.com")).isEqualTo(original);
         verify("ada@example.com");
-        assertThat(identity.current("ada@example.com").organizationName()).isEqualTo("Acme");
+        assertThat(identity.current("ada@example.com").workspaceName()).isEqualTo("My workspace");
     }
 
     @Test
@@ -318,7 +286,7 @@ class RegistrationIntegrationTests {
         when(clock.instant()).thenReturn(start.plus(Duration.ofHours(24)).plusSeconds(59));
         verify("ada@example.com");
         assertThat(count("ACCOUNT")).isEqualTo(1);
-        assertThat(activeOrganizations()).isEqualTo(1);
+        assertThat(activeWorkspaces()).isEqualTo(1);
     }
 
     @Test
@@ -327,7 +295,7 @@ class RegistrationIntegrationTests {
         assertThatThrownBy(() -> identity.resend("ada@example.com"))
                 .isInstanceOf(IdentityException.class);
         verify("ada@example.com");
-        assertThat(activeOrganizations()).isEqualTo(1);
+        assertThat(activeWorkspaces()).isEqualTo(1);
     }
 
     @Test
@@ -339,11 +307,11 @@ class RegistrationIntegrationTests {
         when(clock.instant()).thenReturn(start.plus(Duration.ofHours(24)));
         assertThatThrownBy(() -> identity.verify(link.id(), link.token()))
                 .hasMessageContaining("expired");
-        assertThat(activeOrganizations()).isZero();
+        assertThat(activeWorkspaces()).isZero();
         identity.resend("ada@example.com");
         worker.runOnce();
         verify("ada@example.com");
-        assertThat(activeOrganizations()).isEqualTo(1);
+        assertThat(activeWorkspaces()).isEqualTo(1);
     }
 
     @Test
@@ -377,54 +345,47 @@ class RegistrationIntegrationTests {
         assertThat(jdbc.queryForObject("SELECT STATUS FROM VERIFICATION_EMAIL", String.class))
                 .isEqualTo("FAILED");
         identity.verify(first.id(), first.token());
-        assertThat(activeOrganizations()).isEqualTo(1);
+        assertThat(activeWorkspaces()).isEqualTo(1);
     }
 
     @Test
-    void competingVerificationsCreateExactlyOneCompanyAndDoNotActivateLoser() throws Exception {
-        register("one@example.com", "company.co.uk");
-        register("two@example.com", "company.co.uk");
-        assertThat(activeOrganizations()).isZero();
-        var barrier = new CyclicBarrier(2);
+    void competingVerificationsCreateExactlyOneWorkspaceAndDoNotActivateLoser() throws Exception {
+        register("ada@example.com", "same.com");
+        var link = links.get("ada@example.com");
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<Future<String>> results = new ArrayList<>();
-            for (String email : List.of("one@example.com", "two@example.com"))
-                results.add(
-                        pool.submit(
-                                () -> {
-                                    barrier.await(10, TimeUnit.SECONDS);
-                                    try {
-                                        verify(email);
-                                        return "OK";
-                                    } catch (IdentityException exception) {
-                                        return exception.code();
-                                    }
-                                }));
+            var first = pool.submit(() -> identity.verify(link.id(), link.token()));
+            var second = pool.submit(() -> identity.verify(link.id(), link.token()));
             assertThat(
                             List.of(
-                                    results.get(0).get(15, TimeUnit.SECONDS),
-                                    results.get(1).get(15, TimeUnit.SECONDS)))
-                    .containsExactlyInAnyOrder("OK", "DUPLICATE_REGISTRATION");
+                                    first.get(15, TimeUnit.SECONDS).status(),
+                                    second.get(15, TimeUnit.SECONDS).status()))
+                    .containsExactlyInAnyOrder("VERIFIED", "ALREADY_VERIFIED");
         }
-        assertThat(activeOrganizations()).isEqualTo(1);
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM ACCOUNT WHERE STATUS='ACTIVE'",
-                                Integer.class))
-                .isEqualTo(1);
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM ACCOUNT WHERE STATUS='PENDING' AND"
-                                        + " ACCESS_ROLE IS NULL",
-                                Integer.class))
-                .isEqualTo(1);
+        assertThat(activeWorkspaces()).isEqualTo(1);
+        assertThat(count("WORKSPACE_MEMBERSHIP")).isEqualTo(1);
     }
 
     @Test
     void simultaneousRegistrationsAndResendsDoNotDuplicateAccountsOrEmails() throws Exception {
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            var a = pool.submit(() -> identity.register(request("ada@example.com", "company.com")));
-            var b = pool.submit(() -> identity.register(request("ADA@example.com", "company.com")));
+            var a =
+                    pool.submit(
+                            () -> {
+                                try {
+                                    identity.register(request("ada@example.com", "company.com"));
+                                } catch (IdentityException expected) {
+                                    assertThat(expected.code()).isEqualTo("EMAIL_IN_USE");
+                                }
+                            });
+            var b =
+                    pool.submit(
+                            () -> {
+                                try {
+                                    identity.register(request("ADA@example.com", "company.com"));
+                                } catch (IdentityException expected) {
+                                    assertThat(expected.code()).isEqualTo("EMAIL_IN_USE");
+                                }
+                            });
             a.get(15, TimeUnit.SECONDS);
             b.get(15, TimeUnit.SECONDS);
             worker.runOnce();
@@ -450,32 +411,25 @@ class RegistrationIntegrationTests {
     }
 
     @Test
-    void accountAndOrganizationMustBothBeActiveForAccess() throws Exception {
+    void accountAndWorkspaceMustBothBeActiveForAccess() throws Exception {
         register("ada@example.com", "company.com");
         verify("ada@example.com");
-        jdbc.update("UPDATE ORGANIZATION SET STATUS='PENDING'");
+        var workspace = identity.current("ada@example.com").workspaceId();
+        jdbc.update("UPDATE WORKSPACE SET STATUS='PENDING'");
+        assertThat(identity.credentials("ada@example.com").active()).isTrue();
+        assertThat(identity.current("ada@example.com").workspaces()).isEmpty();
+        assertThatThrownBy(() -> identity.current("ada@example.com", workspace))
+                .isInstanceOf(IdentityException.class);
+        jdbc.update("UPDATE ACCOUNT SET STATUS='PENDING'");
         assertThat(identity.credentials("ada@example.com").active()).isFalse();
-        assertThatThrownBy(() -> identity.current("ada@example.com"))
-                .hasMessageContaining("Verify your email");
-        mvc.perform(
-                        post("/api/auth/login")
-                                .with(csrf())
-                                .contentType("application/json")
-                                .content(
-                                        json.writeValueAsString(
-                                                Map.of(
-                                                        "email",
-                                                        "ada@example.com",
-                                                        "password",
-                                                        password))))
-                .andExpect(status().isUnauthorized());
     }
 
     @Test
     void statusVocabularyCanEvolveWithoutChangingDatabaseConstraints() {
         register("ada@example.com", "company.com");
+        verify("ada@example.com");
         // A future application version can introduce statuses without altering these columns.
-        assertThat(jdbc.update("UPDATE ORGANIZATION SET STATUS='BLOCKED'")).isEqualTo(1);
+        assertThat(jdbc.update("UPDATE WORKSPACE SET STATUS='BLOCKED'")).isEqualTo(1);
         assertThat(jdbc.update("UPDATE ACCOUNT SET STATUS='SUSPENDED'")).isEqualTo(1);
         assertThat(jdbc.update("UPDATE VERIFICATION_EMAIL SET STATUS='DEFERRED'")).isEqualTo(1);
     }
@@ -541,22 +495,24 @@ class RegistrationIntegrationTests {
         assertThat(worker.runOnce()).isTrue();
         identity.register(request("ada@example.com", "company.com"));
         jdbc.update(
-                "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '1 minute'"
-                        + " WHERE NAME = 'verification-email-worker'");
+                "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL"
+                    + " '1 minute' WHERE NAME = 'verification-email-worker'");
         try {
             assertThat(worker.runOnce()).isNull();
             verifyNoInteractions(mail);
         } finally {
             jdbc.update(
-                    "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 second'"
-                            + " WHERE NAME = 'verification-email-worker'");
+                    "UPDATE SHEDLOCK SET LOCK_UNTIL = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') -"
+                        + " INTERVAL '1 second' WHERE NAME = 'verification-email-worker'");
         }
         assertThat(worker.runOnce()).isTrue();
         assertThat(identity.deliveryStatus("ada@example.com").deliveryStatus())
                 .isEqualTo("SMTP_ACCEPTED");
-        assertThat(jdbc.queryForObject(
-                        "SELECT LOCK_UNTIL <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') FROM SHEDLOCK"
-                                + " WHERE NAME = 'verification-email-worker'", Boolean.class))
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT LOCK_UNTIL <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') FROM"
+                                    + " SHEDLOCK WHERE NAME = 'verification-email-worker'",
+                                Boolean.class))
                 .isTrue();
     }
 
@@ -643,15 +599,7 @@ class RegistrationIntegrationTests {
     @org.junit.jupiter.params.provider.MethodSource("invalidPasswords")
     void rejectsPasswordsOutsideTheRegistrationPolicyWithoutSavingData(String candidate)
             throws Exception {
-        var request =
-                new RegistrationRequest(
-                        "Acme",
-                        "https://company.com",
-                        "IT",
-                        "Ada",
-                        "ada@example.com",
-                        candidate,
-                        "OTHER");
+        var request = new RegistrationRequest("Ada", "ada@example.com", candidate);
         mvc.perform(
                         post("/api/registration")
                                 .with(csrf())
@@ -662,7 +610,7 @@ class RegistrationIntegrationTests {
                         jsonPath("$.error.message")
                                 .value(org.hamcrest.Matchers.containsString("uppercase letter")));
         assertThat(count("ACCOUNT")).isZero();
-        assertThat(count("ORGANIZATION")).isZero();
+        assertThat(count("WORKSPACE")).isZero();
         assertThat(count("VERIFICATION_EMAIL")).isZero();
         verifyNoInteractions(mail);
     }
@@ -680,15 +628,7 @@ class RegistrationIntegrationTests {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("validPasswords")
     void acceptsBoundaryPasswordsAndUnicodeUppercaseAndSymbols(String candidate) {
-        identity.register(
-                new RegistrationRequest(
-                        "Acme",
-                        "https://company.com",
-                        "IT",
-                        "Ada",
-                        "ada@example.com",
-                        candidate,
-                        "OTHER"));
+        identity.register(new RegistrationRequest("Ada", "ada@example.com", candidate));
         assertThat(count("ACCOUNT")).isEqualTo(1);
     }
 
@@ -718,7 +658,7 @@ class RegistrationIntegrationTests {
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("VERIFIED"))
                         .andExpect(jsonPath("$.data.account.email").value("ada@example.com"))
-                        .andExpect(jsonPath("$.data.account.accessRole").value("ADMIN"))
+                        .andExpect(jsonPath("$.data.account.accessRole").value("OWNER"))
                         .andReturn();
         var session = (MockHttpSession) result.getRequest().getSession(false);
         assertThat(session.getId()).isNotEqualTo(oldId);
@@ -770,15 +710,26 @@ class RegistrationIntegrationTests {
                                 .content(json.writeValueAsString(badLink)))
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isUnauthorized());
-        assertThat(activeOrganizations()).isZero();
+        assertThat(activeWorkspaces()).isZero();
     }
+
     jakarta.servlet.http.Cookie loginRefresh() throws Exception {
         register("ada@example.com", "company.com");
         verify("ada@example.com");
-        var result = mvc.perform(post("/api/auth/login").with(csrf())
-                .contentType("application/json")
-                .content(json.writeValueAsString(Map.of("email", "ada@example.com", "password", password))))
-                .andExpect(status().isOk()).andReturn();
+        var result =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .with(csrf())
+                                        .contentType("application/json")
+                                        .content(
+                                                json.writeValueAsString(
+                                                        Map.of(
+                                                                "email",
+                                                                "ada@example.com",
+                                                                "password",
+                                                                password))))
+                        .andExpect(status().isOk())
+                        .andReturn();
         var cookie = result.getResponse().getCookie("BETTERF_REFRESH");
         assertThat(cookie).isNotNull();
         assertThat(cookie.isHttpOnly()).isTrue();
@@ -799,18 +750,31 @@ class RegistrationIntegrationTests {
         var anonymous = (MockHttpSession) csrfResponse.getRequest().getSession();
         var oldId = anonymous.getId();
         var token = json.readTree(csrfResponse.getResponse().getContentAsString()).path("data");
-        var result = mvc.perform(post("/api/auth/refresh").cookie(cookie).session(anonymous)
-                .header(token.path("headerName").asText(), token.path("token").asText()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.email").value("ada@example.com"))
-                .andReturn();
+        var result =
+                mvc.perform(
+                                post("/api/auth/refresh")
+                                        .cookie(cookie)
+                                        .session(anonymous)
+                                        .header(
+                                                token.path("headerName").asText(),
+                                                token.path("token").asText()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.email").value("ada@example.com"))
+                        .andReturn();
         var replacement = result.getResponse().getCookie("BETTERF_REFRESH");
         assertThat(replacement.getValue()).isNotEqualTo(cookie.getValue());
         var restored = (MockHttpSession) result.getRequest().getSession();
         assertThat(restored.getId()).isNotEqualTo(oldId);
         mvc.perform(get("/api/auth/me").session(restored)).andExpect(status().isOk());
-        mvc.perform(post("/api/auth/logout").session(restored).cookie(replacement)
-                .header(token.path("headerName").asText(), token.path("token").asText()))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+        mvc.perform(
+                        post("/api/auth/logout")
+                                .session(restored)
+                                .cookie(replacement)
+                                .header(
+                                        token.path("headerName").asText(),
+                                        token.path("token").asText()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
         mvc.perform(post("/api/auth/logout").session(restored).cookie(replacement).with(csrf()))
                 .andExpect(status().isNoContent());
         mvc.perform(post("/api/auth/refresh").cookie(replacement).with(csrf()))
@@ -822,41 +786,74 @@ class RegistrationIntegrationTests {
         var cookie = loginRefresh();
         mvc.perform(post("/api/auth/refresh").cookie(cookie)).andExpect(status().isForbidden());
         mvc.perform(post("/api/auth/refresh").with(csrf())).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/auth/refresh").with(csrf()).cookie(new jakarta.servlet.http.Cookie("BETTERF_REFRESH", "bad")))
+        mvc.perform(
+                        post("/api/auth/refresh")
+                                .with(csrf())
+                                .cookie(new jakarta.servlet.http.Cookie("BETTERF_REFRESH", "bad")))
                 .andExpect(status().isUnauthorized());
         when(clock.instant()).thenReturn(start.plus(Duration.ofDays(14)));
         mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
-                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("SESSION_EXPIRED"));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("SESSION_EXPIRED"));
         assertThat(count("REFRESH_SESSION")).isZero();
     }
 
     @Test
     void replayRevokesReplacementAndPasswordChangesPreventRefresh() throws Exception {
         var cookie = loginRefresh();
-        var first = mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
-                .andExpect(status().isOk()).andReturn().getResponse().getCookie("BETTERF_REFRESH");
-        mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf())).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/auth/refresh").cookie(first).with(csrf())).andExpect(status().isUnauthorized());
+        var first =
+                mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getCookie("BETTERF_REFRESH");
+        mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/refresh").cookie(first).with(csrf()))
+                .andExpect(status().isUnauthorized());
         assertThat(count("REFRESH_SESSION")).isZero();
-        var newLogin = mvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json")
-                .content(json.writeValueAsString(Map.of("email", "ada@example.com", "password", password))))
-                .andExpect(status().isOk()).andReturn().getResponse().getCookie("BETTERF_REFRESH");
+        var newLogin =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .with(csrf())
+                                        .contentType("application/json")
+                                        .content(
+                                                json.writeValueAsString(
+                                                        Map.of(
+                                                                "email",
+                                                                "ada@example.com",
+                                                                "password",
+                                                                password))))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getCookie("BETTERF_REFRESH");
         jdbc.update("UPDATE ACCOUNT SET PASSWORD_HASH = 'changed'");
-        mvc.perform(post("/api/auth/refresh").cookie(newLogin).with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/refresh").cookie(newLogin).with(csrf()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void refreshRechecksOrganizationStatusAndCurrentRole() throws Exception {
+    void refreshRechecksWorkspaceStatusAndCurrentRole() throws Exception {
         var cookie = loginRefresh();
-        jdbc.update("UPDATE ACCOUNT SET ACCESS_ROLE = 'MEMBER'");
-        var result = mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.accessRole").value("MEMBER")).andReturn();
-        mvc.perform(get("/api/invitations").session((MockHttpSession) result.getRequest().getSession()))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
-        jdbc.update("UPDATE ORGANIZATION SET STATUS = 'PENDING'");
-        mvc.perform(post("/api/auth/refresh").cookie(result.getResponse().getCookie("BETTERF_REFRESH")).with(csrf()))
-                .andExpect(status().isUnauthorized());
+        var workspace = identity.current("ada@example.com").workspaceId();
+        jdbc.update("UPDATE WORKSPACE_MEMBERSHIP SET ROLE = 'MEMBER'");
+        var result =
+                mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.accessRole").value("MEMBER"))
+                        .andReturn();
+        mvc.perform(
+                        get("/api/invitations")
+                                .header("X-Workspace-Id", workspace)
+                                .session((MockHttpSession) result.getRequest().getSession()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("WORKSPACE_ACCESS_DENIED"));
+        jdbc.update("UPDATE WORKSPACE_MEMBERSHIP SET ACTIVE = FALSE");
+        assertThatThrownBy(() -> identity.current("ada@example.com", workspace))
+                .isInstanceOf(IdentityException.class);
     }
+
     @Test
     void logoutAfterSessionExpiryStillRevokesRefreshCookie() throws Exception {
         var cookie = loginRefresh();
@@ -874,12 +871,15 @@ class RegistrationIntegrationTests {
         var ready = new CountDownLatch(2);
         var startRefresh = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            Callable<Integer> consume = () -> {
-                ready.countDown();
-                assertThat(startRefresh.await(5, TimeUnit.SECONDS)).isTrue();
-                return mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
-                        .andReturn().getResponse().getStatus();
-            };
+            Callable<Integer> consume =
+                    () -> {
+                        ready.countDown();
+                        assertThat(startRefresh.await(5, TimeUnit.SECONDS)).isTrue();
+                        return mvc.perform(post("/api/auth/refresh").cookie(cookie).with(csrf()))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus();
+                    };
             var first = executor.submit(consume);
             var second = executor.submit(consume);
             assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
