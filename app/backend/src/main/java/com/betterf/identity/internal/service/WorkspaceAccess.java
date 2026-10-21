@@ -106,7 +106,10 @@ public class WorkspaceAccess {
                 active == null ? null : active.id(),
                 active == null ? null : active.name(),
                 active == null ? null : active.role(),
-                available);
+                available,
+                account.getDefaultWorkspace() == null
+                        ? null
+                        : account.getDefaultWorkspace().getId());
     }
 
     private static IdentityException denied() {

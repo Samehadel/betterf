@@ -170,9 +170,14 @@ public class IdentityServiceImpl implements IdentityService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AccountView current(String email) {
-        return workspaces.view(workspaces.account(email), null);
+        // Repair older active accounts that predate automatic default assignment.
+        // A revoked existing default is never replaced during session recovery.
+        locks.lock("email:" + normalizeEmail(email));
+        var account = workspaces.account(email);
+        workspaces.provisionDefault(account);
+        return workspaces.view(account, null);
     }
 
     @Override

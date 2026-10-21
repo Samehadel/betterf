@@ -1422,6 +1422,11 @@ components:
         - accessRole
         - workspaces
       properties:
+        defaultWorkspaceId:
+          type: [string, "null"]
+          format: uuid
+          description: The automatically assigned default workspace; independent of current selection.
+
         id:
           type: string
           format: uuid

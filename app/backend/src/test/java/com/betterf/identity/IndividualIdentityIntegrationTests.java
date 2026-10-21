@@ -128,7 +128,7 @@ class IndividualIdentityIntegrationTests {
         activate("person@example.com");
         jdbc.update(
                 "UPDATE ACCOUNT SET PASSWORD_HASH='!oauth:legacy' WHERE"
-                    + " EMAIL='person@example.com'");
+                        + " EMAIL='person@example.com'");
         mvc.perform(
                         post("/api/auth/login")
                                 .with(csrf())
@@ -141,6 +141,27 @@ class IndividualIdentityIntegrationTests {
                                                         "password",
                                                         password))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void missingLegacyDefaultIsAssignedOnceWithoutMovingExistingMemberships() throws Exception {
+        activate("legacy@example.com");
+        var original = identity.current("legacy@example.com");
+        jdbc.update("UPDATE ACCOUNT SET DEFAULT_WORKSPACE_ID=NULL WHERE ID=?", original.id());
+        var repaired = identity.current("legacy@example.com");
+        assertThat(repaired.defaultWorkspaceId()).isNotNull().isNotEqualTo(original.workspaceId());
+        assertThat(repaired.workspaceId()).isEqualTo(repaired.defaultWorkspaceId());
+        assertThat(repaired.workspaceName()).isEqualTo("My workspace");
+        assertThat(repaired.accessRole()).isEqualTo("OWNER");
+        assertThat(repaired.workspaces()).hasSize(2);
+        assertThat(identity.current("legacy@example.com").defaultWorkspaceId())
+                .isEqualTo(repaired.defaultWorkspaceId());
+        assertThat(identity.current("legacy@example.com").workspaces()).hasSize(2);
+        mvc.perform(
+                        get("/api/knowledge/tickets")
+                                .with(user("legacy@example.com"))
+                                .header("X-Workspace-Id", repaired.defaultWorkspaceId()))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -208,7 +229,7 @@ class IndividualIdentityIntegrationTests {
         var account = identity.current("person@example.com");
         jdbc.update(
                 "INSERT INTO WORKSPACE_MEMBERSHIP(ID, ACCOUNT_ID, WORKSPACE_ID, ROLE) VALUES (?, ?,"
-                    + " ?, 'MEMBER')",
+                        + " ?, 'MEMBER')",
                 UUID.randomUUID(),
                 account.id(),
                 first);
@@ -217,7 +238,7 @@ class IndividualIdentityIntegrationTests {
                         () ->
                                 jdbc.update(
                                         "UPDATE ACCOUNT SET EMAIL=' Person@example.com ' WHERE"
-                                            + " EMAIL='person@example.com'"))
+                                                + " EMAIL='person@example.com'"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -519,7 +540,7 @@ class IndividualIdentityIntegrationTests {
                 .andExpect(status().isForbidden());
         jdbc.update(
                 "UPDATE WORKSPACE_MEMBERSHIP SET ACTIVE=FALSE WHERE ACCOUNT_ID=? AND"
-                    + " WORKSPACE_ID=?",
+                        + " WORKSPACE_ID=?",
                 original.id(),
                 additional.workspaceId());
         code(

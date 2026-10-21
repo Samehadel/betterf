@@ -368,7 +368,15 @@
     "knowledgeDescription": "Find the context, solutions, and lessons your workspace captures.",
     "createCapture": "Create a capture",
     "preserveLesson": "Browse knowledge",
-    "selectRequired": "Select a workspace"
+    "selectRequired": "Select a workspace",
+    "settingsEyebrow": "Make it yours",
+    "renameTitle": "Workspace name",
+    "renameHint": "Your default workspace is ready to use. Give it a name that feels right.",
+    "renameAction": "Save name",
+    "renameLimit": "Use up to 200 characters.",
+    "renameInvalid": "Enter a name of up to 200 characters.",
+    "chooseHint": "Choose a workspace from the sidebar to capture and browse its knowledge.",
+    "defaultLabel": "Default"
   },
   "individual": {
     "eyebrow": "Your knowledge, connected",

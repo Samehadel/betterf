@@ -57,8 +57,18 @@
                   [value]="workspace.id"
                   [selected]="workspace.id === account.workspaceId"
                 >
-                  {{ workspace.name }} ·
-                  {{ workspace.role === "OWNER" ? "Owner" : "Member" }}
+                  {{
+                    workspace.id === account.defaultWorkspaceId
+                      ? t("workspace.defaultLabel") + " · "
+                      : ""
+                  }}{{ workspace.name
+                  }}{{
+                    workspace.id === account.defaultWorkspaceId
+                      ? ""
+                      : workspace.role === "OWNER"
+                        ? " · Owner"
+                        : " · Member"
+                  }}
                 </option>
               }
             </select>
@@ -251,7 +261,13 @@
           } @else {
             <span class="workspace-topbar-status"
               ><span aria-hidden="true">●</span
-              >{{ t("identity.home.active") }}</span
+              >{{
+                t(
+                  auth.account()?.workspaceId
+                    ? "identity.home.active"
+                    : "workspace.selectRequired"
+                )
+              }}</span
             >
           }
         </header>

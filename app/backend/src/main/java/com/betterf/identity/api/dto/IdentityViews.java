@@ -19,7 +19,8 @@ public final class IdentityViews {
             UUID workspaceId,
             String workspaceName,
             String accessRole,
-            java.util.List<WorkspaceView> workspaces) {}
+            java.util.List<WorkspaceView> workspaces,
+            UUID defaultWorkspaceId) {}
 
     public record CredentialsView(
             String email, String passwordHash, String accessRole, boolean active) {}

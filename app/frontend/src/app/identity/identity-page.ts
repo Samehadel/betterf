@@ -169,23 +169,21 @@ export class IdentityPage {
         void this.router.navigateByUrl('/login');
     });
   }
-  async saveWorkspace(rename: boolean) {
+  async renameWorkspace() {
     this.workspaceForm.markAllAsTouched();
     if (this.workspaceForm.invalid || this.workspaceBusy()) return;
     const name = this.workspaceForm.controls.name.value.trim();
     const selected = this.store.account()?.workspaceId;
-    if (!name || (rename && !selected)) return;
+    if (!name || !selected || this.store.account()?.accessRole !== 'OWNER')
+      return;
     this.workspaceBusy.set(true);
     this.workspaceError.set('');
     try {
       const account = await firstValueFrom(
-        rename
-          ? this.api.renameWorkspace(selected!, name)
-          : this.api.createWorkspace(name),
+        this.api.renameWorkspace(selected, name),
       );
       this.auth.setAccount(account);
-      this.workspaceForm.reset();
-      await this.router.navigateByUrl('/knowledge');
+      this.workspaceForm.controls.name.setValue(account.workspaceName ?? name);
     } catch {
       this.workspaceError.set(
         'Unable to save the workspace. Check your access and try again.',

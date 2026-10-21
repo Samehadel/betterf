@@ -2326,3 +2326,68 @@ figure.knowledge-code {
   line-height: 1.7;
   margin-top: 24px;
 }
+
+/* Workspace settings use the same surfaces and contrast as the workspace cards. */
+.workspace-settings {
+  margin-top: 28px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #272630;
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 32px;
+  align-items: start;
+}
+.workspace-settings h2 {
+  margin: 8px 0;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.workspace-settings .eyebrow {
+  font-size: 10px;
+}
+.workspace-settings-description,
+.workspace-settings .form-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+.workspace-rename-form {
+  display: grid;
+  gap: 8px;
+}
+.workspace-rename-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-rename-controls {
+  display: flex;
+  gap: 12px;
+}
+.workspace-rename-controls .identity-input {
+  flex: 1;
+  min-width: 0;
+  background: #202027;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+}
+.workspace-rename-controls .button {
+  white-space: nowrap;
+}
+.workspace-rename-controls .identity-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 850px) {
+  .workspace-settings {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+@media (max-width: 500px) {
+  .workspace-rename-controls {
+    flex-direction: column;
+  }
+}

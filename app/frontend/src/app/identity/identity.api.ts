@@ -21,6 +21,7 @@ export interface Account {
   fullName: string;
   email: string;
   workspaceId: string | null;
+  defaultWorkspaceId?: string | null;
   workspaceName: string | null;
   accessRole: string;
   workspaces: { id: string; name: string; role: string }[];
