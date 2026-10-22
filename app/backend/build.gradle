@@ -1,0 +1,54 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '4.0.8'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+group = 'com.betterf'
+version = file('../../VERSION').text.trim()
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+repositories { mavenCentral() }
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.modulith:spring-modulith-bom:2.0.8'
+        mavenBom 'org.springframework.ai:spring-ai-bom:2.0.1'
+    }
+}
+dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
+    implementation 'com.google.guava:guava:33.4.8-jre'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+dependencyLocking { lockAllConfigurations() }
+jacoco { toolVersion = '0.8.14' }
+tasks.named('test') { useJUnitPlatform(); finalizedBy jacocoTestReport }
+tasks.named('jacocoTestReport') { dependsOn test; reports { xml.required = true } }
+
+// Release metadata may change; CI and Docker always consume this stable path.
+tasks.named('bootJar') {
+    archiveFileName = 'app.jar'
+    manifest { attributes('Implementation-Version': project.version) }
+}

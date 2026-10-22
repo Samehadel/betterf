@@ -1,0 +1,13 @@
+# Local tooling and generated output
+.idea/
+.DS_Store
+.env
+.env.*
+!.env.example
+**/node_modules/
+**/.angular/
+**/dist/
+**/coverage/
+**/test-results/
+**/playwright-report/
+output/

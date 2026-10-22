@@ -1,0 +1,664 @@
+<ng-container *transloco="let t">
+  <a class="skip-link" href="#main">{{ t("landing.skip_to_content") }}</a>
+  <header class="top">
+    <nav class="wrap" aria-label="Main navigation">
+      <a class="brand" [routerLink]="store.account() ? '/workspace' : '/'"
+        >theeverthread<span class="text-[var(--accent)]">.</span></a
+      >
+      @if (store.account(); as account) {
+        <span class="nav-workspace">{{ account.workspaceName }}</span>
+        <button
+          class="button secondary"
+          [disabled]="store.busy()"
+          (click)="store.run({ kind: 'logout' })"
+        >
+          {{ t("identity.logout") }}
+        </button>
+      } @else if (mode === "login") {
+        <a routerLink="/signup">{{ t("identity.register") }}</a>
+      } @else if (mode !== "workspace") {
+        <a routerLink="/login">{{ t("identity.login") }}</a>
+      }
+    </nav>
+  </header>
+  <main
+    class="identity-shell"
+    [class.registration-shell]="isRegistration || mode === 'login'"
+    [class.login-shell]="mode === 'login'"
+    [class.workspace-shell]="mode === 'workspace'"
+    id="main"
+    tabindex="-1"
+  >
+    @if (mode === "signup") {
+      <aside class="registration-story">
+        <div class="story-content">
+          <p class="eyebrow">{{ t("individual.eyebrow") }}</p>
+          <h2>{{ t("individual.title") }}</h2>
+          <p class="story-intro">{{ t("individual.intro") }}</p>
+          <p class="personal-boundary">{{ t("individual.boundary") }}</p>
+        </div>
+      </aside>
+    } @else if (isRegistration || mode === "login") {
+      <aside
+        class="registration-story"
+        aria-labelledby="registration-story-title"
+      >
+        <div class="story-content">
+          <p class="eyebrow">
+            {{
+              t(
+                mode === "login"
+                  ? "identity.loginStory.eyebrow"
+                  : "identity.story.eyebrow"
+              )
+            }}
+          </p>
+          <h2 id="registration-story-title">
+            {{
+              t(
+                mode === "login"
+                  ? "identity.loginStory.title"
+                  : "identity.story.title"
+              )
+            }}
+            <span>{{
+              t(
+                mode === "login"
+                  ? "identity.loginStory.highlight"
+                  : "identity.story.highlight"
+              )
+            }}</span>
+          </h2>
+          <p class="story-intro">
+            {{
+              t(
+                mode === "login"
+                  ? "identity.loginStory.intro"
+                  : "identity.story.intro"
+              )
+            }}
+          </p>
+          <div class="memory-illustration" aria-hidden="true">
+            <div class="memory-orbit orbit-one"></div>
+            <div class="memory-orbit orbit-two"></div>
+            <div class="memory-spark spark-one">✦</div>
+            <div class="memory-spark spark-two">✦</div>
+            <div class="memory-note note-back">
+              <span class="note-symbol">◇</span>
+              <span>{{ t("identity.story.context") }}</span>
+              <div class="note-line"></div>
+              <div class="note-line short"></div>
+            </div>
+            <div class="memory-note note-front">
+              <div class="note-top">
+                <span class="note-symbol">↗</span
+                ><span class="note-dots">•••</span>
+              </div>
+              <span class="note-label">{{ t("identity.story.lesson") }}</span>
+              <strong>{{ t("identity.story.idea") }}</strong>
+              <div class="note-line"></div>
+              <div class="note-line short"></div>
+              <div class="note-footer">
+                <span class="note-check">✓</span>{{ t("identity.story.kept") }}
+              </div>
+            </div>
+            <span class="memory-caption">{{
+              t("identity.story.caption")
+            }}</span>
+          </div>
+          <p class="story-outro">
+            {{
+              t(
+                mode === "login"
+                  ? "identity.loginStory.outro"
+                  : "identity.story.outro"
+              )
+            }}
+          </p>
+        </div>
+      </aside>
+    }
+    @if (mode === "workspace") {
+      <section class="workspace" aria-labelledby="workspace-title">
+        @if (store.errorCode()) {
+          <div role="alert" class="form-alert">
+            {{ store.error() || t("identity.unavailable") }}
+          </div>
+        }
+        @if (store.account(); as account) {
+          <section class="workspace-hero workspace-home-hero">
+            <div class="workspace-hero-copy">
+              <p class="eyebrow">{{ t("identity.home.eyebrow") }}</p>
+              <h1 id="workspace-title">
+                {{ account.workspaceName || t("workspace.selectRequired") }}
+              </h1>
+              <p class="workspace-welcome">
+                {{ t("identity.welcome", { name: account.fullName }) }}
+              </p>
+              <p class="workspace-intro">{{ t("workspace.intro") }}</p>
+              @if (account.workspaceId) {
+                <a class="button" routerLink="/knowledge/new"
+                  ><span aria-hidden="true">＋</span
+                  >{{ t("knowledge.newCapture") }}</a
+                >
+              } @else {
+                <p role="status">{{ t("workspace.chooseHint") }}</p>
+              }
+            </div>
+            <div class="workspace-art" aria-hidden="true">
+              <div class="workspace-monogram">
+                {{
+                  (account.workspaceName ?? account.fullName)
+                    .slice(0, 1)
+                    .toUpperCase()
+                }}
+              </div>
+            </div>
+          </section>
+          @if (account.workspaceId) {
+            <div class="home-section-heading">
+              <h2>{{ t("workspace.atAGlance") }}</h2>
+              <span>{{ account.workspaceName }}</span>
+            </div>
+            <div class="workspace-grid workspace-home-grid">
+              <section
+                class="workspace-note"
+                aria-labelledby="workspace-note-title"
+              >
+                <span class="workspace-icon" aria-hidden="true">↗</span>
+                <h2 id="workspace-note-title">
+                  {{
+                    t(
+                      account.accessRole === "OWNER"
+                        ? "identity.home.nextTitle"
+                        : "identity.home.memberTitle"
+                    )
+                  }}
+                </h2>
+                <p>
+                  {{
+                    t(
+                      account.accessRole === "OWNER"
+                        ? "identity.home.nextDescription"
+                        : "identity.home.memberDescription"
+                    )
+                  }}
+                </p>
+                @if (account.accessRole === "OWNER") {
+                  <div class="home-card-actions">
+                    <a
+                      class="button secondary"
+                      routerLink="/workspace/invitations"
+                      >{{ t("invitations.formTitle") }}</a
+                    ><a class="home-text-link" routerLink="/workspace/team"
+                      >{{ t("team.title") }}
+                      <span aria-hidden="true">→</span></a
+                    >
+                  </div>
+                } @else {
+                  <a class="home-text-link" routerLink="/knowledge/new"
+                    >{{ t("workspace.createCapture") }}
+                    <span aria-hidden="true">→</span></a
+                  >
+                }
+              </section>
+              <section
+                class="workspace-profile workspace-knowledge-card"
+                aria-labelledby="workspace-knowledge-title"
+              >
+                <span class="workspace-icon" aria-hidden="true">✧</span>
+                <h2 id="workspace-knowledge-title">
+                  {{ t("workspace.knowledgeTitle") }}
+                </h2>
+                <p>{{ t("workspace.knowledgeDescription") }}</p>
+                <a class="home-text-link" routerLink="/knowledge"
+                  >{{ t("workspace.preserveLesson") }}
+                  <span aria-hidden="true">→</span></a
+                >
+              </section>
+            </div>
+          }
+          @if (account.workspaceId && account.accessRole === "OWNER") {
+            <section
+              class="workspace-settings"
+              aria-labelledby="workspace-settings-title"
+            >
+              <div>
+                <p class="eyebrow">{{ t("workspace.settingsEyebrow") }}</p>
+                <h2 id="workspace-settings-title">
+                  {{ t("workspace.renameTitle") }}
+                </h2>
+                <p class="workspace-settings-description">
+                  {{ t("workspace.renameHint") }}
+                </p>
+              </div>
+              <form
+                [formGroup]="workspaceForm"
+                (ngSubmit)="renameWorkspace()"
+                class="workspace-rename-form"
+              >
+                <label for="workspace-name">{{
+                  t("identity.workspaceName")
+                }}</label>
+                <div class="workspace-rename-controls">
+                  <input
+                    id="workspace-name"
+                    class="identity-input"
+                    formControlName="name"
+                    [placeholder]="account.workspaceName ?? ''"
+                    maxlength="200"
+                    required
+                    [attr.aria-invalid]="
+                      workspaceForm.controls.name.touched &&
+                      workspaceForm.invalid
+                    "
+                    aria-describedby="workspace-name-hint"
+                  />
+                  <button class="button secondary" [disabled]="workspaceBusy()">
+                    {{
+                      t(
+                        workspaceBusy()
+                          ? "identity.working"
+                          : "workspace.renameAction"
+                      )
+                    }}
+                  </button>
+                </div>
+                <p id="workspace-name-hint" class="form-hint">
+                  {{ t("workspace.renameLimit") }}
+                </p>
+                @if (
+                  workspaceForm.controls.name.touched && workspaceForm.invalid
+                ) {
+                  <p role="alert" class="field-error">
+                    {{ t("workspace.renameInvalid") }}
+                  </p>
+                }
+                @if (workspaceError()) {
+                  <p role="alert" class="field-error">{{ workspaceError() }}</p>
+                }
+              </form>
+            </section>
+          }
+          <p class="workspace-footer">{{ t("identity.home.footer") }}</p>
+        } @else {
+          <div class="workspace-empty">
+            <h1 id="workspace-title">{{ t("identity.title.workspace") }}</h1>
+            @if (store.busy()) {
+              <p role="status">{{ t("identity.home.loading") }}</p>
+            } @else {
+              <p>{{ t("identity.loginRequired") }}</p>
+              <div class="actions">
+                <a class="button" routerLink="/login">{{
+                  t("identity.login")
+                }}</a>
+                <button
+                  class="button secondary"
+                  (click)="store.run({ kind: 'current' })"
+                >
+                  {{ t("identity.retry") }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    } @else {
+      <section class="identity-content" aria-labelledby="identity-title">
+        <div class="identity-form-wrap">
+          <p class="eyebrow">
+            {{
+              t(
+                mode === "signup"
+                  ? "individual.eyebrow"
+                  : mode === "login"
+                    ? "identity.loginEyebrow"
+                    : "identity.eyebrow"
+              )
+            }}
+          </p>
+          <h1 id="identity-title">
+            {{
+              t(
+                mode === "signup"
+                  ? "individual.signup"
+                  : "identity.title." + mode
+              )
+            }}
+          </h1>
+          @if (socialMessage) {
+            <p class="form-alert" role="status">{{ t(socialMessage) }}</p>
+          }
+          @if (store.errorCode()) {
+            <div role="alert" class="form-alert">
+              {{ store.error() || t("identity.unavailable") }}
+            </div>
+          }
+          @if (store.busy() && mode !== "verify") {
+            <p role="status" class="form-hint">{{ t("identity.working") }}</p>
+          }
+          @if (isRegistration && !store.pending()) {
+            <p class="form-intro">
+              {{
+                t(mode === "signup" ? "individual.formIntro" : "identity.intro")
+              }}
+            </p>
+
+            <form
+              [formGroup]="registration"
+              (ngSubmit)="register()"
+              novalidate
+              class="registration-form"
+            >
+              <fieldset [disabled]="store.busy()">
+                <legend>
+                  <span class="section-number" aria-hidden="true">
+                    {{ mode === "signup" ? "01" : "02" }}</span
+                  >{{
+                    t(
+                      mode === "signup"
+                        ? "individual.profile"
+                        : "identity.administrator"
+                    )
+                  }}
+                </legend>
+                <div class="form-grid">
+                  <div class="form-field field-full">
+                    <label for="fullName">{{ t("identity.fullName") }}</label>
+                    <input
+                      class="identity-input"
+                      id="fullName"
+                      formControlName="fullName"
+                      autocomplete="name"
+                      required
+                      maxlength="200"
+                      [attr.aria-invalid]="invalid('fullName')"
+                      [attr.aria-describedby]="
+                        invalid('fullName') ? 'fullNameError' : null
+                      "
+                    />
+                    @if (invalid("fullName")) {
+                      <p id="fullNameError" class="field-error">
+                        {{ t(fieldError("fullName")) }}
+                      </p>
+                    }
+                  </div>
+                  <div class="form-field field-full">
+                    <label for="email">{{ t("individual.email") }}</label>
+                    <input
+                      class="identity-input"
+                      id="email"
+                      type="email"
+                      formControlName="email"
+                      autocomplete="username"
+                      required
+                      maxlength="254"
+                      [attr.aria-invalid]="invalid('email')"
+                      [attr.aria-describedby]="
+                        invalid('email') ? 'emailError' : null
+                      "
+                    />
+                    @if (invalid("email")) {
+                      <p id="emailError" class="field-error">
+                        {{ t(fieldError("email")) }}
+                      </p>
+                    }
+                  </div>
+                  <div class="form-field field-full">
+                    <label for="password">{{ t("identity.password") }}</label>
+                    <input
+                      class="identity-input"
+                      id="password"
+                      type="password"
+                      formControlName="password"
+                      autocomplete="new-password"
+                      required
+                      minlength="10"
+                      maxlength="128"
+                      [attr.aria-describedby]="
+                        invalid('password')
+                          ? 'passwordHint passwordError'
+                          : 'passwordHint'
+                      "
+                      [attr.aria-invalid]="invalid('password')"
+                    />
+                    <p id="passwordHint" class="form-hint">
+                      {{ t("identity.passwordHint") }}
+                    </p>
+                    @if (invalid("password")) {
+                      <p id="passwordError" class="field-error">
+                        {{ t(fieldError("password")) }}
+                      </p>
+                    }
+                  </div>
+                  <div class="form-field field-full">
+                    <label for="confirmPassword">{{
+                      t("identity.confirmPassword")
+                    }}</label>
+                    <input
+                      class="identity-input"
+                      id="confirmPassword"
+                      type="password"
+                      formControlName="confirmPassword"
+                      autocomplete="new-password"
+                      required
+                      [attr.aria-invalid]="invalid('confirmPassword')"
+                      [attr.aria-describedby]="
+                        invalid('confirmPassword')
+                          ? 'confirmPasswordError'
+                          : null
+                      "
+                    />
+                    @if (invalid("confirmPassword")) {
+                      <p id="confirmPasswordError" class="field-error">
+                        {{ t(fieldError("confirmPassword")) }}
+                      </p>
+                    }
+                  </div>
+                </div>
+              </fieldset>
+              @if (submitted() && registration.invalid) {
+                <p role="alert" class="field-error">
+                  {{ t("identity.correctFields") }}
+                </p>
+              }
+              <button class="button register-submit" [disabled]="store.busy()">
+                {{
+                  t(
+                    mode === "signup"
+                      ? "individual.signup"
+                      : "identity.register"
+                  )
+                }}<span aria-hidden="true">→</span>
+              </button>
+              <p class="form-signin">
+                {{ t("identity.alreadyRegistered") }}
+                <a class="text-link" routerLink="/login">{{
+                  t("identity.login")
+                }}</a>
+              </p>
+            </form>
+          }
+          @if (isRegistration && store.pending()) {
+            <div class="delivery-card" aria-live="polite">
+              <span class="delivery-icon" aria-hidden="true">✉</span>
+              <h2>
+                {{
+                  t(
+                    store.pending()?.deliveryStatus === "SMTP_ACCEPTED"
+                      ? "identity.checkEmail"
+                      : "identity.deliveryQueued"
+                  )
+                }}
+              </h2>
+              <p>{{ t(deliveryMessage()) }}</p>
+            </div>
+          }
+          @if (mode === "verify") {
+            @if (store.alreadyVerified()) {
+              <p>{{ t("identity.alreadyVerified") }}</p>
+              <a class="button" routerLink="/login">{{
+                t("identity.login")
+              }}</a>
+            } @else if (invalidFragment()) {
+              <p role="alert" class="form-alert">
+                {{ t("identity.invalidLink") }}
+              </p>
+            } @else if (store.errorCode()) {
+              <button
+                class="button mb-6"
+                [disabled]="store.busy()"
+                (click)="verify()"
+              >
+                {{ t("identity.retry") }}
+              </button>
+            } @else {
+              <p role="status">{{ t("identity.verifying") }}</p>
+            }
+          }
+          @if (mode === "login") {
+            <p class="form-intro">{{ t("identity.loginIntro") }}</p>
+
+            <form
+              [formGroup]="loginForm"
+              (ngSubmit)="login()"
+              class="login-form"
+              novalidate
+            >
+              <fieldset [disabled]="store.busy()">
+                <legend class="sr-only">{{ t("identity.login") }}</legend>
+                <div class="form-field">
+                  <label for="loginEmail">{{ t("individual.email") }}</label>
+                  <input
+                    class="identity-input"
+                    id="loginEmail"
+                    type="email"
+                    formControlName="email"
+                    autocomplete="username"
+                    required
+                    [attr.aria-invalid]="loginInvalid('email')"
+                    [attr.aria-describedby]="
+                      loginInvalid('email') ? 'loginEmailError' : null
+                    "
+                  />
+                  @if (loginInvalid("email")) {
+                    <p id="loginEmailError" class="field-error">
+                      {{ t("identity.emailError") }}
+                    </p>
+                  }
+                </div>
+                <div class="form-field">
+                  <label for="loginPassword">{{
+                    t("identity.password")
+                  }}</label>
+                  <input
+                    class="identity-input"
+                    id="loginPassword"
+                    type="password"
+                    formControlName="password"
+                    autocomplete="current-password"
+                    required
+                    maxlength="128"
+                    [attr.aria-invalid]="loginInvalid('password')"
+                    [attr.aria-describedby]="
+                      loginInvalid('password') ? 'loginPasswordError' : null
+                    "
+                  />
+                  @if (loginInvalid("password")) {
+                    <p id="loginPasswordError" class="field-error">
+                      {{ t("identity.loginPasswordError") }}
+                    </p>
+                  }
+                </div>
+              </fieldset>
+              <button class="button register-submit" [disabled]="store.busy()">
+                {{ t("identity.login") }}<span aria-hidden="true">→</span>
+              </button>
+            </form>
+            <p class="form-signin">
+              {{ t("identity.noAccount") }}
+              <a routerLink="/signup" class="text-link">{{
+                t("individual.signup")
+              }}</a>
+            </p>
+          }
+          @if (
+            (isRegistration &&
+              (store.pending() || store.errorCode() === "EMAIL_UNAVAILABLE")) ||
+            (mode === "verify" &&
+              !store.verified() &&
+              (invalidFragment() || store.errorCode())) ||
+            mode === "login"
+          ) {
+            <details class="verification-recovery" [open]="mode !== 'login'">
+              <summary>{{ t("identity.resendTitle") }}</summary>
+              <form
+                [formGroup]="resendForm"
+                (ngSubmit)="resend()"
+                class="mt-4 space-y-3"
+              >
+                <label for="resendEmail">{{ t("individual.email") }}</label>
+                @if (store.pending(); as pending) {
+                  <input
+                    class="identity-input locked-email"
+                    id="resendEmail"
+                    type="email"
+                    [value]="pending.email"
+                    disabled
+                    aria-describedby="emailLockedHint"
+                  />
+                  <p id="emailLockedHint" class="form-hint">
+                    {{ t("identity.emailLocked") }}
+                  </p>
+                } @else {
+                  <input
+                    class="identity-input"
+                    id="resendEmail"
+                    formControlName="email"
+                    type="email"
+                    autocomplete="email"
+                    required
+                    [attr.aria-invalid]="
+                      resendForm.controls.email.invalid &&
+                      resendForm.controls.email.touched
+                    "
+                    [attr.aria-describedby]="
+                      resendForm.controls.email.invalid &&
+                      resendForm.controls.email.touched
+                        ? 'resendEmailError'
+                        : null
+                    "
+                  />
+                  @if (
+                    resendForm.controls.email.invalid &&
+                    resendForm.controls.email.touched
+                  ) {
+                    <p id="resendEmailError" class="field-error">
+                      {{ t("identity.emailError") }}
+                    </p>
+                  }
+                }
+                <button
+                  class="button secondary"
+                  [disabled]="
+                    store.busy() || remaining() > 0 || deliveryInProgress()
+                  "
+                >
+                  {{ t("identity.resend") }}
+                </button>
+                @if (remaining() > 0) {
+                  <p role="status">
+                    {{ t("identity.cooldown", { seconds: remaining() }) }}
+                  </p>
+                }
+                @if (store.pending() && !isRegistration) {
+                  <p role="status">{{ t(deliveryMessage()) }}</p>
+                }
+              </form>
+            </details>
+          }
+        </div>
+      </section>
+    }
+  </main>
+</ng-container>

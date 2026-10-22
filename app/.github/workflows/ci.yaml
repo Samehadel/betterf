@@ -1,0 +1,59 @@
+name: Foundation checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+      - name: Backend checks and executable JAR
+        working-directory: app/backend
+        run: ./gradlew check bootJar --no-daemon
+      - name: Frontend checks and production build
+        working-directory: app/frontend
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+          npm run build
+          npx playwright install --with-deps chromium
+      - name: Start local stack and verify browser communication
+        working-directory: app
+        run: |
+          cp .env.example .env
+          printf '\nDB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+          docker compose up -d --wait
+          set -a
+          source .env
+          set +a
+          java -jar backend/build/libs/backend-0.0.1-SNAPSHOT.jar > /tmp/betterf-backend.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" 2>/dev/null || true; docker compose down -v' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health/readiness; then ready=1; break; fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then cat /tmp/betterf-backend.log; exit 1; fi
+          cd frontend
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: |
+            app/backend/build/reports/
+            app/frontend/test-results/

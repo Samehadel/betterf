@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - include:
+      file: db/foundation/20260922-001-baseline.sql
+  - include:
+      file: db/identity/20261004-001-registration.sql
+  - include:
+      file: db/identity/20261004-002-email-worker.sql
+  - include:
+      file: db/identity/20261007-001-invitations.sql
+  - include:
+      file: db/foundation/20261007-001-shedlock.sql
+  - include:
+      file: db/foundation/20261008-001-refresh-session.sql
+  - include:
+      file: db/identity/20261008-001-invitation-acceptance.sql
+  - include:
+      file: db/identity/20261015-001-invitation-resend.sql
+  - include:
+      file: db/knowledge/20261018-001-tickets.sql
+  - include:
+      file: db/knowledge/20261019-001-browsing.sql
+  - include:
+      file: db/identity/20261021-001-individuals.sql
+  - include:
+      file: db/knowledge/20261021-001-personal-tickets.sql
+  - include:
+      file: db/identity/20261021-004-workspaces.sql

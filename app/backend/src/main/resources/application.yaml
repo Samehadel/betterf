@@ -1,0 +1,93 @@
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:unconfigured}
+      timeout: 45s
+      max-retries: 0
+      chat:
+        model: gpt-5.4-nano
+        reasoning-effort: none
+        temperature: null
+        max-completion-tokens: 2048
+        store: false
+      embedding:
+        enabled: false
+  task:
+    scheduling:
+      pool:
+        size: 2
+  application:
+    name: betterf
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/betterf}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      data-source-properties:
+        socketTimeout: 3
+        connectTimeout: 2
+      connection-timeout: 2000
+      validation-timeout: 1000
+  mail:
+    host: ${SMTP_HOST:127.0.0.1}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SMTP_AUTH:true}
+      "[mail.smtp.starttls.enable]": ${SMTP_STARTTLS:true}
+      "[mail.smtp.starttls.required]": ${SMTP_STARTTLS:false}
+      "[mail.smtp.connectiontimeout]": 2000
+      "[mail.smtp.timeout]": 2000
+      "[mail.smtp.writetimeout]": 2000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog-master.yaml
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:true}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: ADMIN
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+betterf:
+  oauth:
+    linkedin:
+      client-id: ${LINKEDIN_CLIENT_ID:}
+      client-secret: ${LINKEDIN_CLIENT_SECRET:}
+    facebook:
+      client-id: ${FACEBOOK_CLIENT_ID:}
+      client-secret: ${FACEBOOK_CLIENT_SECRET:}
+      api-version: ${FACEBOOK_API_VERSION:v23.0}
+  auth:
+    refresh-lifetime: ${REFRESH_TOKEN_LIFETIME:14d}
+  registration:
+    public-origin: ${PUBLIC_ORIGIN:http://127.0.0.1:4200}
+    mail-from: ${MAIL_FROM:no-reply@betterf.local}
+  invitations:
+    max-active-accounts: ${INVITATION_MAX_ACTIVE_ACCOUNTS:10}

@@ -1,0 +1,32 @@
+<div *transloco="let t" class="social-options">
+  @if (providers(); as options) {
+    <div class="grid gap-3 sm:grid-cols-2">
+      @for (provider of options; track provider.id) {
+        @if (provider.available) {
+          <a
+            class="button secondary justify-center"
+            [href]="'/api/auth/oauth/authorize/' + provider.id"
+          >
+            {{ t("individual." + provider.id) }}
+          </a>
+        } @else {
+          <button
+            type="button"
+            class="button secondary justify-center"
+            disabled
+            [title]="t('individual.providerUnavailable')"
+          >
+            {{ t("individual." + provider.id) }}
+          </button>
+        }
+      }
+    </div>
+    @if (!options[0].available || !options[1].available) {
+      <p class="form-hint">{{ t("individual.providerUnavailable") }}</p>
+    }
+  } @else {
+    <p class="form-hint" role="status">
+      {{ t(providers() === null ? "individual.providerUnavailable" : "identity.working") }}
+    </p>
+  }
+</div>

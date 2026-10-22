@@ -1,0 +1,92 @@
+import {
+  knowledgeAccess,
+  unsavedCapture,
+} from './knowledge/knowledge-access.guard';
+import { TeamManagementStore } from './invitations/team-management.store';
+import { AcceptanceStore } from './invitations/acceptance.store';
+import { InvitationStore } from './invitations/invitation.store';
+import { IdentityStore } from './identity/identity.store';
+import { Routes } from '@angular/router';
+import { StatusStore } from './foundation/status.store';
+
+export const routes: Routes = [
+  { path: 'register', redirectTo: 'signup', pathMatch: 'full' },
+  { path: 'company', redirectTo: 'knowledge', pathMatch: 'full' },
+  { path: 'company/team', redirectTo: 'workspace/team', pathMatch: 'full' },
+  {
+    path: 'company/invitations',
+    redirectTo: 'workspace/invitations',
+    pathMatch: 'full',
+  },
+
+  {
+    path: 'knowledge',
+    pathMatch: 'full',
+    canActivate: [knowledgeAccess],
+    loadComponent: () =>
+      import('./knowledge/browse-page').then((m) => m.BrowsePage),
+  },
+  {
+    path: 'knowledge/new',
+    canActivate: [knowledgeAccess],
+    canDeactivate: [unsavedCapture],
+    loadComponent: () =>
+      import('./knowledge/capture-page').then((m) => m.CapturePage),
+  },
+  {
+    path: 'knowledge/tickets/:id',
+    canActivate: [knowledgeAccess],
+    loadComponent: () =>
+      import('./knowledge/ticket-page').then((m) => m.TicketPage),
+  },
+  {
+    path: 'invitation/accept',
+    providers: [AcceptanceStore],
+    loadComponent: () =>
+      import('./invitations/acceptance-page').then((m) => m.AcceptancePage),
+  },
+  {
+    path: '',
+    pathMatch: 'full',
+    loadComponent: () =>
+      import('./landing/landing-page').then((m) => m.LandingPage),
+  },
+  {
+    path: 'status',
+    providers: [StatusStore],
+    loadComponent: () =>
+      import('./foundation/status-page').then((m) => m.StatusPage),
+  },
+  {
+    path: 'workspace/invitations/pending',
+    redirectTo: 'workspace/team',
+    pathMatch: 'full',
+  },
+  {
+    path: 'workspace/team',
+    providers: [TeamManagementStore],
+    loadComponent: () =>
+      import('./invitations/team-management-page').then(
+        (m) => m.TeamManagementPage,
+      ),
+  },
+  {
+    path: 'workspace/invitations',
+    providers: [InvitationStore],
+    loadComponent: () =>
+      import('./invitations/invitation-page').then((m) => m.InvitationPage),
+  },
+  ...(['signup', 'verify', 'login', 'workspace'] as const).map((mode) => ({
+    path: mode,
+    data: { mode },
+    providers: [IdentityStore],
+    loadComponent: () =>
+      import('./identity/identity-page').then((m) => m.IdentityPage),
+  })),
+  {
+    path: 'link-account',
+    loadComponent: () =>
+      import('./identity/link-account-page').then((m) => m.LinkAccountPage),
+  },
+  { path: '**', redirectTo: '' },
+];
