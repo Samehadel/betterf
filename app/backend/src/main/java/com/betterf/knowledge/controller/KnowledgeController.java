@@ -19,26 +19,36 @@ public class KnowledgeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TicketView create(Principal principal, @RequestBody CreateTicketRequest request) {
-        return knowledge.create(principal.getName(), request);
+    public TicketView create(
+            Principal principal,
+            @RequestHeader("X-Workspace-Id") UUID workspaceId,
+            @RequestBody CreateTicketRequest request) {
+        return knowledge.create(principal.getName(), workspaceId, request);
     }
 
     @GetMapping
     public TicketPage browse(
             Principal principal,
+            @RequestHeader("X-Workspace-Id") UUID workspaceId,
             @RequestParam(required = false) String detailsType,
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor) {
-        return knowledge.browse(principal.getName(), detailsType, limit, cursor);
+        return knowledge.browse(principal.getName(), workspaceId, detailsType, limit, cursor);
     }
 
     @GetMapping("/{id}")
-    public TicketView get(Principal principal, @PathVariable UUID id) {
-        return knowledge.get(principal.getName(), id);
+    public TicketView get(
+            Principal principal,
+            @RequestHeader("X-Workspace-Id") UUID workspaceId,
+            @PathVariable UUID id) {
+        return knowledge.get(principal.getName(), workspaceId, id);
     }
 
     @PostMapping("/refine")
-    public RefinementView refine(Principal principal, @RequestBody RefinementRequest request) {
-        return knowledge.refine(principal.getName(), request);
+    public RefinementView refine(
+            Principal principal,
+            @RequestHeader("X-Workspace-Id") UUID workspaceId,
+            @RequestBody RefinementRequest request) {
+        return knowledge.refine(principal.getName(), workspaceId, request);
     }
 }

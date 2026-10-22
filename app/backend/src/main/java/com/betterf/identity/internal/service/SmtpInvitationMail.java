@@ -34,6 +34,13 @@ public class SmtpInvitationMail implements InvitationMail {
         }
     }
 
+    /** Allows template formatting whitespace while keeping all substituted values HTML escaped. */
+    private static String replace(String html, String name, String value) {
+        return html.replaceAll(
+                "\\{\\{\\s*" + name + "\\s*}}",
+                java.util.regex.Matcher.quoteReplacement(HtmlUtils.htmlEscape(value)));
+    }
+
     public String send(InvitationTransactions.Claim claim, String token) {
         if (from.endsWith("@betterf.local")
                 && !java.util.Set.of("127.0.0.1", "localhost", "::1", "mailpit").contains(host))
@@ -41,23 +48,19 @@ public class SmtpInvitationMail implements InvitationMail {
         var message = mail.createMimeMessage();
         try {
             String link = origin + "/invitation/accept#" + claim.view().id() + "." + token;
-            String html =
-                    template.replace("{{link}}", HtmlUtils.htmlEscape(link))
-                            .replace(
-                                    "{{expiry}}",
-                                    HtmlUtils.htmlEscape(claim.view().expiresAt().toString()))
-                            .replace("{{company}}", HtmlUtils.htmlEscape(claim.companyName()))
-                            .replace(
-                                    "{{administrator}}",
-                                    HtmlUtils.htmlEscape(claim.administratorName()));
+            String html = template;
+            html = replace(html, "link", link);
+            html = replace(html, "expiry", claim.view().expiresAt().toString());
+            html = replace(html, "workspace", claim.workspaceName());
+            html = replace(html, "administrator", claim.administratorName());
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(from);
             helper.setTo(claim.view().email());
-            helper.setSubject("You are invited to join your team on BetterF");
+            helper.setSubject("You are invited to join your team on theeverthread");
             helper.setText(
                     claim.administratorName()
                             + " invited you to "
-                            + claim.companyName()
+                            + claim.workspaceName()
                             + ". Accept invitation: "
                             + link
                             + "\nExpires: "

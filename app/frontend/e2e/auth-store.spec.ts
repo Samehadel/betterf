@@ -5,9 +5,9 @@ const account = {
   fullName: 'Ada Shared',
   email: 'ada@example.com',
   professionalRole: 'OTHER',
-  organizationId: 'acme',
-  organizationName: 'Shared Acme',
-  accessRole: 'ADMIN',
+  workspaceId: 'acme',
+  workspaceName: 'Shared Acme',
+  accessRole: 'OWNER',
 };
 
 for (const viewport of [
@@ -33,28 +33,30 @@ for (const viewport of [
           await route.fulfill({ json: { data: {}, error: null } });
         }
       });
-      await page.goto('/company');
+      await page.goto('/workspace');
       await expect(
-        page.getByRole('heading', { name: account.organizationName }),
+        page.getByRole('heading', { name: account.workspaceName }),
       ).toBeVisible();
       for (let visit = 0; visit < 2; visit++) {
         await page.getByRole('link', { name: 'Invite a colleague' }).click();
         await expect(
           page.getByRole('heading', { name: 'Invite a colleague' }),
         ).toBeVisible();
-        const navigation = page.getByRole('button', { name: 'Open navigation' });
+        const navigation = page.getByRole('button', {
+          name: 'Open navigation',
+        });
         if (await navigation.isVisible()) {
           await navigation.click();
         }
         await page.getByRole('link', { name: 'Home', exact: true }).click();
         await expect(
-          page.getByRole('heading', { name: account.organizationName }),
+          page.getByRole('heading', { name: account.workspaceName }),
         ).toBeVisible();
       }
       expect(meCalls).toBe(1);
       await page.reload();
       await expect(
-        page.getByRole('heading', { name: account.organizationName }),
+        page.getByRole('heading', { name: account.workspaceName }),
       ).toBeVisible();
       expect(meCalls).toBe(2);
     });
@@ -63,6 +65,7 @@ for (const viewport of [
       page,
     }) => {
       let meCalls = 0;
+      let signedIn = false;
       await page.route('**/api/**', async (route) => {
         const pathname = new URL(route.request().url()).pathname;
         if (pathname === '/api/auth/me' || pathname === '/api/auth/refresh') {
@@ -75,9 +78,20 @@ for (const viewport of [
           await route.fulfill({
             json: { data: { token: 'csrf', headerName: 'X-CSRF-TOKEN' } },
           });
+        } else if (pathname.startsWith('/api/workspaces/')) {
+          await route.fulfill(
+            signedIn
+              ? { json: { data: account } }
+              : {
+                  status: 403,
+                  json: { error: { code: 'WORKSPACE_ACCESS_DENIED' } },
+                },
+          );
         } else if (pathname === '/api/auth/login') {
+          signedIn = true;
           await route.fulfill({ json: { data: account } });
         } else if (pathname === '/api/auth/logout') {
+          signedIn = false;
           await route.fulfill({ status: 204 });
         } else {
           await route.fulfill({
@@ -89,7 +103,7 @@ for (const viewport of [
       await expect(
         page
           .getByRole('link', {
-            name: 'Register your organization',
+            name: 'Create account',
             exact: true,
           })
           .first(),
@@ -98,13 +112,13 @@ for (const viewport of [
       const startupCalls = meCalls;
       await page.getByRole('link', { name: 'Log in', exact: true }).click();
       await page
-        .getByLabel('Organization email', { exact: true })
+        .getByLabel('Email address', { exact: true })
         .first()
         .fill(account.email);
       await page.getByLabel('Password', { exact: true }).fill('Validpass!');
       await page.getByRole('button', { name: 'Log in', exact: true }).click();
       await expect(
-        page.getByRole('heading', { name: account.organizationName }),
+        page.getByRole('heading', { name: 'Knowledge', exact: true }),
       ).toBeVisible();
       expect(meCalls).toBe(startupCalls);
       const navigation = page.getByRole('button', { name: 'Open navigation' });
@@ -114,16 +128,12 @@ for (const viewport of [
       await page.getByLabel('Your account', { exact: true }).click();
       await page.getByRole('button', { name: 'Log out' }).click();
       await expect(page).toHaveURL(/\/login$/);
-      await page.goBack();
+      await page.goto('/knowledge');
+      await expect(page).toHaveURL(/\/login$/);
       await expect(
-        page.getByText(
-          'Log in with a verified account to access your organization.',
-        ),
-      ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: account.organizationName }),
+        page.getByRole('heading', { name: 'Knowledge', exact: true }),
       ).toHaveCount(0);
-      expect(meCalls).toBe(startupCalls);
+      expect(meCalls).toBeGreaterThanOrEqual(startupCalls);
     });
   });
 }

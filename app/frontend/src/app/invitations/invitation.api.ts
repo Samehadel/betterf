@@ -15,7 +15,7 @@ export interface Invitation {
 export interface ActiveMember {
   fullName: string;
   email: string;
-  professionalRole: string;
+  role: string;
 }
 export interface InvitationPage {
   invitations: Invitation[];

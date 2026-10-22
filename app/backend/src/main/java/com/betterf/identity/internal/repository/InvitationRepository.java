@@ -14,13 +14,13 @@ public interface InvitationRepository extends JpaRepository<InvitationEntity, UU
     Optional<String> emailForId(UUID id);
 
     @Query(
-            "select i from InvitationEntity i where i.organization.id = :organizationId and"
+            "select i from InvitationEntity i where i.workspace.id = :workspaceId and"
                     + " (i.status in ('FAILED', 'ACCEPTED') or"
                     + " (i.status = 'SMTP_ACCEPTED' and i.expiresAt > :now))"
                     + " order by coalesce(i.sentAt, i.attemptedAt) desc, i.id desc")
-    List<InvitationEntity> managementRecords(UUID organizationId, java.time.Instant now);
+    List<InvitationEntity> managementRecords(UUID workspaceId, java.time.Instant now);
 
-    Slice<InvitationEntity> findByOrganizationId(UUID organizationId, Pageable page);
+    Slice<InvitationEntity> findByWorkspaceId(UUID workspaceId, Pageable page);
 
-    Optional<InvitationEntity> findByOrganizationIdAndEmail(UUID organizationId, String email);
+    Optional<InvitationEntity> findByWorkspaceIdAndEmail(UUID workspaceId, String email);
 }

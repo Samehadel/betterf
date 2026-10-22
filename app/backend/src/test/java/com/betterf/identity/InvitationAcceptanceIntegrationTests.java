@@ -61,22 +61,14 @@ class InvitationAcceptanceIntegrationTests {
     void setup() {
         jdbc.execute(
                 "TRUNCATE REFRESH_SESSION, TEAM_INVITATION, VERIFICATION_EMAIL, ACCOUNT,"
-                    + " ORGANIZATION CASCADE");
+                        + " WORKSPACE CASCADE");
         when(clock.instant()).thenReturn(now);
         when(mail.send(any(), anyString())).thenReturn("<invitation@test.local>");
         admin("admin@example.com", "acme.com");
     }
 
     void admin(String email, String domain) {
-        identity.register(
-                new RegistrationRequest(
-                        "Acme",
-                        "https://" + domain,
-                        "Engineering",
-                        "Ada",
-                        email,
-                        "Validpass!",
-                        "OTHER"));
+        identity.register(new RegistrationRequest("Ada", email, "Validpass!"));
         var link = new String[1];
         var id = new UUID[1];
         doAnswer(
@@ -100,16 +92,18 @@ class InvitationAcceptanceIntegrationTests {
                         })
                 .when(mail)
                 .send(any(), anyString());
-        var invitation = invitations.send(actor, new InvitationRequest(email));
+        var invitation =
+                invitations.send(
+                        actor, identity.current(actor).workspaceId(), new InvitationRequest(email));
         return new InvitationLinkRequest(invitation.id(), token[0]);
     }
 
     MemberRegistrationRequest registration(InvitationLinkRequest link) {
-        return new MemberRegistrationRequest(link, "Alice Recipient", "OTHER", "Memberpass!");
+        return new MemberRegistrationRequest(link, "Alice Recipient", "Memberpass!");
     }
 
     void rejected(InvitationLinkRequest link, String code) {
-        assertThatThrownBy(() -> acceptance.accept(registration(link)))
+        assertThatThrownBy(() -> acceptance.accept(registration(link), null))
                 .isInstanceOfSatisfying(
                         IdentityException.class, e -> assertThat(e.code()).isEqualTo(code));
     }
@@ -120,10 +114,10 @@ class InvitationAcceptanceIntegrationTests {
         assertThat(acceptance.preview(link).status()).isEqualTo("READY");
         assertThat(acceptance.preview(link).email()).isEqualTo("alice@example.com");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ACCOUNT", Integer.class)).isEqualTo(1);
-        var account = acceptance.accept(registration(link));
+        var account = acceptance.accept(registration(link), null);
         assertThat(account.accessRole()).isEqualTo("MEMBER");
-        assertThat(account.organizationId())
-                .isEqualTo(identity.current("admin@example.com").organizationId());
+        assertThat(account.workspaceId())
+                .isEqualTo(identity.current("admin@example.com").workspaceId());
         assertThat(jdbc.queryForObject("SELECT TOKEN_HASH FROM TEAM_INVITATION", String.class))
                 .isNull();
         assertThat(
@@ -146,32 +140,31 @@ class InvitationAcceptanceIntegrationTests {
         assertThatThrownBy(
                         () ->
                                 acceptance.accept(
-                                        new MemberRegistrationRequest(
-                                                link, " ", "OTHER", "Memberpass!")))
+                                        new MemberRegistrationRequest(link, " ", "Memberpass!"),
+                                        null))
                 .isInstanceOf(IdentityException.class);
         assertThatThrownBy(
                         () ->
                                 acceptance.accept(
-                                        new MemberRegistrationRequest(
-                                                link, "Alice", "OTHER", "weak")))
+                                        new MemberRegistrationRequest(link, "Alice", "weak"), null))
                 .isInstanceOf(IdentityException.class);
         assertThatThrownBy(
                         () ->
                                 acceptance.accept(
-                                        new MemberRegistrationRequest(
-                                                link, "Alice", "ADMIN", "Memberpass!")))
+                                        new MemberRegistrationRequest(link, null, "Memberpass!"),
+                                        null))
                 .isInstanceOf(IdentityException.class);
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=1");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=1");
         assertThat(acceptance.preview(link).message())
                 .isEqualTo(
-                        "This organization has reached its limit of 1 active accounts. Your"
-                                + " invitation cannot be accepted. Please contact the organization"
+                        "This workspace has reached its limit of 1 active accounts. Your"
+                                + " invitation cannot be accepted. Please contact the workspace"
                                 + " administrator.");
         rejected(link, "ACCOUNT_LIMIT");
         assertThat(jdbc.queryForObject("SELECT STATUS FROM TEAM_INVITATION", String.class))
                 .isEqualTo("SMTP_ACCEPTED");
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=2");
-        assertThat(acceptance.accept(registration(link)).accessRole()).isEqualTo("MEMBER");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=2");
+        assertThat(acceptance.accept(registration(link), null).accessRole()).isEqualTo("MEMBER");
     }
 
     @Test
@@ -191,27 +184,22 @@ class InvitationAcceptanceIntegrationTests {
     @Test
     void acceptanceCancelsUnfinishedSignupAndCannotRestoreItsVerificationEvenWithSmtpInFlight() {
         identity.register(
-                new RegistrationRequest(
-                        "Abandoned",
-                        "https://abandoned.com",
-                        "Engineering",
-                        "Old profile",
-                        "alice@example.com",
-                        "Oldpassword!",
-                        "OTHER"));
+                new RegistrationRequest("Old profile", "alice@example.com", "Oldpassword!"));
         var accountId =
                 jdbc.queryForObject(
                         "SELECT ID FROM ACCOUNT WHERE EMAIL='alice@example.com'", UUID.class);
         var attempt = delivery.claim(accountId);
         var link = invite("admin@example.com", "alice@example.com");
         assertThat(acceptance.preview(link).status()).isEqualTo("READY");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ORGANIZATION", Integer.class))
-                .isEqualTo(2);
-        var member = acceptance.accept(registration(link));
-        assertThat(member.id()).isEqualTo(accountId);
-        assertThat(member.fullName()).isEqualTo("Alice Recipient");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ORGANIZATION", Integer.class))
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM WORKSPACE", Integer.class))
                 .isEqualTo(1);
+        var member =
+                acceptance.accept(
+                        new MemberRegistrationRequest(link, "Ignored", "Oldpassword!"), null);
+        assertThat(member.id()).isEqualTo(accountId);
+        assertThat(member.fullName()).isEqualTo("Old profile");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM WORKSPACE", Integer.class))
+                .isEqualTo(2);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM VERIFICATION_EMAIL WHERE ACCOUNT_ID=?",
@@ -221,28 +209,33 @@ class InvitationAcceptanceIntegrationTests {
         delivery.accepted(attempt, "a".repeat(43), "<late@test.local>");
         assertThatThrownBy(() -> identity.verify(accountId, "a".repeat(43)))
                 .isInstanceOf(IdentityException.class);
-        assertThat(identity.current("alice@example.com").accessRole()).isEqualTo("MEMBER");
+        assertThat(identity.current("alice@example.com").accessRole()).isEqualTo("OWNER");
     }
 
     @Test
-    void existingMembershipInSameOrOtherOrganizationIsNeverOverwritten() {
+    void existingMembershipInSameOrOtherWorkspaceIsNeverOverwritten() {
         var first = invite("admin@example.com", "alice@example.com");
         admin("other@example.com", "other.com");
         var other = invite("other@example.com", "alice@example.com");
-        acceptance.accept(registration(first));
-        rejected(other, "OTHER_COMPANY_MEMBER");
-        // Represent another completed flow that established this membership without using its link.
-        jdbc.update(
-                "UPDATE TEAM_INVITATION SET TOKEN_HASH=ACCEPTED_TOKEN_HASH,"
-                        + " ACCEPTED_TOKEN_HASH=NULL, STATUS='SMTP_ACCEPTED'");
-        rejected(first, "ALREADY_MEMBER");
+        var initial = acceptance.accept(registration(first), null);
+        var hash = identity.credentials("alice@example.com").passwordHash();
+        rejected(other, "SIGN_IN_REQUIRED");
+        var added =
+                acceptance.accept(
+                        new MemberRegistrationRequest(other, "Ignored", "Ignored"),
+                        "alice@example.com");
+        assertThat(added.id()).isEqualTo(initial.id());
+        assertThat(added.fullName()).isEqualTo(initial.fullName());
+        assertThat(added.workspaces()).hasSize(3);
+        assertThat(identity.credentials("alice@example.com").passwordHash()).isEqualTo(hash);
+        rejected(first, "INVITATION_USED");
     }
 
     @Test
     void simultaneousAcceptancesCannotExceedCapacityOrCreateTwoMemberships() throws Exception {
         var first = invite("admin@example.com", "alice@example.com");
         var second = invite("admin@example.com", "bob@example.com");
-        jdbc.update("UPDATE ORGANIZATION SET MAX_ACTIVE_ACCOUNTS=2");
+        jdbc.update("UPDATE WORKSPACE SET MAX_ACTIVE_ACCOUNTS=2");
         var outcomes = compete(first, second);
         assertThat(outcomes).containsExactlyInAnyOrder("ACCEPTED", "ACCOUNT_LIMIT");
         assertThat(
@@ -258,7 +251,7 @@ class InvitationAcceptanceIntegrationTests {
         admin("other@example.com", "other.com");
         var second = invite("other@example.com", "alice@example.com");
         assertThat(compete(first, second))
-                .containsExactlyInAnyOrder("ACCEPTED", "OTHER_COMPANY_MEMBER");
+                .containsExactlyInAnyOrder("ACCEPTED", "SIGN_IN_REQUIRED");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM ACCOUNT WHERE EMAIL='alice@example.com'",
@@ -281,7 +274,8 @@ class InvitationAcceptanceIntegrationTests {
                                                     () -> {
                                                         start.await();
                                                         try {
-                                                            acceptance.accept(registration(link));
+                                                            acceptance.accept(
+                                                                    registration(link), null);
                                                             return "ACCEPTED";
                                                         } catch (IdentityException e) {
                                                             return e.code();
@@ -327,7 +321,13 @@ class InvitationAcceptanceIntegrationTests {
         mvc.perform(get("/api/auth/me").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.email").value("alice@example.com"));
-        mvc.perform(get("/api/invitations").session(session)).andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/invitations")
+                                .header(
+                                        "X-Workspace-Id",
+                                        identity.current("admin@example.com").workspaceId())
+                                .session(session))
+                .andExpect(status().isForbidden());
         var replay =
                 mvc.perform(
                                 post("/api/auth/invitation/accept")
@@ -341,8 +341,7 @@ class InvitationAcceptanceIntegrationTests {
     }
 
     @Test
-    void previewInvalidatesDifferentBrowserSessionAndRefreshCredentialWithoutChangingItsAccount()
-            throws Exception {
+    void previewPreservesDifferentBrowserSessionUntilExplicitAccountSwitch() throws Exception {
         var login =
                 mvc.perform(
                                 post("/api/auth/login")
@@ -370,10 +369,10 @@ class InvitationAcceptanceIntegrationTests {
                                                 + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("READY"));
-        assertThat(session.isInvalid()).isTrue();
+        assertThat(session.isInvalid()).isFalse();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM REFRESH_SESSION", Integer.class))
-                .isZero();
-        assertThat(identity.current("admin@example.com").accessRole()).isEqualTo("ADMIN");
+                .isEqualTo(1);
+        assertThat(identity.current("admin@example.com").accessRole()).isEqualTo("OWNER");
         assertThat(identity.credentials("alice@example.com")).isNull();
     }
 
@@ -390,7 +389,7 @@ class InvitationAcceptanceIntegrationTests {
                                 .contentType("application/json")
                                 .content(body(link)))
                 .andExpect(status().isInternalServerError());
-        assertThat(identity.current("alice@example.com").accessRole()).isEqualTo("MEMBER");
+        assertThat(identity.current("alice@example.com").accessRole()).isEqualTo("OWNER");
         rejected(link, "INVITATION_USED");
         reset(sessionLogin);
         mvc.perform(
@@ -405,15 +404,7 @@ class InvitationAcceptanceIntegrationTests {
     @Test
     void acceptedInvitationInvalidatesExistingVerificationTokenAndCompetingVerificationIsAtomic()
             throws Exception {
-        identity.register(
-                new RegistrationRequest(
-                        "Pending",
-                        "https://pending.com",
-                        "Engineering",
-                        "Alice",
-                        "alice@example.com",
-                        "Oldpassword!",
-                        "OTHER"));
+        identity.register(new RegistrationRequest("Alice", "alice@example.com", "Oldpassword!"));
         var accountId =
                 jdbc.queryForObject(
                         "SELECT ID FROM ACCOUNT WHERE EMAIL='alice@example.com'", UUID.class);
@@ -428,10 +419,13 @@ class InvitationAcceptanceIntegrationTests {
                             () -> {
                                 start.await();
                                 try {
-                                    acceptance.accept(registration(link));
+                                    acceptance.accept(
+                                            new MemberRegistrationRequest(
+                                                    link, "Ignored", "Oldpassword!"),
+                                            null);
                                     return true;
                                 } catch (IdentityException e) {
-                                    assertThat(e.code()).isEqualTo("OTHER_COMPANY_MEMBER");
+                                    assertThat(e.code()).isEqualTo("SIGN_IN_REQUIRED");
                                     return false;
                                 }
                             });

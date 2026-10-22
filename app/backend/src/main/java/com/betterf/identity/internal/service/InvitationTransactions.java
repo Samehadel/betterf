@@ -3,7 +3,6 @@ package com.betterf.identity.internal.service;
 import com.betterf.identity.api.dto.*;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.internal.entity.*;
-import com.betterf.identity.internal.mapper.AccountMapper;
 import com.betterf.identity.internal.repository.*;
 
 import jakarta.validation.Validator;
@@ -29,24 +28,13 @@ public class InvitationTransactions {
     private final Clock clock;
     private final Validator validator;
     private final Environment configuration;
-    private final AccountMapper mapper;
+    private final WorkspaceAccess access;
+    private final MembershipRepository memberships;
 
-    public record Claim(InvitationView view, String companyName, String administratorName) {}
+    public record Claim(InvitationView view, String workspaceName, String administratorName) {}
 
-    private AccountEntity administrator(String email) {
-        return accounts.findByEmail(IdentityServiceImpl.normalizeEmail(email))
-                .filter(
-                        a ->
-                                a.getStatus() == AccountStatus.ACTIVE
-                                        && a.getOrganization().getStatus()
-                                                == OrganizationStatus.ACTIVE
-                                        && "ADMIN".equals(a.getAccessRole()))
-                .orElseThrow(
-                        () ->
-                                new IdentityException(
-                                        403,
-                                        "ACCESS_DENIED",
-                                        "Only a verified administrator can invite team members."));
+    private MembershipEntity administrator(String email, UUID workspaceId) {
+        return access.require(email, workspaceId, true);
     }
 
     private String recipient(InvitationRequest request) {
@@ -59,16 +47,17 @@ public class InvitationTransactions {
     }
 
     @Transactional
-    public Claim claim(String actor, InvitationRequest request, String token) {
-        var admin = administrator(actor);
+    public Claim claim(
+            String actor, java.util.UUID workspaceId, InvitationRequest request, String token) {
+        var admin = administrator(actor, workspaceId);
         String email = recipient(request);
         // Acceptance must acquire these locks in the same order.
         locks.lock("email:" + email);
-        locks.lock("organization:" + admin.getOrganization().getId());
+        locks.lock("workspace:" + admin.getWorkspace().getId());
         requireEligibleRecipient(admin, email);
         var existing =
                 invitations
-                        .findByOrganizationIdAndEmail(admin.getOrganization().getId(), email)
+                        .findByWorkspaceIdAndEmail(admin.getWorkspace().getId(), email)
                         .orElse(null);
         if (existing != null && existing.getReplacementTokenHash() != null) {
             throw new IdentityException(
@@ -94,10 +83,10 @@ public class InvitationTransactions {
         if (existing == null) {
             invitation.setId(UUID.randomUUID());
         }
-        invitation.setOrganization(admin.getOrganization());
+        invitation.setWorkspace(admin.getWorkspace());
         invitation.setEmail(email);
-        invitation.setAdministratorId(admin.getId());
-        invitation.setAdministratorName(admin.getFullName());
+        invitation.setAdministratorId(admin.getAccount().getId());
+        invitation.setAdministratorName(admin.getAccount().getFullName());
         invitation.setStatus("SENDING");
         invitation.setTokenHash(IdentityServiceImpl.hash(token));
         invitation.setAttemptedAt(clock.instant());
@@ -106,7 +95,8 @@ public class InvitationTransactions {
         invitation.setSmtpMessageId(null);
         invitation.setFailureCode(null);
         invitations.saveAndFlush(invitation);
-        return new Claim(view(invitation), admin.getOrganization().getName(), admin.getFullName());
+        return new Claim(
+                view(invitation), admin.getWorkspace().getName(), admin.getAccount().getFullName());
     }
 
     @Transactional
@@ -128,29 +118,19 @@ public class InvitationTransactions {
         return view(invitation);
     }
 
-    private void requireEligibleRecipient(AccountEntity admin, String email) {
-        var member =
-                accounts.findByEmail(email)
-                        .filter(
-                                a ->
-                                        a.getAccessRole() != null
-                                                || a.getStatus() == AccountStatus.ACTIVE
-                                                || a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE);
-        if (member.isPresent()) {
-            boolean same =
-                    member.get().getOrganization().getId().equals(admin.getOrganization().getId());
+    private void requireEligibleRecipient(MembershipEntity admin, String email) {
+        var recipient = accounts.findByEmail(email);
+        if (recipient.isPresent()
+                && memberships
+                        .findByAccountIdAndWorkspaceIdAndActiveTrue(
+                                recipient.get().getId(), admin.getWorkspace().getId())
+                        .isPresent()) {
             throw new IdentityException(
-                    409,
-                    same ? "ALREADY_MEMBER" : "OTHER_COMPANY_MEMBER",
-                    same
-                            ? "Already a member."
-                            : "This email already belongs to another company. Use a different email"
-                                    + " address.");
+                    409, "ALREADY_MEMBER", "Already a member of this workspace.");
         }
     }
 
-    private void requireCapacity(AccountEntity admin) {
+    private void requireCapacity(MembershipEntity admin) {
         int defaultLimit =
                 configuration.getProperty(
                         "betterf.invitations.max-active-accounts", Integer.class, 10);
@@ -158,48 +138,55 @@ public class InvitationTransactions {
             throw new IllegalArgumentException("Active-account cap must be positive");
         }
         int limit =
-                admin.getOrganization().getMaxActiveAccounts() == null
+                admin.getWorkspace().getMaxActiveAccounts() == null
                         ? defaultLimit
-                        : admin.getOrganization().getMaxActiveAccounts();
-        if (accounts.countByOrganizationIdAndStatus(
-                        admin.getOrganization().getId(), AccountStatus.ACTIVE)
-                >= limit) {
+                        : admin.getWorkspace().getMaxActiveAccounts();
+        if (memberships.countByWorkspaceIdAndActiveTrue(admin.getWorkspace().getId()) >= limit) {
             throw new IdentityException(
                     409,
                     "ACCOUNT_LIMIT",
-                    "Your organization has reached its limit of "
+                    "Your workspace has reached its limit of "
                             + limit
                             + " active accounts. You cannot send invitations.");
         }
     }
 
     @Transactional(readOnly = true)
-    public List<InvitationView> sent(String actor) {
-        var admin = administrator(actor);
-        return invitations
-                .managementRecords(admin.getOrganization().getId(), clock.instant())
-                .stream()
+    public List<InvitationView> sent(String actor, java.util.UUID workspaceId) {
+        var admin = administrator(actor, workspaceId);
+        return invitations.managementRecords(admin.getWorkspace().getId(), clock.instant()).stream()
                 .map(this::view)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<ActiveMemberView> members(String actor) {
-        var admin = administrator(actor);
-        return accounts.activeMembers(admin.getOrganization().getId()).stream()
-                .map(mapper::member)
+    public List<ActiveMemberView> members(String actor, java.util.UUID workspaceId) {
+        var admin = administrator(actor, workspaceId);
+        return memberships.findByWorkspaceIdAndActiveTrue(admin.getWorkspace().getId()).stream()
+                .filter(m -> m.getAccount().isActive())
+                .sorted(
+                        java.util.Comparator.comparing(
+                                        (MembershipEntity m) -> m.getAccount().getUpdatedAt())
+                                .reversed()
+                                .thenComparing(m -> m.getAccount().getId()))
+                .map(
+                        m ->
+                                new ActiveMemberView(
+                                        m.getAccount().getFullName(),
+                                        m.getAccount().getEmail(),
+                                        m.getRole()))
                 .toList();
     }
 
     /** Reserves a replacement without changing the current link or its acceptance state. */
     @Transactional
-    public Claim claimResend(String actor, UUID id, String token) {
-        var admin = administrator(actor);
+    public Claim claimResend(String actor, java.util.UUID workspaceId, UUID id, String token) {
+        var admin = administrator(actor, workspaceId);
         String email = invitations.emailForId(id).orElseThrow(this::notFound);
         locks.lock("email:" + email);
-        locks.lock("organization:" + admin.getOrganization().getId());
+        locks.lock("workspace:" + admin.getWorkspace().getId());
         var invitation = invitations.findById(id).orElseThrow(this::notFound);
-        if (!invitation.getOrganization().getId().equals(admin.getOrganization().getId())) {
+        if (!invitation.getWorkspace().getId().equals(admin.getWorkspace().getId())) {
             throw notFound();
         }
         if (!("FAILED".equals(invitation.getStatus())
@@ -232,7 +219,8 @@ public class InvitationTransactions {
                         current.status(),
                         invitation.getReplacementExpiresAt(),
                         current.message());
-        return new Claim(replacement, admin.getOrganization().getName(), admin.getFullName());
+        return new Claim(
+                replacement, admin.getWorkspace().getName(), admin.getAccount().getFullName());
     }
 
     /** Serializes promotion with acceptance; an accepted invitation can never be reopened. */
@@ -240,23 +228,16 @@ public class InvitationTransactions {
     public InvitationView completeResend(UUID id, String token, String messageId, String failure) {
         locks.lock("email:" + invitations.emailForId(id).orElseThrow(this::notFound));
         var invitation = invitations.findById(id).orElseThrow(this::notFound);
-        locks.lock("organization:" + invitation.getOrganization().getId());
+        locks.lock("workspace:" + invitation.getWorkspace().getId());
         if (!IdentityServiceImpl.hash(token).equals(invitation.getReplacementTokenHash())) {
             throw new IllegalStateException("Invitation replacement changed");
         }
         if (!"ACCEPTED".equals(invitation.getStatus()) && failure == null) {
-            // A recipient may have joined another company while SMTP was in flight.
-            if (accounts.findByEmail(invitation.getEmail())
-                    .filter(a -> a.getAccessRole() != null)
-                    .isPresent()) {
-                failure = "RECIPIENT_REGISTERED";
-            } else {
-                invitation.setTokenHash(invitation.getReplacementTokenHash());
-                invitation.setExpiresAt(invitation.getReplacementExpiresAt());
-                invitation.setSentAt(clock.instant());
-                invitation.setSmtpMessageId(messageId);
-                invitation.setStatus("SMTP_ACCEPTED");
-            }
+            invitation.setTokenHash(invitation.getReplacementTokenHash());
+            invitation.setExpiresAt(invitation.getReplacementExpiresAt());
+            invitation.setSentAt(clock.instant());
+            invitation.setSmtpMessageId(messageId);
+            invitation.setStatus("SMTP_ACCEPTED");
         }
         invitation.setReplacementTokenHash(null);
         invitation.setReplacementExpiresAt(null);
@@ -284,7 +265,7 @@ public class InvitationTransactions {
 
     private IdentityException notFound() {
         return new IdentityException(
-                404, "INVITATION_NOT_FOUND", "No invitation was found in your company.");
+                404, "INVITATION_NOT_FOUND", "No invitation was found in your workspace.");
     }
 
     private Instant resendAvailableAt(InvitationEntity invitation) {
@@ -300,14 +281,14 @@ public class InvitationTransactions {
     }
 
     @Transactional(readOnly = true)
-    public InvitationPageView history(String actor, int page) {
-        var admin = administrator(actor);
+    public InvitationPageView history(String actor, java.util.UUID workspaceId, int page) {
+        var admin = administrator(actor, workspaceId);
         if (page < 0 || page > Integer.MAX_VALUE / 25) {
             throw new IdentityException(400, "INVALID_REQUEST", "Choose a valid invitation page.");
         }
         var invitationsPage =
-                invitations.findByOrganizationId(
-                        admin.getOrganization().getId(),
+                invitations.findByWorkspaceId(
+                        admin.getWorkspace().getId(),
                         PageRequest.of(
                                 page, 25, Sort.by(Sort.Direction.DESC, "attemptedAt", "id")));
         return new InvitationPageView(
@@ -316,10 +297,11 @@ public class InvitationTransactions {
     }
 
     @Transactional(readOnly = true)
-    public InvitationView status(String actor, InvitationRequest request) {
-        var admin = administrator(actor);
+    public InvitationView status(
+            String actor, java.util.UUID workspaceId, InvitationRequest request) {
+        var admin = administrator(actor, workspaceId);
         return invitations
-                .findByOrganizationIdAndEmail(admin.getOrganization().getId(), recipient(request))
+                .findByWorkspaceIdAndEmail(admin.getWorkspace().getId(), recipient(request))
                 .map(this::view)
                 .orElseThrow(
                         () ->

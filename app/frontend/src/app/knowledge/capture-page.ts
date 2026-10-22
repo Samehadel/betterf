@@ -1,3 +1,4 @@
+import { AuthStore } from '../core/auth.store';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,7 +34,16 @@ import { DetailsView } from './details-view';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CapturePage {
+  readonly auth = inject(AuthStore);
   readonly store = inject(KnowledgeStore);
+  private readonly originAccountId = this.auth.account()?.id;
+  private readonly originWorkspaceId = this.auth.account()?.workspaceId;
+  readonly workspaceChanged = computed(
+    () =>
+      !this.originWorkspaceId ||
+      this.auth.account()?.id !== this.originAccountId ||
+      this.auth.account()?.workspaceId !== this.originWorkspaceId,
+  );
   readonly content = signal<TicketContent>({
     title: '',
     capture: '',
@@ -110,11 +120,19 @@ export class CapturePage {
     this.store.discard();
   }
   canRefine(field: RefinementField) {
-    return !this.locked() && canRefineField(this.content(), field);
+    return (
+      !this.workspaceChanged() &&
+      !this.locked() &&
+      canRefineField(this.content(), field)
+    );
   }
   refine(field: RefinementField) {
     if (this.canRefine(field))
-      this.store.refine({ content: this.content(), field });
+      this.store.refine({
+        content: this.content(),
+        field,
+        workspaceId: this.originWorkspaceId!,
+      });
   }
   accept() {
     const suggestion = this.store.suggestion();
@@ -123,8 +141,17 @@ export class CapturePage {
     this.changed();
   }
   publish() {
-    if (this.valid() && !this.store.busy() && !this.store.refining())
-      this.store.publish({ id: this.submissionId, content: this.content() });
+    if (
+      !this.workspaceChanged() &&
+      this.valid() &&
+      !this.store.busy() &&
+      !this.store.refining()
+    )
+      this.store.publish({
+        id: this.submissionId,
+        content: this.content(),
+        workspaceId: this.originWorkspaceId!,
+      });
   }
   canLeave() {
     return (

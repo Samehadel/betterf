@@ -8,7 +8,7 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, Observable, pipe, tap } from 'rxjs';
-import { IdentityApi, Pending, Registration, Role } from './identity.api';
+import { IdentityApi, Pending, Registration } from './identity.api';
 import { AuthStore } from '../core/auth.store';
 type Action =
   | { kind: 'register'; body: Registration }
@@ -24,9 +24,8 @@ export const IdentityStore = signalStore(
     errorCode: '',
     pending: null as Pending | null,
     verified: false,
+    loginSucceeded: false,
     alreadyVerified: false,
-    roles: [] as Role[],
-    rolesError: false,
     signedOut: false,
   }),
   withComputed(() => ({ account: inject(AuthStore).account })),
@@ -37,23 +36,11 @@ export const IdentityStore = signalStore(
         errorCode: '',
         pending: null,
         verified: false,
+        loginSucceeded: false,
         alreadyVerified: false,
         signedOut: false,
       });
     },
-    loadRoles: rxMethod<void>(
-      pipe(
-        exhaustMap(() =>
-          api.roles().pipe(
-            tap((roles) => patchState(store, { roles, rolesError: false })),
-            catchError(() => {
-              patchState(store, { rolesError: true });
-              return EMPTY;
-            }),
-          ),
-        ),
-      ),
-    ),
     refreshDelivery: rxMethod<string>(
       pipe(
         exhaustMap((email) =>
@@ -101,21 +88,22 @@ export const IdentityStore = signalStore(
               );
               break;
             case 'login':
-              operation = api
-                .login(action.email, action.password)
-                .pipe(tap((account) => auth.setAccount(account)));
+              operation = api.login(action.email, action.password).pipe(
+                tap((account) => {
+                  auth.setAccount(account);
+                  patchState(store, { loginSucceeded: true });
+                }),
+              );
               break;
             case 'current':
-              operation = auth
-                .load()
-                .pipe(
-                  tap(() =>
-                    patchState(store, {
-                      error: auth.error(),
-                      errorCode: auth.errorCode(),
-                    }),
-                  ),
-                );
+              operation = auth.load().pipe(
+                tap(() =>
+                  patchState(store, {
+                    error: auth.error(),
+                    errorCode: auth.errorCode(),
+                  }),
+                ),
+              );
               break;
             case 'logout':
               operation = api.logout().pipe(

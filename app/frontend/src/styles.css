@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 * {
   box-sizing: border-box;
@@ -15,7 +15,7 @@ body {
     15px/1.6 Inter,
     -apple-system,
     BlinkMacSystemFont,
-    'Segoe UI',
+    "Segoe UI",
     sans-serif;
 }
 :root {
@@ -55,7 +55,7 @@ nav {
   gap: 36px;
 }
 .brand {
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 750;
   letter-spacing: -1px;
   margin-right: auto;
@@ -73,7 +73,7 @@ nav {
   position: relative;
 }
 .logo:after {
-  content: '';
+  content: "";
   position: absolute;
   width: 12px;
   height: 4px;
@@ -120,7 +120,7 @@ nav {
   margin: 0 0 22px;
 }
 .eyebrow:before {
-  content: '';
+  content: "";
   width: 7px;
   height: 7px;
   background: var(--accent);
@@ -512,7 +512,7 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.identity-input[aria-invalid='true'] {
+.identity-input[aria-invalid="true"] {
   border-color: #fca5a5;
 }
 
@@ -587,7 +587,7 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.identity-content .identity-input[aria-invalid='true'] {
+.identity-content .identity-input[aria-invalid="true"] {
   border-color: var(--form-error);
   box-shadow: 0 0 0 1px var(--form-error);
 }
@@ -729,7 +729,8 @@ button:disabled {
 .registration-story {
   position: relative;
   padding: 72px clamp(28px, 5vw, 80px) 48px;
-  background: radial-gradient(ellipse at 55% 48%, #47366555, transparent 65%), #23212d;
+  background:
+    radial-gradient(ellipse at 55% 48%, #47366555, transparent 65%), #23212d;
   border-right: 1px solid #41394e;
 }
 
@@ -1007,7 +1008,7 @@ button:disabled {
   color: var(--form-muted);
   cursor: pointer;
 }
-.nav-organization {
+.nav-workspace {
   max-width: 35%;
   overflow: hidden;
   white-space: nowrap;
@@ -1016,8 +1017,8 @@ button:disabled {
   color: var(--muted);
 }
 
-/* Organization home displays server-owned account and organization details. */
-.company-shell {
+/* Workspace home displays server-owned account and workspace details. */
+.workspace-shell {
   max-width: 1180px;
   padding: 36px 32px 24px;
 }
@@ -1040,7 +1041,8 @@ button:disabled {
   overflow: hidden;
   border: 1px solid #665578;
   border-radius: 24px;
-  background: radial-gradient(ellipse at 85% 30%, #654b8070, transparent 60%), #2e293b;
+  background:
+    radial-gradient(ellipse at 85% 30%, #654b8070, transparent 60%), #2e293b;
 }
 .workspace-hero-copy {
   padding: 48px;
@@ -1175,7 +1177,9 @@ button:disabled {
   border-color: #a38acb;
   background: #ded3ef;
   color: #513968;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 .workspace-note .workspace-team-button:hover {
   border-color: #8463b4;
@@ -1279,10 +1283,10 @@ button:disabled {
   }
 }
 @media (max-width: 650px) {
-  .nav-organization {
+  .nav-workspace {
     display: none;
   }
-  .company-shell {
+  .workspace-shell {
     padding: 24px 20px;
   }
   .workspace-hero {
@@ -1320,7 +1324,7 @@ button:disabled {
   }
 }
 
-/* Shared organization workspace navigation and home layout. */
+/* Shared workspace workspace navigation and home layout. */
 .workspace-app {
   --sidebar-width: 232px;
   padding-inline-start: var(--sidebar-width);
@@ -1351,10 +1355,11 @@ button:disabled {
   overflow-y: auto;
 }
 .sidebar-brand {
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 750;
   letter-spacing: -1px;
 }
@@ -1372,7 +1377,7 @@ button:disabled {
   font-size: 29px;
   flex-shrink: 0;
 }
-.sidebar-organization {
+.sidebar-workspace {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1381,7 +1386,7 @@ button:disabled {
   border-radius: 10px;
   min-width: 0;
 }
-.organization-avatar,
+.workspace-avatar,
 .account-avatar {
   display: grid;
   place-items: center;
@@ -1499,7 +1504,7 @@ button:disabled {
 .sidebar-collapsed .sidebar-label {
   display: none;
 }
-.sidebar-collapsed .sidebar-organization {
+.sidebar-collapsed .sidebar-workspace {
   border: 0;
   padding: 0;
   justify-content: center;
@@ -1557,7 +1562,7 @@ button:disabled {
 .workspace-topbar-status > span {
   font-size: 7px;
 }
-.workspace-app .company-shell {
+.workspace-app .workspace-shell {
   max-width: 1200px;
   padding: 36px;
 }
@@ -1673,7 +1678,7 @@ button:disabled {
   .workspace-app {
     --sidebar-width: 210px;
   }
-  .workspace-app .company-shell {
+  .workspace-app .workspace-shell {
     padding: 28px 24px;
   }
   .workspace-home-hero {
@@ -1707,7 +1712,7 @@ button:disabled {
   .sidebar-collapsed .sidebar-label {
     display: initial;
   }
-  .sidebar-collapsed .sidebar-organization {
+  .sidebar-collapsed .sidebar-workspace {
     border: 1px solid var(--line);
     padding: 12px 9px;
     justify-content: flex-start;
@@ -1752,7 +1757,7 @@ button:disabled {
   .workspace-topbar-status {
     display: none;
   }
-  .workspace-app .company-shell {
+  .workspace-app .workspace-shell {
     padding: 24px 16px;
   }
   .workspace-home-hero {
@@ -2311,5 +2316,78 @@ figure.knowledge-code {
   .knowledge-filter select {
     flex: 1;
     min-width: 0;
+  }
+}
+
+/* Keep the personal account boundary readable on the dark onboarding panel. */
+.registration-story .personal-boundary {
+  color: #c5bfd5;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-top: 24px;
+}
+
+/* Workspace settings use the same surfaces and contrast as the workspace cards. */
+.workspace-settings {
+  margin-top: 28px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #272630;
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 32px;
+  align-items: start;
+}
+.workspace-settings h2 {
+  margin: 8px 0;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.workspace-settings .eyebrow {
+  font-size: 10px;
+}
+.workspace-settings-description,
+.workspace-settings .form-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+.workspace-rename-form {
+  display: grid;
+  gap: 8px;
+}
+.workspace-rename-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-rename-controls {
+  display: flex;
+  gap: 12px;
+}
+.workspace-rename-controls .identity-input {
+  flex: 1;
+  min-width: 0;
+  background: #202027;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+}
+.workspace-rename-controls .button {
+  white-space: nowrap;
+}
+.workspace-rename-controls .identity-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 850px) {
+  .workspace-settings {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+@media (max-width: 500px) {
+  .workspace-rename-controls {
+    flex-direction: column;
   }
 }

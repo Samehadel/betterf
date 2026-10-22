@@ -5,7 +5,6 @@ import com.betterf.identity.api.dto.IdentityViews.*;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.IdentityService;
 import com.betterf.identity.internal.entity.*;
-import com.betterf.identity.internal.mapper.AccountMapper;
 import com.betterf.identity.internal.repository.*;
 
 import jakarta.validation.Validator;
@@ -20,44 +19,18 @@ import java.time.*;
 import java.util.*;
 
 @Service
+@lombok.RequiredArgsConstructor
 public class IdentityServiceImpl implements IdentityService {
     private final AccountRepository accounts;
-    private final OrganizationRepository organizations;
     private final VerificationEmailRepository emails;
     private final RegistrationLocks locks;
     private final PasswordEncoder passwords;
-    private final AccountMapper mapper;
+    private final WorkspaceAccess workspaces;
     private final Clock clock;
     private final Validator validator;
 
-    public IdentityServiceImpl(
-            AccountRepository accounts,
-            OrganizationRepository organizations,
-            RegistrationLocks locks,
-            PasswordEncoder passwords,
-            AccountMapper mapper,
-            Clock clock,
-            Validator validator,
-            VerificationEmailRepository emails) {
-        this.accounts = accounts;
-        this.organizations = organizations;
-        this.locks = locks;
-        this.passwords = passwords;
-        this.mapper = mapper;
-        this.clock = clock;
-        this.validator = validator;
-        this.emails = emails;
-    }
-
     public static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static IdentityException duplicate() {
-        return new IdentityException(
-                409,
-                "DUPLICATE_REGISTRATION",
-                "You cannot register this company. It is already registered.");
     }
 
     private static IdentityException invalidLink() {
@@ -70,46 +43,27 @@ public class IdentityServiceImpl implements IdentityService {
     @Override
     @Transactional
     public PendingView register(RegistrationRequest request) {
-        var violations = validator.validate(request);
-        if (!violations.isEmpty())
+        if (request == null || !validator.validate(request).isEmpty()) {
             throw new IdentityException(
-                    400, "INVALID_REQUEST", violations.iterator().next().getMessage());
-        String domain = RootWebsite.domain(request.website());
-        if (ProfessionalRoles.ALL.stream()
-                .noneMatch(role -> role.id().equals(request.professionalRole())))
-            throw new IdentityException(
-                    400, "INVALID_ROLE", "Choose a professional role from the list.");
+                    400,
+                    "INVALID_REQUEST",
+                    "Enter your name, a valid email and a password of 10–128 characters with an"
+                            + " uppercase letter and a special character.");
+        }
         String email = normalizeEmail(request.email());
         locks.lock("email:" + email);
-        if (organizations.existsByDomainAndStatus(domain, OrganizationStatus.ACTIVE))
-            throw duplicate();
         var existing = accounts.findByEmail(email);
         if (existing.isPresent()) {
-            var account = existing.get();
-            if (account.getStatus() == AccountStatus.ACTIVE
-                    || account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
-                throw duplicate();
-            // A repeated public submission must never overwrite another person's password or
-            // profile.
-            return pending(account);
+            throw emailInUse();
         }
         var account = new AccountEntity();
         account.setId(UUID.randomUUID());
         account.setEmail(email);
         account.setFullName(request.fullName().trim());
         account.setPasswordHash(passwords.encode(request.password()));
-        account.setProfessionalRole(request.professionalRole());
         account.setStatus(AccountStatus.PENDING);
         account.setUpdatedAt(clock.instant());
-        var organization = new OrganizationEntity();
-        organization.setId(UUID.randomUUID());
-        organization.setName(request.companyName().trim());
-        organization.setDomain(domain);
-        organization.setSpecialization(request.specialization().trim());
-        organization.setStatus(OrganizationStatus.PENDING);
-        organization = organizations.save(organization);
-        account.setOrganization(organization);
-        account = accounts.save(account);
+        accounts.save(account);
         var delivery = new VerificationEmailEntity();
         delivery.setAccountId(account.getId());
         delivery.setRecipient(email);
@@ -117,6 +71,14 @@ public class IdentityServiceImpl implements IdentityService {
         delivery.setNextAttemptAt(clock.instant());
         emails.save(delivery);
         return pending(account);
+    }
+
+    static IdentityException emailInUse() {
+        return new IdentityException(
+                409,
+                "EMAIL_IN_USE",
+                "This email is already registered. Log in with your existing method, or request"
+                        + " another verification email if registration is pending.");
     }
 
     @Override
@@ -131,12 +93,9 @@ public class IdentityServiceImpl implements IdentityService {
                                         new IdentityException(
                                                 400,
                                                 "REGISTRATION_NOT_FOUND",
-                                                "No pending registration was found. Register your"
-                                                        + " organization or log in if already"
-                                                        + " verified."));
-        if (account.getStatus() == AccountStatus.ACTIVE
-                || account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
-            throw duplicate();
+                                                "No pending registration was found. Sign up or log"
+                                                        + " in if already verified."));
+        if (account.getStatus() == AccountStatus.ACTIVE) throw emailInUse();
         var delivery =
                 emails.findById(account.getId()).orElseThrow(IdentityServiceImpl::invalidLink);
         if (delivery.getLastSentAt() != null
@@ -145,9 +104,6 @@ public class IdentityServiceImpl implements IdentityService {
                     429,
                     "RESEND_COOLDOWN",
                     "Wait 60 seconds after the previous email before requesting another.");
-        if (organizations.existsByDomainAndStatus(
-                account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
-            throw duplicate();
         if (delivery.getStatus() == EmailDeliveryStatus.SMTP_ACCEPTED) {
             delivery.setStatus(EmailDeliveryStatus.PENDING);
             delivery.setNextAttemptAt(clock.instant());
@@ -194,21 +150,12 @@ public class IdentityServiceImpl implements IdentityService {
                     400,
                     "EXPIRED_VERIFICATION",
                     "This link has expired. Request a new verification email.");
-        if (account.getStatus() == AccountStatus.ACTIVE
-                && account.getOrganization().getStatus() == OrganizationStatus.ACTIVE)
-            return new VerificationView("ALREADY_VERIFIED", null);
-        if (account.getStatus() != AccountStatus.PENDING
-                || account.getOrganization().getStatus() != OrganizationStatus.PENDING)
-            throw duplicate();
-        locks.lock("domain:" + account.getOrganization().getDomain());
-        if (organizations.existsByDomainAndStatus(
-                account.getOrganization().getDomain(), OrganizationStatus.ACTIVE))
-            throw duplicate();
-        account.getOrganization().setStatus(OrganizationStatus.ACTIVE);
-        account.setAccessRole("ADMIN");
+        if (account.isActive()) return new VerificationView("ALREADY_VERIFIED", null);
+        if (account.getStatus() != AccountStatus.PENDING) throw invalidLink();
         account.setStatus(AccountStatus.ACTIVE);
         account.setUpdatedAt(clock.instant());
-        return new VerificationView("VERIFIED", mapper.view(account));
+        workspaces.provisionDefault(account);
+        return new VerificationView("VERIFIED", workspaces.view(account, null));
     }
 
     @Override
@@ -218,37 +165,26 @@ public class IdentityServiceImpl implements IdentityService {
                 .map(
                         a ->
                                 new CredentialsView(
-                                        a.getEmail(),
-                                        a.getPasswordHash(),
-                                        a.getAccessRole(),
-                                        a.getStatus() == AccountStatus.ACTIVE
-                                                && a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE))
+                                        a.getEmail(), a.getPasswordHash(), "USER", a.isActive()))
                 .orElse(null);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AccountView current(String email) {
-        var account =
-                accounts.findByEmail(normalizeEmail(email))
-                        .filter(
-                                a ->
-                                        a.getStatus() == AccountStatus.ACTIVE
-                                                && a.getOrganization().getStatus()
-                                                        == OrganizationStatus.ACTIVE)
-                        .orElseThrow(
-                                () ->
-                                        new IdentityException(
-                                                403,
-                                                "ACCESS_DENIED",
-                                                "Verify your email and log in to continue."));
-        return mapper.view(account);
+        // Repair older active accounts that predate automatic default assignment.
+        // A revoked existing default is never replaced during session recovery.
+        locks.lock("email:" + normalizeEmail(email));
+        var account = workspaces.account(email);
+        workspaces.provisionDefault(account);
+        return workspaces.view(account, null);
     }
 
     @Override
-    public List<RoleView> roles() {
-        return ProfessionalRoles.ALL;
+    @Transactional(readOnly = true)
+    public AccountView current(String email, UUID workspaceId) {
+        var membership = workspaces.require(email, workspaceId, false);
+        return workspaces.view(membership.getAccount(), workspaceId);
     }
 
     static String hash(String value) {

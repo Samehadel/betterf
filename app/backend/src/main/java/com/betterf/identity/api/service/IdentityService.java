@@ -3,7 +3,6 @@ package com.betterf.identity.api.service;
 import com.betterf.identity.api.dto.*;
 import com.betterf.identity.api.dto.IdentityViews.*;
 
-import java.util.List;
 import java.util.UUID;
 
 public interface IdentityService {
@@ -19,5 +18,5 @@ public interface IdentityService {
 
     AccountView current(String email);
 
-    List<RoleView> roles();
+    AccountView current(String email, UUID workspaceId);
 }

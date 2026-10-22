@@ -108,7 +108,7 @@ class SpringAiKnowledgeAiTests {
                 assertThat(payload.path("store").asBoolean()).isFalse();
                 assertThat(request)
                         .doesNotContain(
-                                "organizationId",
+                                "workspaceId",
                                 "authorId",
                                 "authorName",
                                 "submissionId",

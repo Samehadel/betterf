@@ -54,6 +54,18 @@ class SmtpInvitationMailTests {
                         "&lt;script&gt;",
                         expiry.toString(),
                         "name=\"viewport\"");
+        assertThat(html)
+                .containsSubsequence(
+                        "href=\"https://betterf.example/invitation/accept#"
+                                + id
+                                + "."
+                                + "x".repeat(43)
+                                + "\"",
+                        "href=\"https://betterf.example/invitation/accept#"
+                                + id
+                                + "."
+                                + "x".repeat(43)
+                                + "\"");
         assertThat(html).doesNotContain("<script>", "{{");
         assertThat(message.getAllRecipients()[0].toString()).isEqualTo("person@gmail.com");
     }

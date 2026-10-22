@@ -20,8 +20,7 @@ public class TicketEntity {
     @Column(nullable = false)
     private UUID authorId;
 
-    @Column(nullable = false)
-    private UUID organizationId;
+    @Column private UUID workspaceId;
 
     @Column(nullable = false, length = 200)
     private String authorName;

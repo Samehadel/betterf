@@ -1,7 +1,7 @@
 package com.betterf.foundation.controller;
 
-import com.betterf.foundation.internal.security.SessionLogin;
 import com.betterf.foundation.internal.security.RefreshSessions;
+import com.betterf.foundation.internal.security.SessionLogin;
 import com.betterf.identity.api.dto.IdentityViews.AccountView;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.IdentityService;
@@ -22,9 +22,15 @@ public class SessionController {
     private final SessionLogin login;
     private final IdentityService identity;
     private final RefreshSessions refresh;
+    private final java.time.Clock clock;
 
     public SessionController(
-            AuthenticationManager authentication, SessionLogin login, IdentityService identity, RefreshSessions refresh) {
+            AuthenticationManager authentication,
+            SessionLogin login,
+            IdentityService identity,
+            RefreshSessions refresh,
+            java.time.Clock clock) {
+        this.clock = clock;
         this.refresh = refresh;
         this.authentication = authentication;
         this.login = login;
@@ -54,6 +60,8 @@ public class SessionController {
                                     body.email().trim().toLowerCase(java.util.Locale.ROOT),
                                     body.password()));
             login.establish(principal, request, response);
+            com.betterf.foundation.internal.security.SocialLoginState.authenticated(
+                    request, principal.getName(), clock.instant());
             return identity.current(principal.getName());
         } catch (AuthenticationException exception) {
             throw new IdentityException(
@@ -69,10 +77,16 @@ public class SessionController {
         var grant = refresh.consume(request);
         if (grant == null) {
             refresh.write(response, null);
-            throw new IdentityException(401, "SESSION_EXPIRED", "Your session has expired. Please log in again.");
+            throw new IdentityException(
+                    401, "SESSION_EXPIRED", "Your session has expired. Please log in again.");
         }
-        var principal = UsernamePasswordAuthenticationToken.authenticated(grant.email(), null,
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + grant.role())));
+        var principal =
+                UsernamePasswordAuthenticationToken.authenticated(
+                        grant.email(),
+                        null,
+                        java.util.List.of(
+                                new org.springframework.security.core.authority
+                                        .SimpleGrantedAuthority("ROLE_" + grant.role())));
         login.restore(principal, request, response);
         refresh.write(response, grant);
         return identity.current(grant.email());

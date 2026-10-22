@@ -40,10 +40,10 @@ public class SmtpVerificationMail implements VerificationMail {
             var helper = new MimeMessageHelper(message, "UTF-8");
             helper.setFrom(from);
             helper.setTo(email);
-            helper.setSubject("Verify your BetterF email");
+            helper.setSubject("Verify your theeverthread email");
             // The fragment keeps the credential out of HTTP access logs and Referer headers.
             helper.setText(
-                    "Complete your BetterF organization registration:\n"
+                    "Complete your theeverthread registration:\n"
                             + origin
                             + "/verify#"
                             + id

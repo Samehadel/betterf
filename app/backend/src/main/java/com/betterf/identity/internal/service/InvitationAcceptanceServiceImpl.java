@@ -5,7 +5,6 @@ import com.betterf.identity.api.dto.IdentityViews.AccountView;
 import com.betterf.identity.api.exception.IdentityException;
 import com.betterf.identity.api.service.InvitationAcceptanceService;
 import com.betterf.identity.internal.entity.*;
-import com.betterf.identity.internal.mapper.AccountMapper;
 import com.betterf.identity.internal.repository.*;
 
 import jakarta.validation.Validator;
@@ -28,11 +27,11 @@ import java.util.UUID;
 public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceService {
     private final InvitationRepository invitations;
     private final AccountRepository accounts;
-    private final OrganizationRepository organizations;
+    private final WorkspaceAccess workspaces;
+    private final MembershipRepository memberships;
     private final VerificationEmailRepository verificationEmails;
     private final RegistrationLocks locks;
     private final PasswordEncoder passwords;
-    private final AccountMapper mapper;
     private final Validator validator;
     private final Clock clock;
 
@@ -48,58 +47,66 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
 
     @Override
     @Transactional
-    public AccountView accept(MemberRegistrationRequest request) {
+    public AccountView accept(MemberRegistrationRequest request, String authenticatedEmail) {
         validate(request);
-        if (ProfessionalRoles.ALL.stream()
-                .noneMatch(role -> role.id().equals(request.professionalRole()))) {
-            throw new IdentityException(
-                    400, "INVALID_ROLE", "Choose a professional role from the list.");
-        }
         var invitation = lockedInvitation(request.invitation().id());
         var preview = inspect(invitation, request.invitation().token());
         if (!"READY".equals(preview.status())) {
             throw new IdentityException(409, preview.status(), preview.message());
         }
-        var account = registerMember(invitation, request);
+        var account = registerMember(invitation, request, authenticatedEmail);
         invitation.setAcceptedAt(clock.instant());
         invitation.setAcceptedTokenHash(invitation.getTokenHash());
         invitation.setTokenHash(null);
         invitation.setStatus("ACCEPTED");
-        return mapper.view(account);
+        return workspaces.view(account, invitation.getWorkspace().getId());
     }
 
     private AccountEntity registerMember(
-            InvitationEntity invitation, MemberRegistrationRequest request) {
-        var account = accounts.findByEmail(invitation.getEmail()).orElseGet(AccountEntity::new);
-        var abandonedOrganization = cancelUnfinishedSignup(account);
-        if (account.getId() == null) {
+            InvitationEntity invitation,
+            MemberRegistrationRequest request,
+            String authenticatedEmail) {
+        if (authenticatedEmail != null
+                && !IdentityServiceImpl.normalizeEmail(authenticatedEmail)
+                        .equals(invitation.getEmail())) {
+            throw new IdentityException(
+                    409, "ACCOUNT_MISMATCH", "Switch to the invited account before accepting.");
+        }
+        var account = accounts.findByEmail(invitation.getEmail()).orElse(null);
+        if (account == null) {
+            var registration =
+                    new RegistrationRequest(
+                            request.fullName(), invitation.getEmail(), request.password());
+            validate(registration);
+            account = new AccountEntity();
             account.setId(UUID.randomUUID());
+            account.setEmail(invitation.getEmail());
+            account.setFullName(request.fullName().trim());
+            account.setPasswordHash(passwords.encode(request.password()));
+        } else if (account.isActive()) {
+            if (authenticatedEmail == null)
+                throw new IdentityException(
+                        401,
+                        "SIGN_IN_REQUIRED",
+                        "Sign in to your existing account before accepting.");
+        } else {
+            // Possession of the invitation verifies the email, but never authorizes replacing
+            // credentials.
+            if (request.password() == null
+                    || !passwords.matches(request.password(), account.getPasswordHash())) {
+                throw new IdentityException(
+                        401,
+                        "SIGN_IN_REQUIRED",
+                        "Use the password from your pending signup to accept this invitation.");
+            }
+            verificationEmails.findById(account.getId()).ifPresent(verificationEmails::delete);
         }
-        account.setEmail(invitation.getEmail());
-        account.setOrganization(invitation.getOrganization());
-        account.setFullName(request.fullName().trim());
-        account.setProfessionalRole(request.professionalRole());
-        account.setPasswordHash(passwords.encode(request.password()));
         account.setStatus(AccountStatus.ACTIVE);
-        account.setAccessRole("MEMBER");
         account.setUpdatedAt(clock.instant());
-        accounts.saveAndFlush(account);
-        if (abandonedOrganization != null) {
-            organizations.delete(abandonedOrganization);
-        }
+        account = accounts.save(account);
+        workspaces.provisionDefault(account);
+        workspaces.join(account, invitation.getWorkspace(), "MEMBER");
         return account;
-    }
-
-    /**
-     * Deleting the delivery also makes an SMTP attempt already in flight unable to publish a token.
-     */
-    private OrganizationEntity cancelUnfinishedSignup(AccountEntity account) {
-        if (account.getId() == null) {
-            return null;
-        }
-        var pendingOrganization = account.getOrganization();
-        verificationEmails.findById(account.getId()).ifPresent(verificationEmails::delete);
-        return pendingOrganization;
     }
 
     private void validate(Object request) {
@@ -122,7 +129,7 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
         locks.lock("email:" + email);
         var invitation = invitations.findById(id).orElse(null);
         if (invitation != null) {
-            locks.lock("organization:" + invitation.getOrganization().getId());
+            locks.lock("workspace:" + invitation.getWorkspace().getId());
         }
         return invitation;
     }
@@ -154,26 +161,22 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
     }
 
     private InvitationAcceptanceView membershipFailure(InvitationEntity invitation) {
-        var member = accounts.findByEmail(invitation.getEmail()).orElse(null);
-        if (member != null
-                && (member.getStatus() != AccountStatus.PENDING
-                        || member.getAccessRole() != null
-                        || member.getOrganization().getStatus() != OrganizationStatus.PENDING)) {
-            boolean same =
-                    member.getOrganization().getId().equals(invitation.getOrganization().getId());
+        var account = accounts.findByEmail(invitation.getEmail()).orElse(null);
+        if (account != null
+                && memberships
+                        .findByAccountIdAndWorkspaceIdAndActiveTrue(
+                                account.getId(), invitation.getWorkspace().getId())
+                        .isPresent()) {
             return view(
                     invitation,
-                    same ? "ALREADY_MEMBER" : "OTHER_COMPANY_MEMBER",
-                    same
-                            ? "You have already joined this organization. Please log in."
-                            : "This email already belongs to another company. Request an invitation"
-                                    + " to a different email address.");
+                    "ALREADY_MEMBER",
+                    "You already belong to this workspace. Sign in to open it.");
         }
         return null;
     }
 
     private InvitationAcceptanceView checkCapacity(InvitationEntity invitation) {
-        if (invitation.getOrganization().getStatus() != OrganizationStatus.ACTIVE) {
+        if (invitation.getWorkspace().getStatus() != WorkspaceStatus.ACTIVE) {
             return view(
                     invitation,
                     "INVITATION_UNUSABLE",
@@ -181,22 +184,21 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
                             + " valid invitation.");
         }
         int limit =
-                invitation.getOrganization().getMaxActiveAccounts() == null
+                invitation.getWorkspace().getMaxActiveAccounts() == null
                         ? configuration.getProperty(
                                 "betterf.invitations.max-active-accounts", Integer.class, 10)
-                        : invitation.getOrganization().getMaxActiveAccounts();
-        if (accounts.countByOrganizationIdAndStatus(
-                        invitation.getOrganization().getId(), AccountStatus.ACTIVE)
+                        : invitation.getWorkspace().getMaxActiveAccounts();
+        if (memberships.countByWorkspaceIdAndActiveTrue(invitation.getWorkspace().getId())
                 >= limit) {
             return view(
                     invitation,
                     "ACCOUNT_LIMIT",
-                    "This organization has reached its limit of "
+                    "This workspace has reached its limit of "
                             + limit
                             + " active accounts. Your invitation cannot be accepted. Please contact"
-                            + " the organization administrator.");
+                            + " the workspace administrator.");
         }
-        return view(invitation, "READY", "Complete registration to join your organization.");
+        return view(invitation, "READY", "Complete registration to join your workspace.");
     }
 
     private InvitationAcceptanceView invalid() {
@@ -211,6 +213,6 @@ public class InvitationAcceptanceServiceImpl implements InvitationAcceptanceServ
     private InvitationAcceptanceView view(
             InvitationEntity invitation, String status, String message) {
         return new InvitationAcceptanceView(
-                status, message, invitation.getOrganization().getName(), invitation.getEmail());
+                status, message, invitation.getWorkspace().getName(), invitation.getEmail());
     }
 }

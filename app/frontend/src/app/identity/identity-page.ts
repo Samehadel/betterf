@@ -1,3 +1,6 @@
+import { IdentityApi } from './identity.api';
+import { AuthStore } from '../core/auth.store';
+import { firstValueFrom } from 'rxjs';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -20,39 +23,76 @@ import { IdentityStore } from './identity.store';
 })
 export class IdentityPage {
   readonly store = inject(IdentityStore);
+  private readonly api = inject(IdentityApi);
+  private readonly auth = inject(AuthStore);
+  readonly workspaceBusy = signal(false);
+  readonly workspaceError = signal('');
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  readonly mode = this.route.snapshot.data['mode'] as 'register' | 'verify' | 'login' | 'company';
+  readonly mode = this.route.snapshot.data['mode'] as
+    'signup' | 'verify' | 'login' | 'workspace';
+  readonly isRegistration = this.mode === 'signup';
+  readonly socialStatus = this.route.snapshot.queryParamMap.get('social');
+  readonly socialMessage = [
+    'SIGNUP_REQUIRED',
+    'LINK_REQUIRED',
+    'PROVIDER_EMAIL_UNVERIFIED',
+    'PROVIDER_EMAIL_MISSING',
+    'ACCOUNT_INACTIVE',
+    'PROVIDER_AUTHENTICATION_FAILED',
+    'PROVIDER_UNAVAILABLE',
+  ].includes(this.socialStatus ?? '')
+    ? 'individual.errors.' + this.socialStatus
+    : '';
   private readonly fb = inject(FormBuilder).nonNullable;
-  readonly registration = this.fb.group({
-    companyName: ['', [Validators.required, Validators.maxLength(200)]],
-    website: ['', [Validators.required, Validators.maxLength(253)]],
-    specialization: ['', [Validators.required, Validators.maxLength(200)]],
-    fullName: ['', [Validators.required, Validators.maxLength(200)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: [
-      '',
-      [
-        Validators.required,
-        Validators.minLength(10),
-        Validators.maxLength(128),
-        Validators.pattern(/^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u),
+  readonly registration = this.fb.group(
+    {
+      fullName: ['', [Validators.required, Validators.maxLength(200)]],
+      email: [
+        '',
+        [Validators.required, Validators.email, Validators.maxLength(254)],
       ],
-    ],
-    professionalRole: ['', Validators.required],
+      password: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(10),
+          Validators.maxLength(128),
+          Validators.pattern(
+            /^(?=[\s\S]*\p{Lu})(?=[\s\S]*[\p{P}\p{S}])[\s\S]*$/u,
+          ),
+        ],
+      ],
+      confirmPassword: ['', Validators.required],
+    },
+    {
+      validators: (form) =>
+        form.get('password')?.value === form.get('confirmPassword')?.value
+          ? null
+          : { passwordMismatch: true },
+    },
+  );
+  readonly workspaceForm = this.fb.group({
+    name: ['', [Validators.required, Validators.maxLength(200)]],
   });
   readonly loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', Validators.required],
   });
-  readonly resendForm = this.fb.group({ email: ['', [Validators.required, Validators.email]] });
+  readonly resendForm = this.fb.group({
+    email: ['', [Validators.required, Validators.email]],
+  });
   readonly submitted = signal(false);
   readonly now = signal(Date.now());
   readonly remaining = computed(
     () =>
       Math.max(
         0,
-        Math.ceil((Date.parse(this.store.pending()?.resendAvailableAt ?? '') - this.now()) / 1000),
+        Math.ceil(
+          (Date.parse(this.store.pending()?.resendAvailableAt ?? '') -
+            this.now()) /
+            1000,
+        ),
       ) || 0,
   );
   readonly deliveryMessage = computed(() => {
@@ -68,14 +108,15 @@ export class IdentityPage {
     }
   });
   readonly deliveryInProgress = computed(() =>
-    ['PENDING', 'SENDING', 'FAILED'].includes(this.store.pending()?.deliveryStatus ?? ''),
+    ['PENDING', 'SENDING', 'FAILED'].includes(
+      this.store.pending()?.deliveryStatus ?? '',
+    ),
   );
   private verification: { id: string; token: string } | null = null;
   readonly invalidFragment = signal(false);
   constructor() {
     this.store.clear();
-    if (this.mode === 'register') this.store.loadRoles();
-    if (this.mode === 'company') this.store.run({ kind: 'current' });
+    if (this.mode === 'workspace') this.store.run({ kind: 'current' });
     if (this.mode === 'verify') {
       this.route.fragment.pipe(takeUntilDestroyed()).subscribe((fragment) => {
         // Removing the credential from history must not discard the in-memory link.
@@ -105,7 +146,8 @@ export class IdentityPage {
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
     const deliveryTimer = setInterval(() => {
       const pending = this.store.pending();
-      if (pending && this.deliveryInProgress()) this.store.refreshDelivery(pending.email);
+      if (pending && this.deliveryInProgress())
+        this.store.refreshDelivery(pending.email);
     }, 5000);
     inject(DestroyRef).onDestroy(() => {
       clearInterval(timer);
@@ -113,20 +155,63 @@ export class IdentityPage {
     });
     effect(() => {
       if (this.mode === 'verify' && this.store.verified())
-        void this.router.navigateByUrl('/company', { replaceUrl: true });
-      if (this.mode === 'login' && this.store.account()) void this.router.navigateByUrl('/company');
-      if (this.mode === 'company' && this.store.signedOut())
+        void this.router.navigateByUrl('/knowledge', { replaceUrl: true });
+      if (
+        this.mode === 'login' &&
+        this.store.account() &&
+        (this.socialStatus !== 'LINK_REQUIRED' || this.store.loginSucceeded())
+      ) {
+        void this.router.navigateByUrl(
+          this.socialStatus === 'LINK_REQUIRED'
+            ? '/link-account'
+            : '/knowledge',
+        );
+      }
+      if (
+        this.mode === 'workspace' &&
+        this.store.account() &&
+        !this.store.account()?.workspaceId
+      ) {
+        void this.router.navigateByUrl('/knowledge', { replaceUrl: true });
+      }
+      if (this.mode === 'workspace' && this.store.signedOut())
         void this.router.navigateByUrl('/login');
     });
   }
+  async renameWorkspace() {
+    this.workspaceForm.markAllAsTouched();
+    if (this.workspaceForm.invalid || this.workspaceBusy()) return;
+    const name = this.workspaceForm.controls.name.value.trim();
+    const selected = this.store.account()?.workspaceId;
+    if (!name || !selected || this.store.account()?.accessRole !== 'OWNER')
+      return;
+    this.workspaceBusy.set(true);
+    this.workspaceError.set('');
+    try {
+      const account = await firstValueFrom(
+        this.api.renameWorkspace(selected, name),
+      );
+      this.auth.setAccount(account);
+      this.workspaceForm.controls.name.setValue(account.workspaceName ?? name);
+    } catch {
+      this.workspaceError.set(
+        'Unable to save the workspace. Check your access and try again.',
+      );
+    } finally {
+      this.workspaceBusy.set(false);
+    }
+  }
+
   register() {
     this.submitted.set(true);
     this.registration.markAllAsTouched();
     if (this.registration.invalid) return;
-    const body = this.registration.getRawValue();
+    const { fullName, email, password } = this.registration.getRawValue();
+    const body = { fullName, email, password };
     this.resendForm.controls.email.setValue(body.email);
     this.store.run({ kind: 'register', body });
     this.registration.controls.password.reset();
+    this.registration.controls.confirmPassword.reset();
   }
   login() {
     this.submitted.set(true);
@@ -137,7 +222,8 @@ export class IdentityPage {
     this.loginForm.controls.password.reset();
   }
   resend() {
-    if (this.store.busy() || this.remaining() > 0 || this.deliveryInProgress()) return;
+    if (this.store.busy() || this.remaining() > 0 || this.deliveryInProgress())
+      return;
     const pending = this.store.pending();
     if (pending) {
       this.store.run({ kind: 'resend', email: pending.email });
@@ -145,14 +231,23 @@ export class IdentityPage {
     }
     this.resendForm.markAllAsTouched();
     if (this.resendForm.valid)
-      this.store.run({ kind: 'resend', email: this.resendForm.getRawValue().email });
+      this.store.run({
+        kind: 'resend',
+        email: this.resendForm.getRawValue().email,
+      });
   }
   verify() {
-    if (this.verification) this.store.run({ kind: 'verify', ...this.verification });
+    if (this.verification)
+      this.store.run({ kind: 'verify', ...this.verification });
   }
   invalid(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
-    return control.invalid && control.touched;
+    return (
+      control.touched &&
+      (control.invalid ||
+        (field === 'confirmPassword' &&
+          this.registration.hasError('passwordMismatch')))
+    );
   }
   loginInvalid(field: keyof typeof this.loginForm.controls) {
     const control = this.loginForm.controls[field];
@@ -161,6 +256,7 @@ export class IdentityPage {
   fieldError(field: keyof typeof this.registration.controls) {
     const control = this.registration.controls[field];
     if (control.hasError('required')) return 'identity.errors.' + field;
+    if (field === 'confirmPassword') return 'identity.passwordMismatch';
     if (field === 'email') return 'identity.emailError';
     if (field === 'password') return 'identity.passwordHint';
     return 'identity.tooLong';

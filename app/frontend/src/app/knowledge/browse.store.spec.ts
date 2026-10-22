@@ -9,14 +9,14 @@ import { AuthStore } from '../core/auth.store';
 import { Account } from '../identity/identity.api';
 import { TicketSummary } from './knowledge.models';
 
-const account = { id: 'author', organizationId: 'org' } as Account;
+const account = { id: 'author', workspaceId: 'org' } as Account;
 const summary = {
   id: 'one',
   title: 'A useful insight',
   detailsType: 'Coding',
   attributes: [],
 } as unknown as TicketSummary;
-describe('Organization knowledge browsing session', () => {
+describe('Workspace knowledge browsing session', () => {
   let store: InstanceType<typeof BrowseStore>;
   let auth: InstanceType<typeof AuthStore>;
   let http: HttpTestingController;
@@ -63,11 +63,9 @@ describe('Organization knowledge browsing session', () => {
       .flush({}, { status: 503, statusText: 'Unavailable' });
     expect(store.items()).toEqual([summary]);
     store.retry();
-    http
-      .expectOne('/api/knowledge/tickets')
-      .flush({
-        data: { items: [{ ...summary, id: 'newest' }], nextCursor: null },
-      });
+    http.expectOne('/api/knowledge/tickets').flush({
+      data: { items: [{ ...summary, id: 'newest' }], nextCursor: null },
+    });
     expect(store.items().map((item) => item.id)).toEqual(['newest']);
   });
   it('cancels stale responses on filter changes and refresh retains the selection', () => {
@@ -100,7 +98,7 @@ describe('Organization knowledge browsing session', () => {
       expect(store.nextCursor()).toBeNull();
     },
   );
-  it('clears the session on logout and organization changes and rejects old in-flight results', () => {
+  it('clears the session on logout and workspace changes and rejects old in-flight results', () => {
     firstPage();
     store.more();
     const old = http.expectOne('/api/knowledge/tickets?cursor=next');
@@ -109,7 +107,7 @@ describe('Organization knowledge browsing session', () => {
     expect(store.items()).toEqual([]);
     old.flush({ data: { items: [summary], nextCursor: null } });
     expect(store.items()).toEqual([]);
-    auth.setAccount({ ...account, organizationId: 'other' });
+    auth.setAccount({ ...account, workspaceId: 'other' });
     store.enter();
     http
       .expectOne('/api/knowledge/tickets')

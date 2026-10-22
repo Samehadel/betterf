@@ -40,10 +40,28 @@ describe('Session recovery', () => {
     csrf();
     const request = http.expectOne('/api/auth/refresh');
     expect(request.request.headers.get('X-CSRF-TOKEN')).toBe('fresh');
-    request.flush({ data: { id: 'refreshed', accessRole: 'ADMIN' } });
+    request.flush({ data: { id: 'refreshed', accessRole: 'OWNER' } });
     expect(TestBed.inject(AuthStore).account()?.id).toBe('refreshed');
     csrf('rotated');
   }
+  it('clears inaccessible knowledge when the selected membership is revoked', () => {
+    const auth = TestBed.inject(AuthStore);
+    auth.setAccount({ id: 'person', workspaceId: 'revoked' } as Account);
+    const version = auth.sessionVersion();
+    client
+      .get('/api/knowledge', { headers: { 'X-Workspace-Id': 'revoked' } })
+      .subscribe({ error: () => undefined });
+    http
+      .expectOne('/api/knowledge')
+      .flush(rejected('WORKSPACE_ACCESS_DENIED'), {
+        status: 403,
+        statusText: 'Forbidden',
+      });
+    expect(auth.account()?.workspaceId).toBeNull();
+    expect(auth.account()?.id).toBe('person');
+    expect(auth.sessionVersion()).toBeGreaterThan(version);
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
   it('shares refresh for simultaneous 401s and preserves the original mutation', () => {
     const result = jest.fn();
     client.get('/api/auth/me').subscribe();
@@ -155,7 +173,13 @@ describe('Session recovery', () => {
       .expectOne('https://other.example/api/auth/me')
       .flush(rejected(), { status: 401, statusText: 'Unauthorized' });
   });
-  it.each(['/api/auth/logout', '/api/auth/invitation/preview'])(
+  it('preview preserves the current session and does not initiate logout or refresh', () => {
+    client.post('/api/auth/invitation/preview', {}).subscribe();
+    http.expectOne('/api/auth/invitation/preview').flush({});
+    http.expectNone('/api/auth/refresh');
+    http.expectNone('/api/auth/logout');
+  });
+  it.each(['/api/auth/logout'])(
     'waits for in-flight refresh before %s revokes its replacement cookie',
     (url) => {
       client.get('/api/auth/me').subscribe();
@@ -217,4 +241,83 @@ describe('Cross-tab session recovery', () => {
       Reflect.deleteProperty(navigator, 'locks');
     }
   });
+});
+
+describe('Workspace-safe capture recovery', () => {
+  it.each([false, true])(
+    'requires selection after membership disappears (shared session: %s)',
+    async (shared) => {
+      const locks = { request: jest.fn((_name, run) => run()) };
+      if (shared)
+        Object.defineProperty(navigator, 'locks', {
+          value: locks,
+          configurable: true,
+        });
+      try {
+        TestBed.configureTestingModule({
+          providers: [
+            provideHttpClient(withInterceptors([sessionRefreshInterceptor])),
+            provideHttpClientTesting(),
+            { provide: Router, useValue: { navigateByUrl: jest.fn() } },
+          ],
+        });
+        const auth = TestBed.inject(AuthStore);
+        auth.setAccount({
+          id: 'person',
+          workspaceId: 'original',
+          workspaces: [{ id: 'original', name: 'Team', role: 'MEMBER' }],
+        } as Account);
+        const client = TestBed.inject(HttpClient);
+        const http = TestBed.inject(HttpTestingController);
+        const failure = jest.fn();
+        client
+          .post(
+            '/api/knowledge/tickets',
+            { content: 'private draft' },
+            { headers: { 'X-Workspace-Id': 'original' } },
+          )
+          .subscribe({ error: failure });
+        http
+          .expectOne('/api/knowledge/tickets')
+          .flush(
+            { error: { code: 'AUTHENTICATION_REQUIRED' } },
+            { status: 401, statusText: 'Unauthorized' },
+          );
+        const restored = {
+          id: 'person',
+          workspaceId: 'default',
+          workspaceName: 'Default',
+          accessRole: 'OWNER',
+          workspaces: [{ id: 'default', name: 'Default', role: 'OWNER' }],
+        };
+        if (shared) {
+          http.expectOne('/api/auth/me').flush({ data: restored });
+        } else {
+          http
+            .expectOne('/api/auth/csrf')
+            .flush({ data: { token: 'one', headerName: 'X-CSRF-TOKEN' } });
+          http.expectOne('/api/auth/refresh').flush({ data: restored });
+        }
+        http
+          .expectOne('/api/auth/csrf')
+          .flush({ data: { token: 'two', headerName: 'X-CSRF-TOKEN' } });
+        if (shared) {
+          await locks.request.mock.results[0].value;
+          await Promise.resolve();
+        }
+        expect(auth.account()?.workspaceId).toBeNull();
+        expect(auth.account()?.workspaces).toEqual(restored.workspaces);
+        expect(failure).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 409 }),
+        );
+        http.expectNone('/api/knowledge/tickets');
+        // Subsequent recovery must not implicitly reselect the default either.
+        auth.restoreAccount(restored as Account);
+        expect(auth.account()?.workspaceId).toBeNull();
+        http.verify();
+      } finally {
+        if (shared) Reflect.deleteProperty(navigator, 'locks');
+      }
+    },
+  );
 });

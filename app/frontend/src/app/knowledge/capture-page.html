@@ -1,30 +1,36 @@
 <ng-container *transloco="let t">
-  <a class="skip-link" href="#main">{{ t('landing.skip_to_content') }}</a>
+  <a class="skip-link" href="#main">{{ t("landing.skip_to_content") }}</a>
   <header class="top">
     <nav class="wrap" aria-label="Main navigation">
-      <a class="brand" routerLink="/company"
-        >BetterF<span class="text-[var(--accent)]">.</span></a
-      ><span class="navlink">{{ t('knowledge.breadcrumb') }}</span>
+      <a class="brand" routerLink="/workspace"
+        >theeverthread<span class="text-[var(--accent)]">.</span></a
+      ><span class="navlink">{{ t("knowledge.breadcrumb") }}</span>
     </nav>
   </header>
   <main id="main" class="wrap knowledge-studio" tabindex="-1">
     <div class="knowledge-writing">
       <div class="flex items-center justify-between gap-4">
-        <p class="eyebrow">{{ t('knowledge.eyebrow') }}</p>
-        <a class="button secondary" routerLink="/company"
-          >{{ t('knowledge.cancel') }}</a
-        >
+        <p class="eyebrow">{{ t("knowledge.eyebrow") }}</p>
+        <a class="button secondary" routerLink="/workspace">{{
+          t("knowledge.cancel")
+        }}</a>
       </div>
-      <h1>{{ t('knowledge.title') }}</h1>
-      <p class="knowledge-intro">{{ t('knowledge.intro') }}</p>
+      <h1>{{ t("knowledge.title") }}</h1>
+      <p class="knowledge-intro">{{ t("knowledge.intro") }}</p>
+      @if (workspaceChanged()) {
+        <p role="alert" class="form-alert">
+          {{ t("knowledge.workspaceChanged") }}
+          <a routerLink="/workspace">{{ t("workspace.selectRequired") }}</a>
+        </p>
+      }
       <form class="knowledge-card" (ngSubmit)="publish()">
         <fieldset [disabled]="locked()" class="knowledge-fields">
-          <legend class="sr-only">{{ t('knowledge.title') }}</legend>
+          <legend class="sr-only">{{ t("knowledge.title") }}</legend>
           <div class="knowledge-field">
             <div class="knowledge-label">
               <label for="ticket-title"
-                >{{ t('knowledge.fields.title') }}
-                <span>{{ t('knowledge.required') }}</span></label
+                >{{ t("knowledge.fields.title") }}
+                <span>{{ t("knowledge.required") }}</span></label
               ><button
                 class="knowledge-ai"
                 type="button"
@@ -45,15 +51,15 @@
               aria-describedby="title-hint"
             />
             <p id="title-hint" class="knowledge-hint">
-              {{ t('knowledge.titleHint') }}
+              {{ t("knowledge.titleHint") }}
               <span>{{ content().title.length }}/200</span>
             </p>
           </div>
           <div class="knowledge-field">
             <div class="knowledge-label">
               <label for="ticket-capture"
-                >{{ t('knowledge.fields.capture') }}
-                <span>{{ t('knowledge.optional') }}</span></label
+                >{{ t("knowledge.fields.capture") }}
+                <span>{{ t("knowledge.optional") }}</span></label
               ><button
                 class="knowledge-ai"
                 type="button"
@@ -74,12 +80,12 @@
               aria-describedby="capture-hint"
             ></textarea>
             <p id="capture-hint" class="knowledge-hint">
-              {{ t('knowledge.captureHint') }}
-              <span>{{ (content().capture?.length ?? 0) }}/1,000</span>
+              {{ t("knowledge.captureHint") }}
+              <span>{{ content().capture?.length ?? 0 }}/1,000</span>
             </p>
           </div>
           <div class="knowledge-label">
-            <label for="writing-template">{{ t('knowledge.template') }}</label
+            <label for="writing-template">{{ t("knowledge.template") }}</label
             ><select
               id="writing-template"
               name="template"
@@ -87,21 +93,21 @@
               (ngModelChange)="update('template', $event)"
             >
               @for (template of templates; track template) {
-              <option [value]="template">
-                {{ t('knowledge.templates.' + template) }}
-              </option>
+                <option [value]="template">
+                  {{ t("knowledge.templates." + template) }}
+                </option>
               }
             </select>
           </div>
           <div class="knowledge-field">
             <div class="knowledge-label">
               <h2>
-                {{ t('knowledge.fields.details') }}
-                <span>{{ t('knowledge.required') }}</span>
+                {{ t("knowledge.fields.details") }}
+                <span>{{ t("knowledge.required") }}</span>
               </h2>
             </div>
             <p id="details-hint" class="knowledge-hint">
-              {{ t('knowledge.guidance.' + content().template) }}
+              {{ t("knowledge.guidance." + content().template) }}
             </p>
             <div class="knowledge-editor">
               <div
@@ -110,89 +116,105 @@
                 [attr.aria-label]="t('knowledge.addBlock')"
               >
                 @for (type of blockTypes; track type) {
-                <button
-                  type="button"
-                  (click)="add(type)"
-                  [disabled]="content().details.length >= 200"
-                >
-                  + {{ t('knowledge.blocks.' + type) }}
-                </button>
+                  <button
+                    type="button"
+                    (click)="add(type)"
+                    [disabled]="content().details.length >= 200"
+                  >
+                    + {{ t("knowledge.blocks." + type) }}
+                  </button>
                 }
               </div>
               <div class="knowledge-blocks">
                 @for (item of content().details; track $index; let i = $index) {
-                <div
-                  class="knowledge-block"
-                  [class.knowledge-code]="item.type === 'code'"
-                >
-                  <div class="knowledge-block-heading">
-                    <label [for]="'block-' + i"
-                      >{{ t('knowledge.blocks.' + item.type) }} {{ i + 1
-                      }}</label
-                    >
-                    <div class="flex items-center gap-2">
-                      @if (item.type === 'code') {
-                      <select
-                        [name]="'language-' + i"
-                        [ngModel]="item.language"
-                        (ngModelChange)="block(i, {language: $event})"
-                        [attr.aria-label]="t('knowledge.language') + ' ' + (i + 1)"
+                  <div
+                    class="knowledge-block"
+                    [class.knowledge-code]="item.type === 'code'"
+                  >
+                    <div class="knowledge-block-heading">
+                      <label [for]="'block-' + i"
+                        >{{ t("knowledge.blocks." + item.type) }}
+                        {{ i + 1 }}</label
                       >
-                        @for (language of languages; track language) {
-                        <option [value]="language">{{ language }}</option>
+                      <div class="flex items-center gap-2">
+                        @if (item.type === "code") {
+                          <select
+                            [name]="'language-' + i"
+                            [ngModel]="item.language"
+                            (ngModelChange)="block(i, { language: $event })"
+                            [attr.aria-label]="
+                              t('knowledge.language') + ' ' + (i + 1)
+                            "
+                          >
+                            @for (language of languages; track language) {
+                              <option [value]="language">{{ language }}</option>
+                            }
+                          </select>
                         }
-                      </select>
-                      }
-                      <button
-                        type="button"
-                        (click)="move(i, -1)"
-                        [disabled]="i === 0"
-                        [attr.aria-label]="t('knowledge.moveUp') + ' ' + (i + 1)"
-                      >
-                        ↑</button
-                      ><button
-                        type="button"
-                        (click)="move(i, 1)"
-                        [disabled]="i === content().details.length - 1"
-                        [attr.aria-label]="t('knowledge.moveDown') + ' ' + (i + 1)"
-                      >
-                        ↓</button
-                      ><button
-                        type="button"
-                        (click)="remove(i)"
-                        [attr.aria-label]="t('knowledge.remove') + ' ' + (i + 1)"
-                      >
-                        ×
-                      </button>
+                        <button
+                          type="button"
+                          (click)="move(i, -1)"
+                          [disabled]="i === 0"
+                          [attr.aria-label]="
+                            t('knowledge.moveUp') + ' ' + (i + 1)
+                          "
+                        >
+                          ↑</button
+                        ><button
+                          type="button"
+                          (click)="move(i, 1)"
+                          [disabled]="i === content().details.length - 1"
+                          [attr.aria-label]="
+                            t('knowledge.moveDown') + ' ' + (i + 1)
+                          "
+                        >
+                          ↓</button
+                        ><button
+                          type="button"
+                          (click)="remove(i)"
+                          [attr.aria-label]="
+                            t('knowledge.remove') + ' ' + (i + 1)
+                          "
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <textarea
-                    [id]="'block-' + i"
-                    [name]="'block-' + i"
-                    [ngModel]="item.text"
-                    (ngModelChange)="block(i, {text: $event})"
-                    [rows]="item.type === 'code' ? 6 : item.type === 'heading' ? 1 : 3"
-                    maxlength="30000"
-                    [spellcheck]="item.type !== 'code'"
-                    [class.font-mono]="item.type === 'code'"
-                    aria-describedby="details-hint"
-                    [placeholder]="t('knowledge.placeholders.' + item.type)"
-                  ></textarea>
-                  @if (item.type === 'link') {
-                  <div class="knowledge-link-input">
-                    <label [for]="'url-' + i">{{ t('knowledge.url') }}</label
-                    ><input
-                      [id]="'url-' + i"
-                      [name]="'url-' + i"
-                      type="url"
-                      [ngModel]="item.url"
-                      (ngModelChange)="block(i, {url: $event})"
-                      placeholder="https://"
+                    <textarea
+                      [id]="'block-' + i"
+                      [name]="'block-' + i"
+                      [ngModel]="item.text"
+                      (ngModelChange)="block(i, { text: $event })"
+                      [rows]="
+                        item.type === 'code'
+                          ? 6
+                          : item.type === 'heading'
+                            ? 1
+                            : 3
+                      "
                       maxlength="30000"
-                    />
+                      [spellcheck]="item.type !== 'code'"
+                      [class.font-mono]="item.type === 'code'"
+                      aria-describedby="details-hint"
+                      [placeholder]="t('knowledge.placeholders.' + item.type)"
+                    ></textarea>
+                    @if (item.type === "link") {
+                      <div class="knowledge-link-input">
+                        <label [for]="'url-' + i">{{
+                          t("knowledge.url")
+                        }}</label
+                        ><input
+                          [id]="'url-' + i"
+                          [name]="'url-' + i"
+                          type="url"
+                          [ngModel]="item.url"
+                          (ngModelChange)="block(i, { url: $event })"
+                          placeholder="https://"
+                          maxlength="30000"
+                        />
+                      </div>
+                    }
                   </div>
-                  }
-                </div>
                 }
               </div>
             </div>
@@ -204,44 +226,47 @@
                 class="text-link"
                 (click)="preview.set(!preview())"
               >
-                {{ t(preview() ? 'knowledge.hidePreview' : 'knowledge.preview')
+                {{
+                  t(preview() ? "knowledge.hidePreview" : "knowledge.preview")
                 }}
               </button>
             </div>
             @if (preview()) {
-            <section
-              class="knowledge-preview"
-              [attr.aria-label]="t('knowledge.preview')"
-            >
-              <app-details-view [blocks]="content().details" />
-            </section>
+              <section
+                class="knowledge-preview"
+                [attr.aria-label]="t('knowledge.preview')"
+              >
+                <app-details-view [blocks]="content().details" />
+              </section>
             }
           </div>
-          <p class="knowledge-hint">✧ {{ t('knowledge.aiHint') }}</p>
+          <p class="knowledge-hint">✧ {{ t("knowledge.aiHint") }}</p>
         </fieldset>
         @if (store.error()) {
-        <p role="alert" class="form-alert">{{ t(store.error()) }}</p>
-        <p class="knowledge-hint">{{ t('knowledge.retryHint') }}</p>
+          <p role="alert" class="form-alert">{{ t(store.error()) }}</p>
+          <p class="knowledge-hint">{{ t("knowledge.retryHint") }}</p>
         }
         <div class="knowledge-publish">
           <p>
-            {{ t('knowledge.visibility') }}<br /><span
-              >{{ t('knowledge.autoAttributes') }}</span
-            >
+            {{ t("knowledge.visibility") }}<br /><span>{{
+              t("knowledge.autoAttributes")
+            }}</span>
           </p>
           <button
             class="button"
-            [disabled]="!valid() || store.busy() || store.refining()"
+            [disabled]="
+              workspaceChanged() || !valid() || store.busy() || store.refining()
+            "
           >
-            {{ t(store.busy() ? 'knowledge.publishing' : 'knowledge.publish') }}
+            {{ t(store.busy() ? "knowledge.publishing" : "knowledge.publish") }}
           </button>
         </div>
       </form>
     </div>
     <aside class="knowledge-sidebar">
-      <p class="eyebrow">{{ t('knowledge.beforeShare') }}</p>
-      <h2>{{ t('knowledge.polish') }}</h2>
-      <p>{{ t('knowledge.polishIntro') }}</p>
+      <p class="eyebrow">{{ t("knowledge.beforeShare") }}</p>
+      <h2>{{ t("knowledge.polish") }}</h2>
+      <p>{{ t("knowledge.polishIntro") }}</p>
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
@@ -249,7 +274,7 @@
           [disabled]="!canRefine('title')"
           (click)="refine('title')"
         >
-          {{ t('knowledge.refineTitle') }}
+          {{ t("knowledge.refineTitle") }}
         </button>
         <button
           type="button"
@@ -257,37 +282,39 @@
           [disabled]="!canRefine('capture')"
           (click)="refine('capture')"
         >
-          {{ t('knowledge.refineCapture') }}
+          {{ t("knowledge.refineCapture") }}
         </button>
       </div>
       @if (store.refining()) {
-      <p role="status">{{ t('knowledge.refining') }}</p>
-      } @if (store.refinementError()) {
-      <p role="alert" class="form-alert">{{ t(store.refinementError()) }}</p>
-      } @if (store.suggestion(); as suggestion) {
-      <section class="knowledge-suggestion" aria-live="polite">
-        <h3>{{ t('knowledge.suggestion') }}</h3>
-        <h4>{{ t('knowledge.fields.' + suggestion.field) }}</h4>
-        <p>{{ suggestion.text }}</p>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" class="button" (click)="accept()">
-            {{ t('knowledge.accept') }}</button
-          ><button
-            type="button"
-            class="button secondary"
-            (click)="store.discard()"
-          >
-            {{ t('knowledge.discard') }}
-          </button>
-        </div>
-      </section>
+        <p role="status">{{ t("knowledge.refining") }}</p>
+      }
+      @if (store.refinementError()) {
+        <p role="alert" class="form-alert">{{ t(store.refinementError()) }}</p>
+      }
+      @if (store.suggestion(); as suggestion) {
+        <section class="knowledge-suggestion" aria-live="polite">
+          <h3>{{ t("knowledge.suggestion") }}</h3>
+          <h4>{{ t("knowledge.fields." + suggestion.field) }}</h4>
+          <p>{{ suggestion.text }}</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="button" (click)="accept()">
+              {{ t("knowledge.accept") }}</button
+            ><button
+              type="button"
+              class="button secondary"
+              (click)="store.discard()"
+            >
+              {{ t("knowledge.discard") }}
+            </button>
+          </div>
+        </section>
       }
       <hr />
-      <h3>{{ t('knowledge.organizationVisibility') }}</h3>
-      <p>{{ t('knowledge.organizationHint') }}</p>
-      <h3>{{ t('knowledge.attributes') }}</h3>
-      <p>{{ t('knowledge.attributeHint') }}</p>
-      <p class="knowledge-hint">{{ t('knowledge.externalAi') }}</p>
+      <h3>{{ t("knowledge.workspaceVisibility") }}</h3>
+      <p>{{ t("knowledge.workspaceHint") }}</p>
+      <h3>{{ t("knowledge.attributes") }}</h3>
+      <p>{{ t("knowledge.attributeHint") }}</p>
+      <p class="knowledge-hint">{{ t("knowledge.externalAi") }}</p>
     </aside>
   </main>
 </ng-container>

@@ -1,3 +1,4 @@
+import { workspaceInterceptor } from './core/workspace.interceptor';
 import {
   ApplicationConfig,
   inject,
@@ -22,7 +23,11 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes),
     provideHttpClient(
-      withInterceptors([sessionRefreshInterceptor, apiTimeoutInterceptor]),
+      withInterceptors([
+        workspaceInterceptor,
+        sessionRefreshInterceptor,
+        apiTimeoutInterceptor,
+      ]),
     ),
     provideTransloco({
       config: {

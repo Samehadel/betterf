@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test';
 
 const account = {
   id: 'author',
-  organizationId: 'org',
+  workspaceId: 'org',
   fullName: 'Ada',
-  organizationName: 'Acme',
+  workspaceName: 'Acme',
   accessRole: 'MEMBER',
 };
 const summary = (i: number, detailsType = 'Coding') => ({
   id: `ticket-${i}`,
-  title: `Reliable retries ${i}: keeping context for the whole organization`,
+  title: `Reliable retries ${i}: keeping context for the whole workspace`,
   capturePreview:
     'Reuse the original key. Keep a compact explanation of the context and the outcome so your colleagues can apply it.',
   detailsType,
@@ -32,7 +32,10 @@ for (const width of [1440, 390]) {
     let calls = 0;
     await page.route('**/api/**', async (route) => {
       const url = new URL(route.request().url());
-      if (url.pathname === '/api/auth/me')
+      if (
+        url.pathname === '/api/auth/me' ||
+        url.pathname.startsWith('/api/workspaces/')
+      )
         return route.fulfill({ json: { data: account } });
       if (url.pathname === '/api/knowledge/tickets') {
         calls++;
@@ -175,7 +178,7 @@ test('detail polling preserves content on failure and clears it after access den
   await page.clock.install();
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === '/api/auth/me')
+    if (path === '/api/auth/me' || path.startsWith('/api/workspaces/'))
       return route.fulfill({ json: { data: account } });
     if (path.startsWith('/api/knowledge/tickets/')) {
       reads++;
@@ -185,7 +188,7 @@ test('detail polling preserves content on failure and clears it after access den
           status: 404,
           json: {
             error: {
-              message: 'This ticket is unavailable in your organization.',
+              message: 'This ticket is unavailable in your workspace.',
             },
           },
         });

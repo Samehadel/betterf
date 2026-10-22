@@ -1,3 +1,4 @@
+import { AuthStore } from '../core/auth.store';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -19,6 +20,7 @@ import { attributeLabels, fullDate, templates } from './knowledge.models';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BrowsePage {
+  readonly auth = inject(AuthStore);
   readonly store = inject(BrowseStore);
   readonly templates = templates;
   readonly labels = attributeLabels;

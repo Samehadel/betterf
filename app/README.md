@@ -64,15 +64,15 @@ Use Ctrl-C in each application terminal and `docker compose down` to stop suppor
 
 ## Configuration
 
-| Variable | Purpose / default |
-|---|---|
-| `DB_PASSWORD` | Required local PostgreSQL password |
-| `DB_USER` | Required backend username; `.env.example` uses `postgres` |
-| `DB_PORT` | Compose host database port, `5432` |
-| `DB_URL` | Backend JDBC URL, `jdbc:postgresql://127.0.0.1:5432/betterf` |
-| `SERVER_PORT` | Backend port, `8080` |
-| `BACKEND_URL` | Angular development proxy target, `http://127.0.0.1:8080` |
-| `SERVER_ADDRESS` | Backend bind address, `127.0.0.1` |
+| Variable         | Purpose / default                                            |
+| ---------------- | ------------------------------------------------------------ |
+| `DB_PASSWORD`    | Required local PostgreSQL password                           |
+| `DB_USER`        | Required backend username; `.env.example` uses `postgres`    |
+| `DB_PORT`        | Compose host database port, `5432`                           |
+| `DB_URL`         | Backend JDBC URL, `jdbc:postgresql://127.0.0.1:5432/betterf` |
+| `SERVER_PORT`    | Backend port, `8080`                                         |
+| `BACKEND_URL`    | Angular development proxy target, `http://127.0.0.1:8080`    |
+| `SERVER_ADDRESS` | Backend bind address, `127.0.0.1`                            |
 
 If changing `DB_PORT`, change the port in `DB_URL` too. If changing `SERVER_PORT`, update `BACKEND_URL`. Browser requests use relative `/api` URLs. The production frontend build requires a host serving the SPA and proxying `/api` on the same origin; production deployment is not supplied by this story.
 
@@ -152,7 +152,6 @@ For the first AWS development pipeline and server setup, see
 repository setting and AWS resources are configured.
 
 English is the temporary foundation resource language, not a decision on supported product languages. Organization onboarding and session authentication are implemented in the identity module. Member acceptance, invitation management, and password recovery remain separate work. No demonstration product accounts are installed.
-
 
 ## Organization registration (BTF-5)
 
@@ -292,7 +291,7 @@ requests rejected by authentication before execution. Refresh credentials rotate
 live in a Secure, HttpOnly, SameSite=Strict cookie scoped to `/api/auth`; the database
 stores only hashes. `REFRESH_TOKEN_LIFETIME` defaults to `14d` with an absolute expiry.
 Logout revokes this browser's refresh credential. Password changes and inactive
-accounts/organizations prevent renewal. Sessions established before this deployment
+accounts prevent renewal; workspace access is revalidated separately. Sessions established before this deployment
 need one new login to obtain a refresh cookie.
 
 Anonymous protected requests now return `401 AUTHENTICATION_REQUIRED`; CSRF rejection
@@ -305,11 +304,9 @@ Apply the additive refresh-session migration with the backend deployment and dep
 the matching frontend. Architecture consulted: `16a2955` on architecture `origin/main`;
 the proposed decision is in `architecture/decisions/0005-session-refresh.md`.
 
-
 ## Knowledge capture and monitoring
 
-Active members and administrators can open **Capture knowledge** from organization
-home. Title and Details are required; Capture is optional. Refine Title or Capture
+Active members and administrators can open **Capture knowledge** from Knowledge. Title and Details are required; Capture is optional. Refine Title or Capture
 independently and accept each suggestion separately. Refinement rephrases only
 the selected field's existing text; blank Capture cannot be refined. Prompts live
 in backend `resources/prompts/knowledge/*.st`. Details are never refinement context.
@@ -318,7 +315,7 @@ Set the server-only `OPENAI_API_KEY` for Spring AI ChatClient with OpenAI
 `gpt-5.4-nano`. Startup requires a nonblank API key. After startup, AI suggestions
 are optional; an unavailable provider does not prevent
 publication. Title, Capture, and Details are sent to the provider without author or
-organization metadata. Content sanitization is deferred by the product owner's
+workspace metadata. Content sanitization is deferred by the product owner's
 explicit decision, so embedded sensitive text is not redacted.
 
 Classification makes up to three attempts and preserves publication on failure.
@@ -330,11 +327,10 @@ The Details block format and catalog are documented in
 Public Actuator probes are `/actuator/health/liveness` and
 `/actuator/health/readiness` (database readiness). Aggregate `/actuator/health`
 also checks configured SMTP. `/actuator/info`, `/actuator/metrics`, and
-`/actuator/prometheus` require an active administrator session. JVM and HTTP metrics
+`/actuator/prometheus` are denied to ordinary product accounts; workspace ownership grants no platform operator access. JVM and HTTP metrics
 are available; `betterf.knowledge.classification` records completed and failed
 classification attempts. The deployment proxy forwards these protected endpoints;
 no deployment has been performed as part of this story.
-
 
 The knowledge ChatClient and model initialize lazily and share the application's
 observation and meter registries. OpenAI calls use `reasoning-effort: none`,
@@ -343,3 +339,13 @@ The browser and proxy allow 50 and 55 seconds respectively for refinement.
 `SimpleLoggerAdvisor` is installed with advisor parameter `provider=openai`.
 Its request/response logging is available at DEBUG via
 `logging.level.org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor=DEBUG`.
+
+## Accounts and workspaces
+
+`/signup` requests full name, email and password. Email activation creates a ready-to-use default workspace. `/register` redirects to signup; the organization registration flow is removed. The workspace picker selects among memberships, and `/workspace` offers owner-only rename. Signup assigns the default workspace automatically; users do not need a create-workspace step.
+
+Workspace invitations add membership alongside the default workspace. Existing accounts sign in and explicitly accept; pending accounts use their original password. Invitations never replace credentials or existing memberships. New social signup is unavailable in this delivery; stored provider links and trusted linking/login support remain intact.
+
+Deploy the matching backend and frontend after taking a database backup and stopping old backend instances. The new versioned workspace migration preserves existing IDs, credentials and content and replaces organization/account classifications with workspace memberships. Invalidate old sessions at rollout. Restore the backup and old binaries for rollback; do not run old binaries against the new schema.
+
+Knowledge and invitation APIs require `X-Workspace-Id`. See [OpenAPI](backend/src/main/resources/openapi.yaml) and [workspace identity design](../architecture/backend/workspace-identity.md).
