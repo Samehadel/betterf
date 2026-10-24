@@ -2,8 +2,8 @@
 
 The root `.github/workflows/ci.yml` runs application checks, publishes the tested
 backend and frontend as GHCR images, and deploys their immutable digests to one
-x86_64 Ubuntu EC2 server through Systems Manager. Only `develop` can publish or
-deploy. Pull requests run checks only.
+x86_64 Ubuntu EC2 server through Systems Manager. Pushes to `main` and manual
+Actions runs on `main` can publish and deploy. Pull requests run checks only.
 
 Deployment is disabled until the repository Actions variable
 `AWS_DEPLOY_ENABLED` is set to `true`. Keep it unset while preparing AWS.
@@ -29,17 +29,23 @@ Deployment is disabled until the repository Actions variable
    `development` environment. In IAM, add the GitHub OIDC provider with audience
    `sts.amazonaws.com`, create `betterf-github-deploy` using the trust policy,
    and attach the permissions policy as an inline policy.
-5. Create the GitHub environment `development`, restrict it to the `develop`
+5. Create the GitHub environment `development`, restrict it to the `main`
    branch, and set environment variables `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`,
    and `EC2_INSTANCE_ID`. The OIDC trust subject must match this environment.
 6. Set the **repository** variable `AWS_DEPLOY_ENABLED=true`. After these files
    are committed and pushed, run “BetterF checks and deployment” from Actions on
-   `develop`, or push a new commit to `develop`.
+   `main`, or push a new commit to `main`.
 7. Check the deploy job's SSM result, then visit the server's public IP and
    `/status`. Limit inbound HTTP to your own IP for this development setup.
 
 The workflow reads the files in this directory. Changes to server-side Compose or `deploy.sh` must be copied to EC2
 explicitly before deploying code that depends on them.
+
+For an existing environment restricted to `develop`, update its deployment branch
+policy to allow `main` before running deployment. To deploy manually, open GitHub
+Actions, select “BetterF checks and deployment”, choose **Run workflow**, select
+`main`, and run it. `AWS_DEPLOY_ENABLED` must be `true` for either trigger to
+publish images and deploy; when disabled, only the checks run.
 
 ## Operation and recovery
 
