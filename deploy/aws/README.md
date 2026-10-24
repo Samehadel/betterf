@@ -28,7 +28,7 @@ Deployment is disabled until the repository Actions variable
    They target account `129896631580`, region `eu-central-1`, and instance
    `i-0c895901443d5905b`. The trust policy uses the verified immutable GitHub
    subject prefix `repo:Samehadel@24625713/theeverthread@1380628408` and the
-   `development` environment. In IAM, add the GitHub OIDC provider with audience
+   `production` environment. In IAM, add the GitHub OIDC provider with audience
    `sts.amazonaws.com`, create `theeverthread-github-deploy` using the trust policy,
    and attach the permissions policy as an inline policy.
 5. Create the GitHub environment `production`, restrict it to the `main`
@@ -36,7 +36,7 @@ Deployment is disabled until the repository Actions variable
    and `EC2_INSTANCE_ID`. The OIDC trust subject must match this environment.
 6. Set the **repository** variable `AWS_DEPLOY_ENABLED=true`. After these files
    are committed and pushed, run “theeverthread checks and deployment” from Actions on
-   `develop`, or push a new commit to `main`.
+   `main`, or push a new commit to `main`.
 7. Check the deploy job's SSM result, then visit the server's public IP and
    `/status`. Limit inbound HTTP to your own IP for this development setup.
 
@@ -45,9 +45,15 @@ explicitly before deploying code that depends on them.
 
 For an existing environment restricted to `develop`, update its deployment branch
 policy to allow `main` before running deployment. To deploy manually, open GitHub
-Actions, select “BetterF checks and deployment”, choose **Run workflow**, select
+Actions, select “theeverthread checks and deployment”, choose **Run workflow**, select
 `main`, and run it. `AWS_DEPLOY_ENABLED` must be `true` for either trigger to
 publish images and deploy; when disabled, only the checks run.
+
+When changing the GitHub environment from `development` to `production`, update
+the AWS deploy role's trust policy to match `github-trust-policy.json`. The OIDC
+subject includes the environment name, so changing the workflow alone is not
+enough to grant AWS access. Configure `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, and
+`EC2_INSTANCE_ID` on the `production` environment.
 
 ## Operation and recovery
 

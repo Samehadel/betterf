@@ -161,7 +161,7 @@ jobs:
         run: |
           for key in AWS_REGION AWS_DEPLOY_ROLE_ARN EC2_INSTANCE_ID; do
             if [[ -z "${!key}" ]]; then
-              echo "::error::Missing development environment variable: $key"
+              echo "::error::Missing production environment variable: $key"
               exit 1
             fi
           done
