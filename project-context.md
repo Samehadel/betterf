@@ -4,8 +4,8 @@ This file maps project work to its business and architecture sources. Working in
 
 ## Project and paths
 
-- Project name: `betterf`
-- Application repository URL: `https://github.com/Samehadel/betterf.git`
+- Project name: `theeverthread`
+- Application repository URL: `https://github.com/Samehadel/theeverthread.git`
 - Application checkout: workspace root (`./`); implementation directories remain under `app/`.
 - Layout override: the current application Git repository is at the workspace root; `architecture/` remains a separate ignored repository. Run application Git commands from the workspace root. CI workflows live in `.github/workflows/`.
 - Backend implementation: `app/backend/`
@@ -25,7 +25,7 @@ Use the task's issue identifier or link to locate the relevant requirements with
 
 ## Architecture
 
-- Repository URL: `https://github.com/Samehadel/betterf-architecture.git`
+- Repository URL: `https://github.com/Samehadel/theeverthread-architecture.git`
 - Local checkout: `architecture/`
 - Remote name: `origin`
 - Tracking branch: `main`

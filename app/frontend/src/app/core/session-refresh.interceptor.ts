@@ -85,7 +85,7 @@ export class SessionRefresh {
     // Serialize cookie rotation across tabs and reuse an already-restored session.
     return from(
       (async () =>
-        await navigator.locks.request('betterf-session-refresh', () =>
+        await navigator.locks.request('theeverthread-session-refresh', () =>
           firstValueFrom(this.sharedSession()),
         ))(),
     );

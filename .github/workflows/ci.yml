@@ -1,5 +1,7 @@
-name: BetterF checks and deployment
+name: theeverthread checks and deployment
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened]
   workflow_dispatch:
@@ -47,7 +49,7 @@ jobs:
           set -a
           source .env
           set +a
-          java -jar backend/build/libs/app.jar > /tmp/betterf-backend.log 2>&1 &
+          java -jar backend/build/libs/app.jar > /tmp/theeverthread-backend.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true; docker compose down -v' EXIT
           ready=0
@@ -55,7 +57,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/actuator/health/readiness; then ready=1; break; fi
             sleep 2
           done
-          if [ "$ready" != 1 ]; then cat /tmp/betterf-backend.log; exit 1; fi
+          if [ "$ready" != 1 ]; then cat /tmp/theeverthread-backend.log; exit 1; fi
           cd frontend
           npm run test:e2e
       - uses: actions/upload-artifact@v4
@@ -82,7 +84,7 @@ jobs:
 
   publish:
     needs: verify
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop' && vars.AWS_DEPLOY_ENABLED == 'true'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -108,11 +110,11 @@ jobs:
       - name: Choose lowercase image names
         id: names
         env:
-          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
-          repository="${REPOSITORY,,}"
-          echo "backend=ghcr.io/${repository}-backend" >> "$GITHUB_OUTPUT"
-          echo "frontend=ghcr.io/${repository}-frontend" >> "$GITHUB_OUTPUT"
+          owner="${REPOSITORY_OWNER,,}"
+          echo "backend=ghcr.io/${owner}/theeverthread-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${owner}/theeverthread-frontend" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -144,7 +146,7 @@ jobs:
     timeout-minutes: 25
     environment: development
     concurrency:
-      group: betterf-development-deployment
+      group: theeverthread-development-deployment
       cancel-in-progress: false
     permissions:
       contents: read
@@ -163,6 +165,10 @@ jobs:
               exit 1
             fi
           done
+          if [[ ! "$AWS_DEPLOY_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/.+ ]]; then
+            echo "::error::AWS_DEPLOY_ROLE_ARN must be an IAM role ARN, not an EC2 instance ARN"
+            exit 1
+          fi
       - uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}

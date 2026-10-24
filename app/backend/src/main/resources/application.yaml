@@ -17,9 +17,9 @@ spring:
       pool:
         size: 2
   application:
-    name: betterf
+    name: theeverthread
   datasource:
-    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/betterf}
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/${DB_NAME:theeverthread}}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
@@ -75,7 +75,7 @@ management:
         readiness:
           include: readinessState,db
 
-betterf:
+theeverthread:
   oauth:
     linkedin:
       client-id: ${LINKEDIN_CLIENT_ID:}
@@ -88,6 +88,6 @@ betterf:
     refresh-lifetime: ${REFRESH_TOKEN_LIFETIME:14d}
   registration:
     public-origin: ${PUBLIC_ORIGIN:http://127.0.0.1:4200}
-    mail-from: ${MAIL_FROM:no-reply@betterf.local}
+    mail-from: ${MAIL_FROM:no-reply@theeverthread.local}
   invitations:
     max-active-accounts: ${INVITATION_MAX_ACTIVE_ACCOUNTS:10}

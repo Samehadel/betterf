@@ -1,5 +1,5 @@
 {
-  "name": "betterf-frontend",
+  "name": "theeverthread-frontend",
   "version": "0.1.1",
   "scripts": {
     "start": "ng serve --host 127.0.0.1 --proxy-config proxy.conf.cjs",

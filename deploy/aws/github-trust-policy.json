@@ -3,13 +3,13 @@
   "Statement": [{
     "Effect": "Allow",
     "Principal": {
-      "Federated": "arn:aws:iam::975050244178:oidc-provider/token.actions.githubusercontent.com"
+      "Federated": "arn:aws:iam::129896631580:oidc-provider/token.actions.githubusercontent.com"
     },
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
       "StringEquals": {
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:Samehadel@24625713/betterf@1380628408:environment:development"
+        "token.actions.githubusercontent.com:sub": "repo:Samehadel@24625713/theeverthread@1380628408:environment:development"
       }
     }
   }]
