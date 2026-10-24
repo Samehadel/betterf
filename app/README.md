@@ -1,4 +1,6 @@
-# BetterF application foundation
+# theeverthread application foundation
+
+Existing installations: follow the [rename and deployment cutover](../docs/RENAMING.md) before starting the renamed stack.
 
 Implementation of [BTF-3](https://linear.app/betterf/issue/BTF-3). Spring Boot backend, Angular shell, PostgreSQL, Liquibase, and automated checks. BTF-5 adds organization registration, administrator email verification, and password-based account access.
 
@@ -22,8 +24,8 @@ The checked-in Gradle 9.7.1 wrapper downloads its distribution and verifies the 
 Clone the application repository and enter its `app/` directory:
 
 ```bash
-git clone https://github.com/Samehadel/betterf.git
-cd betterf/app
+git clone https://github.com/Samehadel/theeverthread.git
+cd theeverthread/app
 cp .env.example .env
 ```
 
@@ -36,7 +38,7 @@ npm ci
 cd ..
 ```
 
-PostgreSQL listens only on loopback, uses database `betterf`, and persists in the project-owned `betterf_postgres-data` volume. On first startup PostgreSQL initializes credentials from `.env`. Changing `.env` later does not change a password already stored in that volume.
+PostgreSQL listens only on loopback, uses database `theeverthread`, and persists in the project-owned `theeverthread_postgres-data` volume. On first startup PostgreSQL initializes credentials from `.env`. Changing `.env` later does not change a password already stored in that volume.
 
 ## Run
 
@@ -69,7 +71,9 @@ Use Ctrl-C in each application terminal and `docker compose down` to stop suppor
 | `DB_PASSWORD`    | Required local PostgreSQL password                           |
 | `DB_USER`        | Required backend username; `.env.example` uses `postgres`    |
 | `DB_PORT`        | Compose host database port, `5432`                           |
-| `DB_URL`         | Backend JDBC URL, `jdbc:postgresql://127.0.0.1:5432/betterf` |
+| `DB_NAME`        | Local Compose database name; defaults to `theeverthread` |
+| `POSTGRES_VOLUME` | Local PostgreSQL volume; defaults to `theeverthread_postgres-data` |
+| `DB_URL`         | Backend JDBC URL, `jdbc:postgresql://127.0.0.1:5432/theeverthread` |
 | `SERVER_PORT`    | Backend port, `8080`                                         |
 | `BACKEND_URL`    | Angular development proxy target, `http://127.0.0.1:8080`    |
 | `SERVER_ADDRESS` | Backend bind address, `127.0.0.1`                            |
@@ -85,9 +89,9 @@ The scheduler calls the worker through its Spring proxy so `@SchedulerLock` also
 protects direct worker invocations. Competing invocations skip work; the lease is
 released after completion or failure. Database time controls lease expiry.
 
-`betterf.registration.delivery.enabled=false` disables automatic delivery, and
-`betterf.registration.delivery.delay` defaults to 5000 milliseconds.
-`betterf.registration.delivery.lock-at-most-for` defaults to `10m`; keep it longer
+`theeverthread.registration.delivery.enabled=false` disables automatic delivery, and
+`theeverthread.registration.delivery.delay` defaults to 5000 milliseconds.
+`theeverthread.registration.delivery.lock-at-most-for` defaults to `10m`; keep it longer
 than the maximum duration of a 25-email batch, including SMTP and database calls.
 An invocation still running after lease expiry can overlap another worker.
 
@@ -191,8 +195,8 @@ Email sending runs in a background worker every five seconds, in batches of 25.
 A PostgreSQL session advisory lock on a dedicated connection prevents overlapping
 runs across application instances. Use direct PostgreSQL or session pooling;
 transaction-mode PgBouncer cannot hold this lock. Allow at least two connections
-per worker instance. `BETTERF_REGISTRATION_DELIVERY_ENABLED=false` disables the
-scheduler; `BETTERF_REGISTRATION_DELIVERY_DELAY` sets its interval in milliseconds.
+per worker instance. `THEEVERTHREAD_REGISTRATION_DELIVERY_ENABLED=false` disables the
+scheduler; `THEEVERTHREAD_REGISTRATION_DELIVERY_DELAY` sets its interval in milliseconds.
 
 The additive migration converts existing SENT records to SMTP_ACCEPTED and schedules
 existing PENDING/FAILED records. Stop old application instances before applying it:
@@ -238,7 +242,7 @@ SESSION_COOKIE_SECURE=false
 ```
 
 Use HTTPS and `SESSION_COOKIE_SECURE=true` outside local HTTP development. The SMTP
-login and MAIL_FROM are different settings. The default `no-reply@betterf.local`
+login and MAIL_FROM are different settings. The default `no-reply@theeverthread.local`
 is rejected for remote SMTP with `SMTP_FROM_NOT_CONFIGURED`. Authentication errors
 use `SMTP_AUTHENTICATION_FAILED`; other submission failures use `SMTP_DELIVERY_FAILED`.
 Fix configuration and restart; FAILED rows retry when due.
@@ -319,8 +323,8 @@ workspace metadata. Content sanitization is deferred by the product owner's
 explicit decision, so embedded sensitive text is not redacted.
 
 Classification makes up to three attempts and preserves publication on failure.
-`betterf.knowledge.classification.enabled=false` disables the scheduler;
-`betterf.knowledge.classification.delay` changes its five-second default interval.
+`theeverthread.knowledge.classification.enabled=false` disables the scheduler;
+`theeverthread.knowledge.classification.delay` changes its five-second default interval.
 The Details block format and catalog are documented in
 [the knowledge contract](../architecture/backend/knowledge-capture.md).
 
@@ -328,7 +332,7 @@ Public Actuator probes are `/actuator/health/liveness` and
 `/actuator/health/readiness` (database readiness). Aggregate `/actuator/health`
 also checks configured SMTP. `/actuator/info`, `/actuator/metrics`, and
 `/actuator/prometheus` are denied to ordinary product accounts; workspace ownership grants no platform operator access. JVM and HTTP metrics
-are available; `betterf.knowledge.classification` records completed and failed
+are available; `theeverthread.knowledge.classification` records completed and failed
 classification attempts. The deployment proxy forwards these protected endpoints;
 no deployment has been performed as part of this story.
 

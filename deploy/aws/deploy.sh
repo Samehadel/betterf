@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-cd /opt/betterf
+cd /opt/theeverthread
 
 # Serialize manual and automated deployments on this server.
-exec 9>/opt/betterf/deploy.lock
+exec 9>/opt/theeverthread/deploy.lock
 flock -n 9 || { echo 'Another deployment is running'; exit 1; }
 
 [[ $# == 2 ]] || { echo 'Usage: deploy.sh BACKEND_DIGEST FRONTEND_DIGEST'; exit 2; }
@@ -16,8 +16,8 @@ done
 
 printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\n' "$1" "$2" > candidate.env
 compose() {
-  docker compose --env-file /opt/betterf/secrets.env --env-file "$1" \
-    -f /opt/betterf/compose.yaml "${@:2}"
+  docker compose --env-file /opt/theeverthread/secrets.env --env-file "$1" \
+    -f /opt/theeverthread/compose.yaml "${@:2}"
 }
 
 # Pull before changing the running application. Database image is managed separately.

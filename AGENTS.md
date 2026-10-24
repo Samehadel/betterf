@@ -5,7 +5,7 @@
 These instructions apply to work across this project workspace:
 
 ```text
-betterf/
+theeverthread/
 ├── AGENTS.md
 ├── architecture/       # Architecture Git repository
 │   ├── README.md

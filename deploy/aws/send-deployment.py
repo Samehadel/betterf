@@ -23,7 +23,7 @@ for ref in (backend, frontend):
 if not re.fullmatch(r"i-[a-f0-9]+", instance):
     raise SystemExit("Invalid instance ID")
 
-command = shlex.join(["/opt/betterf/deploy.sh", backend, frontend])
+command = shlex.join(["/opt/theeverthread/deploy.sh", backend, frontend])
 result = aws(
     "send-command", "--instance-ids", instance,
     "--document-name", "AWS-RunShellScript",

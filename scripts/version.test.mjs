@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 function fixture(t, version = '0.2.0-rc.1') {
-  const root = mkdtempSync(join(tmpdir(), 'betterf-version-'));
+  const root = mkdtempSync(join(tmpdir(), 'theeverthread-version-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'scripts'));
   mkdirSync(join(root, 'app/frontend'), { recursive: true });

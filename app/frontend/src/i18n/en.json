@@ -14,8 +14,8 @@
   },
   "landing": {
     "skip_to_content": "Skip to content",
-    "betterf": "betterf",
-    "why_betterf": "Why theeverthread",
+    "theeverthread": "theeverthread",
+    "why_theeverthread": "Why theeverthread",
     "the_vision": "The vision",
     "explore_the_vision": "Explore the vision ",
     "workspaceal_memory_made_useful": "Workspaceal memory, made useful",
@@ -59,7 +59,7 @@
     "connect_description": "Keep useful context connected to the work and people it came from.",
     "reuse_description": "Help the next person build on what your team has already learned.",
     "closing_description": "Discover the vision for preserving what your team learns.",
-    "footer": "betterf. / Workspaceal memory, made useful",
+    "footer": "theeverthread. / Workspaceal memory, made useful",
     "preview_shortcut": "⌘ K"
   },
   "identity": {
