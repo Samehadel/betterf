@@ -1,4 +1,4 @@
-name: theeverthread-dev
+name: theeverthread-prod
 
 x-logging: &logging
   driver: json-file
@@ -14,7 +14,7 @@ services:
       DB_URL: ${DB_URL:?DB_URL is required}
       DB_USER: ${DB_USER:?DB_USER is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://127.0.0.1:4200}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://theeverthread.com}
       MAIL_FROM: ${MAIL_FROM:-no-reply@theeverthread.local}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-unconfigured}
       SMTP_HOST: ${SMTP_HOST:-127.0.0.1}

@@ -9,7 +9,7 @@
     "Condition": {
       "StringEquals": {
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:Samehadel@24625713/theeverthread@1380628408:environment:development"
+        "token.actions.githubusercontent.com:sub": "repo:Samehadel@24625713/theeverthread@1380628408:environment:production"
       }
     }
   }]
