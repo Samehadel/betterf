@@ -7,7 +7,7 @@
       "Action": "ssm:SendCommand",
       "Resource": [
         "arn:aws:ssm:eu-central-1::document/AWS-RunShellScript",
-        "arn:aws:ec2:eu-central-1:129896631580:instance/i-0c895901443d5905b"
+        "arn:aws:ec2:eu-central-1:129896631580:instance/i-i-0bfc9d538cefca896"
       ]
     },
     {
