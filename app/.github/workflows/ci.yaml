@@ -39,7 +39,7 @@ jobs:
           set -a
           source .env
           set +a
-          java -jar backend/build/libs/backend-0.0.1-SNAPSHOT.jar > /tmp/betterf-backend.log 2>&1 &
+          java -jar backend/build/libs/app.jar > /tmp/theeverthread-backend.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" 2>/dev/null || true; docker compose down -v' EXIT
           ready=0
@@ -47,7 +47,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/actuator/health/readiness; then ready=1; break; fi
             sleep 2
           done
-          if [ "$ready" != 1 ]; then cat /tmp/betterf-backend.log; exit 1; fi
+          if [ "$ready" != 1 ]; then cat /tmp/theeverthread-backend.log; exit 1; fi
           cd frontend
           npm run test:e2e
       - uses: actions/upload-artifact@v4

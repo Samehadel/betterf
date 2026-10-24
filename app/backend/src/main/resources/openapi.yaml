@@ -1065,7 +1065,7 @@ paths:
 
         Rechecks account and workspace status, current role, and password fingerprint.
 
-        On success rotates JSESSIONID, invalidates the CSRF token, and replaces BETTERF_REFRESH.
+        On success rotates JSESSIONID, invalidates the CSRF token, and replaces THEEVERTHREAD_REFRESH.
 
         Fetch CSRF again before retrying a rejected mutation. Never retry uncertain network/server failures.
 
@@ -1203,7 +1203,7 @@ components:
     RefreshCookie:
       type: apiKey
       in: cookie
-      name: BETTERF_REFRESH
+      name: THEEVERTHREAD_REFRESH
       description: HttpOnly, Secure by default, SameSite Strict, Path /api/auth; absolute 14-day lifetime by default.
     SessionCookie:
       type: apiKey

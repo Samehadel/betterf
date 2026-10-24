@@ -7,6 +7,6 @@
 - Routes: `/` is the Orbit landing page; `/status` preserves the backend connection diagnostic. The landing page requires no API or login.
 - Architecture baseline consulted: `ab3aa138af3f1b0d23d12661cc1c5849ab54a5ab`.
 
-The local verification stack uses an isolated Compose project `betterf-develop-check` on PostgreSQL port 55433, with the packaged backend on 8080. Credentials are generated into an owner-readable temporary environment file, never committed. Existing `.env` and database data are preserved.
+The local verification stack uses an isolated Compose project `theeverthread-develop-check` on PostgreSQL port 55433, with the packaged backend on 8080. Credentials are generated into an owner-readable temporary environment file, never committed. Existing `.env` and database data are preserved.
 
 CI is configured to run backend, frontend, and Chromium checks; its remote result is separate from these local checks.
