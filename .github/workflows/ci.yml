@@ -144,7 +144,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    environment: development
+    environment: production
     concurrency:
       group: theeverthread-development-deployment
       cancel-in-progress: false
